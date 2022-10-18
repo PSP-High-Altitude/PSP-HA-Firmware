@@ -2,6 +2,7 @@
 #define SPI_H
 
 // Standard library
+#include <stddef.h>
 #include <stdint.h>
 
 // PSPHAA library
