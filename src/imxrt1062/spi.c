@@ -295,7 +295,7 @@ Status spi_exchange(SpiDevice* dev, uint8_t* tx_buf, uint8_t* rx_buf,
                     << (8 * (3 - byte));  // Combine write data into one word
             }
         }
-        while (spi_base->FSR & 0x1F == (1 << (spi_base->PARAM & 0xFF))) {
+        while ((spi_base->FSR & 0x1F) == (1 << (spi_base->PARAM & 0xFF))) {
         }                         // Wait for the tx FIFO to empty
         spi_base->TDR = tx_data;  // Write data to be sent
     }

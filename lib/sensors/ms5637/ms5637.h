@@ -27,9 +27,6 @@ typedef struct {
 
 #define D_READ_ERROR 0xFFFFFFFF
 
-static uint32_t read_D1(AdcSpeed speed);
-static uint32_t read_D2(AdcSpeed speed);
-
 Status ms5637_init();
 BaroData ms5637_read(AdcSpeed speed);
 

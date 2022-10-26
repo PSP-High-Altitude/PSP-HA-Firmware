@@ -1,5 +1,8 @@
 #include "ms5637.h"
 
+static uint32_t read_D1(AdcSpeed speed);
+static uint32_t read_D2(AdcSpeed speed);
+
 I2cDevice *device;
 CalibrationData data;
 
@@ -118,10 +121,10 @@ BaroData ms5637_read(AdcSpeed speed) {
     uint32_t D1;
     uint32_t D2;
 
-    if (D1 = readD1(speed) == D_READ_ERROR) {
+    if ((D1 = read_D1(speed)) == D_READ_ERROR) {
         return result;
     }
-    if (D2 = readD2(speed) == D_READ_ERROR) {
+    if ((D2 = read_D2(speed)) == D_READ_ERROR) {
         return result;
     }
     int32_t dT = D2 - (data.C5 * 256);
@@ -149,8 +152,6 @@ BaroData ms5637_read(AdcSpeed speed) {
     SENS -= SENS2;
 
     int32_t P = ((D1 * SENS / 2097152) - OFF) / 32768;
-
-    BaroData result;
 
     result.pressure = (float)P / 100;
     result.temperature = (float)TEMP / 100;
