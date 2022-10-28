@@ -6,9 +6,7 @@ static uint32_t read_D2(AdcSpeed speed);
 I2cDevice *device;
 CalibrationData data;
 
-Status ms5637_init(I2cDevice *dev) {
-    device = dev;
-
+Status ms5637_init(I2cDevice* device) {
     uint8_t rx_buf[2];
     uint8_t tx_buf[1] = {0x1E};
 

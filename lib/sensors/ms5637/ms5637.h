@@ -27,7 +27,7 @@ typedef struct {
 
 #define D_READ_ERROR 0xFFFFFFFF
 
-Status ms5637_init();
+Status ms5637_init(I2cDevice* device);
 BaroData ms5637_read(AdcSpeed speed);
 
 #endif // MS5637_H
