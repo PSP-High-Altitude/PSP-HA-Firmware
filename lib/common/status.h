@@ -7,6 +7,7 @@ typedef enum {
     ERROR,
     DATA_ERROR,
     HARDWARE_ERROR,
+    TESTING_ERROR,
 } Status;
 
 #endif  // STATUS_H
