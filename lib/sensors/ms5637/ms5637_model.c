@@ -90,8 +90,8 @@ Status ms5637_model_i2c_read(I2cDevice *device, uint8_t *rx_buf, size_t len) {
         if (len != 2) {
             return TESTING_ERROR;
         }
-        rx_buf[1] = (s_model_prom[prom_addr] >> 8) & 0xFF;
-        rx_buf[2] = (s_model_prom[prom_addr] >> 0) & 0xFF;
+        rx_buf[0] = (s_model_prom[prom_addr] >> 8) & 0xFF;
+        rx_buf[1] = (s_model_prom[prom_addr] >> 0) & 0xFF;
     }
 
     return OK;
