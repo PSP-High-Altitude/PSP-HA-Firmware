@@ -15,6 +15,19 @@ TEST(TestMS5637, Init) {
     EXPECT_EQ(ms5637_init(&device), OK);
 }
 
+TEST(TestMS5637, ReadDefault) {
+    I2cDevice device = {
+        .address = 0b1110110,
+        .clk = I2C_SPEED_FAST,
+        .periph = I2C0,
+    };
+    EXPECT_EQ(ms5637_init(&device), OK);
+
+    BaroData data = ms5637_read(&device, OSR_8192);
+    EXPECT_NEAR(data.pressure, 1100.02, 0.1);
+    EXPECT_NEAR(data.temperature, 20.00, 0.1);
+}
+
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
     if (RUN_ALL_TESTS())
