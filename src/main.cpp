@@ -1,6 +1,8 @@
 #include <Arduino.h>
 #include <stdint.h>
 
+#include "teensy_sd.h"
+
 #define LED_PIN 13
 
 void setup() { pinMode(LED_PIN, OUTPUT); }
@@ -18,4 +20,7 @@ void loop() {
         delay(1000);
     }
     delay(2000);
+
+    SDDevice device{.cs = 1};
+    sd_init(&device);
 }
