@@ -2,12 +2,15 @@
 #include <stdint.h>
 // #include <teensy_sd.h>
 
+extern "C" {
+#include "gpio/gpio.h"
 #include "i2c/i2c.h"
 #include "spi/spi.h"
+}
 
 #define LED_PIN 13
 
-void setup() { pinMode(LED_PIN, OUTPUT); }
+void setup() { gpio_mode(LED_PIN, GPIO_OUTPUT); }
 
 void loop() {
     /*
@@ -23,10 +26,10 @@ void loop() {
         delay(1000);
     }
     */
-    digitalWrite(LED_PIN, HIGH);
-    delay(2000);
-    digitalWrite(LED_PIN, LOW);
-    delay(2000);
+    gpio_write(LED_PIN, GPIO_HIGH);
+    delay(500);
+    gpio_write(LED_PIN, GPIO_LOW);
+    delay(500);
 
     // SDDevice device{.cs = 1};
     // sd_init(&device);

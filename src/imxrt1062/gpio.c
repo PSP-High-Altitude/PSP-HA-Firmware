@@ -1,69 +1,47 @@
 #include "gpio/gpio.h"
-/*
-#include "registers.h"
-#include "stdlib.h"
 
-static GPIO_t *getGpio(uint8_t pin) {
-    GPIO_t *base = NULL;
-    uint8_t gpioGroup = PIN[pin].gpio_pin / 100 + 5;
-    if (gpioGroup == 6) {
-        base = GPIO6;
-    } else if (gpioGroup == 7) {
-        base = GPIO7;
-    } else if (gpioGroup == 8) {
-        base = GPIO8;
-    } else if (gpioGroup == 9) {
-        base = GPIO9;
-    }
-    return base;
-}
+#include "imxrt1062/MIMXRT1062/drivers/fsl_gpio.h"
+#include "teensy_41/board.h"
 
 Status gpio_mode(uint8_t pin, GpioMode mode) {
-    *(PIN[pin].MUX_REG_ADDR) = (*(PIN[pin].MUX_REG_ADDR) & 0xFFFFFFF8) |
-                               0x00000005;  // Set to GPIO Mode
-    GPIO_t *base = getGpio(pin);
-    if (base == NULL) {
-        return ERROR;
-    }
-    uint32_t gpioPin = (uint32_t)PIN[pin].gpio_pin % 100;
-    if (mode) {
-        base->GDIR |= (1 << gpioPin);
-    } else {
-        base->GDIR &= ~(1 << gpioPin);
-    }
+    uint8_t gpio_pin = PIN_TO_NUM[pin];
+    GPIO_Type *base = PIN_TO_BASE[pin];
+    gpio_pin_config_t conf = {
+        .direction = mode,
+        .interruptMode = kGPIO_NoIntmode,
+        .outputLogic = 0,
+    };
+    GPIO_PinInit(base, gpio_pin, &conf);
     return OK;
 }
 
 Status gpio_write(uint8_t pin, GpioValue value) {
-    *(PIN[pin].MUX_REG_ADDR) = (*(PIN[pin].MUX_REG_ADDR) & 0xFFFFFFF8) |
-                               0x00000005;  // Set to GPIO Mode
-    GPIO_t *base = getGpio(pin);
-    if (base == NULL) {
-        return ERROR;
-    }
-    uint32_t gpioPin = (uint32_t)PIN[pin].gpio_pin % 100;
-    if (!((base->GDIR) & (1 << gpioPin))) {
-        base->GDIR |= (1 << gpioPin);
-    }
-    if (value) {
-        base->DR_SET |= (1 << gpioPin);
-    } else {
-        base->DR_CLEAR |= (1 << gpioPin);
-    }
+    uint8_t gpio_pin = PIN_TO_NUM[pin];
+    GPIO_Type *base = PIN_TO_BASE[pin];
+    gpio_pin_config_t conf = {
+        .direction = GPIO_OUTPUT,
+        .interruptMode = kGPIO_NoIntmode,
+        .outputLogic = value,
+    };
+    GPIO_PinInit(base, gpio_pin, &conf);
     return OK;
 }
 
 GpioValue gpio_read(uint8_t pin) {
-    *(PIN[pin].MUX_REG_ADDR) = (*(PIN[pin].MUX_REG_ADDR) & 0xFFFFFFF8) |
-                               0x00000005;  // Set to GPIO Mode
-    GPIO_t *base = getGpio(pin);
-    if (base == NULL) {
+    uint8_t gpio_pin = PIN_TO_NUM[pin];
+    GPIO_Type *base = PIN_TO_BASE[pin];
+    gpio_pin_config_t conf = {
+        .direction = GPIO_INPUT,
+        .interruptMode = kGPIO_NoIntmode,
+        .outputLogic = 0,
+    };
+    GPIO_PinInit(base, pin, &conf);
+    uint32_t val = GPIO_PinRead(base, gpio_pin);
+    if (val == GPIO_HIGH) {
+        return GPIO_HIGH;
+    } else if (val == GPIO_LOW) {
+        return GPIO_LOW;
+    } else {
         return GPIO_ERR;
     }
-    uint32_t gpioPin = (uint32_t)PIN[pin].gpio_pin % 100;
-    if ((base->GDIR) & (1 << gpioPin)) {
-        base->GDIR &= ~(1 << gpioPin);
-    }
-    return ((base->DR) & (1 << gpioPin)) >> gpioPin;
 }
-*/

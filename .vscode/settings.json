@@ -10,6 +10,7 @@
         "core_cm7.h": "c",
         "fsl_device_registers.h": "c",
         "fsl_lpi2c.h": "c",
-        "mimxrt1062_features.h": "c"
+        "mimxrt1062_features.h": "c",
+        "fsl_gpio.h": "c"
     }
 }
