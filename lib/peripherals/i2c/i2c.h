@@ -6,6 +6,8 @@
 
 #include "status.h"
 
+#define LPI2C_SRC_CLK 60000000
+
 typedef enum {
     I2C0 = 0,
     I2C1 = 1,

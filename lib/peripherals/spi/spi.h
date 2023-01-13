@@ -9,6 +9,8 @@
 // PSPHAA library
 #include <status.h>
 
+#define LPSPI_SRC_CLK 132000000
+
 typedef enum {
     SPI0 = 0,
     SPI1 = 1,

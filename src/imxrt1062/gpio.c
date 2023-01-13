@@ -1,5 +1,5 @@
 #include "gpio/gpio.h"
-
+/*
 #include "registers.h"
 #include "stdlib.h"
 
@@ -66,3 +66,4 @@ GpioValue gpio_read(uint8_t pin) {
     }
     return ((base->DR) & (1 << gpioPin)) >> gpioPin;
 }
+*/
