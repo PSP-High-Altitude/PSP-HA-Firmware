@@ -4,13 +4,21 @@
 
 extern "C" {
 #include "gpio/gpio.h"
-#include "i2c/i2c.h"
-#include "spi/spi.h"
+#include "ms5637/ms5637.h"
 }
 
 #define LED_PIN 13
 
-void setup() { gpio_mode(LED_PIN, GPIO_OUTPUT); }
+I2cDevice baroConf = {
+    .address = 0x76,
+    .clk = I2C_SPEED_FAST,
+    .periph = I2C0,
+};
+
+void setup() {
+    gpio_mode(LED_PIN, GPIO_OUTPUT);
+    ms5637_init(&baroConf);
+}
 
 void loop() {
     /*
@@ -30,6 +38,10 @@ void loop() {
     delay(500);
     gpio_write(LED_PIN, GPIO_LOW);
     delay(500);
+
+    BaroData data = ms5637_read(&baroConf, OSR_4096);
+    Serial.printf("Pressure: %d mbar, Temperature %d degC\n", data.pressure,
+                  data.temperature);
 
     // SDDevice device{.cs = 1};
     // sd_init(&device);
