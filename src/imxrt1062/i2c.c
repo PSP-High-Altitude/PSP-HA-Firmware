@@ -14,19 +14,25 @@ static Status lpi2cSetup(I2cDevice *dev) {
     switch (dev->periph) {
         case I2C0:
             base = LPI2C1;
+            IOMUXC_SetPinMux(IOMUXC_GPIO_AD_B1_00_LPI2C1_SCL, 1);  // pin 19
+            IOMUXC_SetPinMux(IOMUXC_GPIO_AD_B1_01_LPI2C1_SDA, 1);  // pin 18
             break;
         case I2C1:
-            base = LPI2C2;
+            return PARAMETER_ERROR;
             break;
         case I2C2:
             base = LPI2C3;
+            IOMUXC_SetPinMux(IOMUXC_GPIO_AD_B1_07_LPI2C3_SCL, 1);  // pin 16
+            IOMUXC_SetPinMux(IOMUXC_GPIO_AD_B1_06_LPI2C3_SDA, 1);  // pin 17
             break;
         case I2C3:
             base = LPI2C4;
+            IOMUXC_SetPinMux(IOMUXC_GPIO_AD_B0_12_LPI2C4_SCL, 1);  // pin 24
+            IOMUXC_SetPinMux(IOMUXC_GPIO_AD_B0_13_LPI2C4_SDA, 1);  // pin 25
             break;
+        default:
+            return PARAMETER_ERROR;
     }
-    IOMUXC_SetPinMux(IOMUXC_GPIO_AD_B1_00_LPI2C1_SCL, 1);
-    IOMUXC_SetPinMux(IOMUXC_GPIO_AD_B1_01_LPI2C1_SDA, 1);
     lpi2c_master_config_t conf;
     LPI2C_MasterGetDefaultConfig(&conf);
     conf.baudRate_Hz = dev->clk;
@@ -36,7 +42,9 @@ static Status lpi2cSetup(I2cDevice *dev) {
 }
 
 Status i2c_write(I2cDevice *device, uint8_t *tx_buf, size_t len) {
-    lpi2cSetup(device);
+    if (lpi2cSetup(device) != OK) {
+        return PARAMETER_ERROR;
+    }
     lpi2c_master_transfer_t transfer = {
         .data = tx_buf,
         .dataSize = len,
@@ -65,7 +73,9 @@ Status i2c_write(I2cDevice *device, uint8_t *tx_buf, size_t len) {
 }
 
 Status i2c_read(I2cDevice *device, uint8_t *rx_buf, size_t len) {
-    lpi2cSetup(device);
+    if (lpi2cSetup(device) != OK) {
+        return PARAMETER_ERROR;
+    }
     lpi2c_master_transfer_t transfer = {
         .data = rx_buf,
         .dataSize = len,

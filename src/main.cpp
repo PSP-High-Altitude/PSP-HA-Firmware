@@ -18,8 +18,8 @@ I2cDevice baroConf = {
 };
 /*SpiDevice imuConf = {
     .clk = 1000000,
-    .cpol = 1,
-    .cpha = 1,
+    .cpol = 0,
+    .cpha = 0,
     .cs = 0,
     .periph = SPI3,
 };*/
@@ -29,8 +29,8 @@ void setup() {
     Serial.begin(9600);
     gpio_mode(LED_PIN, GPIO_OUTPUT);
     delay(200);
-    // ms5637_init(&baroConf);
-    //  lsm6dsox_init(&imuConf);
+    //  ms5637_init(&baroConf);
+    //   lsm6dsox_init(&imuConf);
 }
 
 void loop() {

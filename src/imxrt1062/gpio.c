@@ -1,11 +1,13 @@
 #include "gpio/gpio.h"
 
 #include "imxrt1062/MIMXRT1062/drivers/fsl_gpio.h"
+#include "imxrt1062/MIMXRT1062/drivers/fsl_iomuxc.h"
 #include "teensy_41/board.h"
 
 Status gpio_mode(uint8_t pin, GpioMode mode) {
-    uint8_t gpio_pin = PIN_TO_NUM[pin];
-    GPIO_Type *base = PIN_TO_BASE[pin];
+    IOMUXC_SetPinMux(IOMUXC_PIN_TO_MUX[pin], 5, 0, 0, 0, 0);
+    uint8_t gpio_pin = GPIO_PIN_TO_NUM[pin];
+    GPIO_Type *base = GPIO_PIN_TO_BASE[pin];
     gpio_pin_config_t conf = {
         .direction = mode,
         .interruptMode = kGPIO_NoIntmode,
@@ -16,8 +18,9 @@ Status gpio_mode(uint8_t pin, GpioMode mode) {
 }
 
 Status gpio_write(uint8_t pin, GpioValue value) {
-    uint8_t gpio_pin = PIN_TO_NUM[pin];
-    GPIO_Type *base = PIN_TO_BASE[pin];
+    IOMUXC_SetPinMux(IOMUXC_PIN_TO_MUX[pin], 5, 0, 0, 0, 0);
+    uint8_t gpio_pin = GPIO_PIN_TO_NUM[pin];
+    GPIO_Type *base = GPIO_PIN_TO_BASE[pin];
     gpio_pin_config_t conf = {
         .direction = GPIO_OUTPUT,
         .interruptMode = kGPIO_NoIntmode,
@@ -28,8 +31,9 @@ Status gpio_write(uint8_t pin, GpioValue value) {
 }
 
 GpioValue gpio_read(uint8_t pin) {
-    uint8_t gpio_pin = PIN_TO_NUM[pin];
-    GPIO_Type *base = PIN_TO_BASE[pin];
+    IOMUXC_SetPinMux(IOMUXC_PIN_TO_MUX[pin], 5, 0, 0, 0, 0);
+    uint8_t gpio_pin = GPIO_PIN_TO_NUM[pin];
+    GPIO_Type *base = GPIO_PIN_TO_BASE[pin];
     gpio_pin_config_t conf = {
         .direction = GPIO_INPUT,
         .interruptMode = kGPIO_NoIntmode,

@@ -16,6 +16,7 @@
         "clock_config.h": "c",
         "fsl_gpt.h": "c",
         "fsl_clock.h": "c",
-        "fsl_qtmr.h": "c"
+        "fsl_qtmr.h": "c",
+        "pin_mux.h": "c"
     }
 }
