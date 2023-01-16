@@ -1,11 +1,13 @@
 #include "i2c/i2c.h"
 
+#include "imxrt1062/MIMXRT1062/drivers/fsl_clock.h"
+#include "imxrt1062/MIMXRT1062/drivers/fsl_iomuxc.h"
 #include "imxrt1062/MIMXRT1062/drivers/fsl_lpi2c.h"
 
 static bool i2c_enabled[] = {0, 0, 0, 0};
 
 static Status lpi2cSetup(I2cDevice *dev) {
-    if (!i2c_enabled[dev->periph]) {
+    if (i2c_enabled[dev->periph]) {
         return OK;
     }
     LPI2C_Type *base = NULL;
@@ -23,10 +25,12 @@ static Status lpi2cSetup(I2cDevice *dev) {
             base = LPI2C4;
             break;
     }
+    IOMUXC_SetPinMux(IOMUXC_GPIO_AD_B1_00_LPI2C1_SCL, 1);
+    IOMUXC_SetPinMux(IOMUXC_GPIO_AD_B1_01_LPI2C1_SDA, 1);
     lpi2c_master_config_t conf;
     LPI2C_MasterGetDefaultConfig(&conf);
     conf.baudRate_Hz = dev->clk;
-    LPI2C_MasterInit(base, &conf, LPI2C_SRC_CLK);
+    LPI2C_MasterInit(base, &conf, CLOCK_GetClockRootFreq(kCLOCK_Lpi2cClkRoot));
     i2c_enabled[dev->periph] = 1;
     return OK;
 }

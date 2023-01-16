@@ -60,9 +60,9 @@ Accel lsm6dsox_read_accel(SpiDevice* device) {
     lsm6dsox_read(device, 0x28, rx_buf, 6);
 
     // Convert unsigned 8-bit halves to signed 16-bit numbers
-    int16_t acc_x_raw = (int16_t)(((uint16_t)rx_buf[1] << 8) | rx_buf[0]);
-    int16_t acc_y_raw = (int16_t)(((uint16_t)rx_buf[3] << 8) | rx_buf[2]);
-    int16_t acc_z_raw = (int16_t)(((uint16_t)rx_buf[5] << 8) | rx_buf[4]);
+    int16_t acc_x_raw = ((int16_t)(((uint16_t)rx_buf[1] << 8) | rx_buf[0]));
+    int16_t acc_y_raw = ((int16_t)(((uint16_t)rx_buf[3] << 8) | rx_buf[2]));
+    int16_t acc_z_raw = ((int16_t)(((uint16_t)rx_buf[5] << 8) | rx_buf[4]));
 
     // Convert data to units of g
     float acc_x = (acc_x_raw * 0.488) / 1000;

@@ -1,5 +1,7 @@
 #include "ms5637.h"
 
+#include "time.h"
+
 static uint32_t read_D1(I2cDevice* device, AdcSpeed speed);
 static uint32_t read_D2(I2cDevice* device, AdcSpeed speed);
 
@@ -87,6 +89,7 @@ static uint32_t read_D1(I2cDevice* device, AdcSpeed speed) {
     if (i2c_write(device, tx_buf, 1) != OK) {
         return D_READ_ERROR;
     }
+    DELAY(conversion_delay_ms[speed / 2]);
     tx_buf[0] = 0x00;
     while (!D1) {
         // Send ADC read command
@@ -110,6 +113,7 @@ static uint32_t read_D2(I2cDevice* device, AdcSpeed speed) {
     if (i2c_write(device, tx_buf, 1) != OK) {
         return D_READ_ERROR;
     }
+    DELAY(conversion_delay_ms[speed / 2]);
     tx_buf[0] = 0x00;
     while (!D2) {
         // Send ADC read command
@@ -141,21 +145,21 @@ BaroData ms5637_read(I2cDevice* device, AdcSpeed speed) {
     }
     int32_t dT = D2 - (data.C5 * 256);
     int32_t TEMP = (int32_t)(2000 + (dT * ((float)data.C6 / 8388608)));
-    int64_t OFF = ((int64_t)data.C2 * 131072) + (((int64_t)data.C4 * dT) / 64);
-    int64_t SENS = ((int64_t)data.C1 * 65536) + (((int64_t)data.C3 * dT) / 128);
+    int64_t OFF = ((int64_t)data.C2 << 17) + (((int64_t)data.C4 * dT) >> 6);
+    int64_t SENS = ((int64_t)data.C1 << 16) + (((int64_t)data.C3 * dT) >> 7);
     int32_t T2;
     int64_t OFF2;
     int64_t SENS2;
     if (TEMP < 2000) {
-        T2 = 3 * (dT * dT) / 8589934592;
-        OFF2 = 61 * (TEMP - 2000) * (TEMP - 2000) / 16;
-        SENS2 = 29 * (TEMP - 2000) * (TEMP - 2000) / 16;
+        T2 = 3 * ((int64_t)dT * (int64_t)dT) >> 33;
+        OFF2 = 61 * ((int64_t)TEMP - 2000) * ((int64_t)TEMP - 2000) / 16;
+        SENS2 = 29 * ((int64_t)TEMP - 2000) * ((int64_t)TEMP - 2000) / 16;
         if (TEMP < -1500) {
-            OFF2 += 17 * (TEMP + 1500) * (TEMP + 1500);
-            SENS2 += 9 * (TEMP + 1500) * (TEMP + 1500);
+            OFF2 += 17 * ((int64_t)TEMP + 1500) * ((int64_t)TEMP + 1500);
+            SENS2 += 9 * ((int64_t)TEMP + 1500) * ((int64_t)TEMP + 1500);
         }
     } else {
-        T2 = 5 * (dT * dT) / 274877906944;
+        T2 = (5 * ((int64_t)dT * (int64_t)dT)) >> 38;
         OFF2 = 0;
         SENS2 = 0;
     }
@@ -163,7 +167,7 @@ BaroData ms5637_read(I2cDevice* device, AdcSpeed speed) {
     OFF -= OFF2;
     SENS -= SENS2;
 
-    int32_t P = ((D1 * SENS / 2097152) - OFF) / 32768;
+    int64_t P = (((D1 * SENS) >> 21) - OFF) >> 15;
 
     result.pressure = (float)P / 100;
     result.temperature = (float)TEMP / 100;

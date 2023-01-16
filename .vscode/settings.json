@@ -11,6 +11,11 @@
         "fsl_device_registers.h": "c",
         "fsl_lpi2c.h": "c",
         "mimxrt1062_features.h": "c",
-        "fsl_gpio.h": "c"
+        "fsl_gpio.h": "c",
+        "board.h": "c",
+        "clock_config.h": "c",
+        "fsl_gpt.h": "c",
+        "fsl_clock.h": "c",
+        "fsl_qtmr.h": "c"
     }
 }
