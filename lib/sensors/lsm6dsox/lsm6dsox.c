@@ -8,17 +8,19 @@ static Status lsm6dsox_read(SpiDevice* device, uint8_t address, uint8_t* rx_buf,
         return PARAMETER_ERROR;
     }
 
-    if (len > 6) {
-        return PARAMETER_ERROR;
-    }
+    // Create tx buffer with extra dummy bytes
+    uint8_t tx_buf[len + 1];
+    // Create rx buffer with space for the initial blank byte
+    uint8_t rx_buf_new[len + 1];
 
-    address = address | 0x80;  // Add read bit to address
+    tx_buf[0] = address | 0x80;  // Add address and read bit to tx buffer
 
-    uint8_t tx_buf[6] = {0};
+    // Exchange the address and read len bits then copy all but the first byte
+    // received to the original rx_buf.
+    Status status = spi_exchange(device, tx_buf, rx_buf_new, len + 1);
+    memcpy(rx_buf, rx_buf_new + 1, len);
 
-    tx_buf[0] = address;
-
-    return spi_exchange(device, tx_buf, rx_buf, len);
+    return status;
 }
 
 static Status lsm6dsox_write(SpiDevice* device, uint8_t address,
@@ -27,29 +29,34 @@ static Status lsm6dsox_write(SpiDevice* device, uint8_t address,
         return PARAMETER_ERROR;
     }
 
-    if (len > 6) {
-        return PARAMETER_ERROR;
-    }
+    // Create dummy read buffer
+    uint8_t rx_buf[len + 1];
 
-    address = address & 0x7F;  // Add write bit to address
+    // Create new tx buffer
+    uint8_t tx_buf_new[len + 1];
+    tx_buf_new[0] = address & 0x7F;  // Add address and write bit to tx buffer
+    memcpy(tx_buf_new + 1, tx_buf,
+           len);  // Copy bytes to end of the new tx buffer
 
-    uint8_t rx_buf[7];
-
-    // Create new buffer with the address and copy over the old one
-    uint8_t tx_buf_new[7];
-    tx_buf_new[0] = address;
-    memcpy(tx_buf_new + 1, tx_buf, len);
-
+    // Exchange address and write len bytes
     return spi_exchange(device, tx_buf_new, rx_buf, len + 1);
 }
 
 Status lsm6dsox_init(SpiDevice* device) {
-    uint8_t tx_buf = 0xA4;
+    uint8_t tx_buf;
+
+    tx_buf = 0x85;
+    lsm6dsox_write(device, 0x12, &tx_buf, 1);  // Reset
+
+    tx_buf = 0xE2;
+    lsm6dsox_write(device, 0x18, &tx_buf, 1);  // Disable I3C
+
+    tx_buf = 0xA4;
     lsm6dsox_write(device, 0x10, &tx_buf,
                    1);  // Enable and configure the accelerometer to 16g range
 
     tx_buf = 0xAC;
-    lsm6dsox_write(device, 0x10, &tx_buf,
+    lsm6dsox_write(device, 0x11, &tx_buf,
                    1);  // Enable and configure the gyro to 2000dps range
 
     return OK;
