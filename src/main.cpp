@@ -31,6 +31,10 @@ void setup() {
     delay(200);
     // ms5637_init(&baroConf);
     lsm6dsox_init(&imuConf);
+    lsm6dsox_config_accel(&imuConf, LSM6DSOX_XL_RATE_6_66_KHZ,
+                          LSM6DSOX_XL_RANGE_16_G);
+    lsm6dsox_config_gyro(&imuConf, LSM6DSOX_G_RATE_6_66_KHZ,
+                         LSM6DSOX_G_RANGE_2000_DPS);
 }
 
 void loop() {
