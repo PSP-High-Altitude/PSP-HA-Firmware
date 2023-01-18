@@ -16,8 +16,6 @@ typedef enum {
     OSR_8192 = 0xA,
 } AdcSpeed;
 
-uint8_t conversion_delay_ms[] = {1, 2, 3, 5, 9, 17};
-
 typedef struct {
     uint16_t C1;
     uint16_t C2;

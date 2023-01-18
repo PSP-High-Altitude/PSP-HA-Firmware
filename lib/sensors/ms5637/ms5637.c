@@ -8,6 +8,8 @@ static uint32_t read_D2(I2cDevice* device, AdcSpeed speed);
 I2cDevice *device;
 CalibrationData data;
 
+uint8_t conversion_delay_ms[] = {1, 2, 3, 5, 9, 17};
+
 Status ms5637_init(I2cDevice* device) {
     uint8_t rx_buf[2];
     uint8_t tx_buf[1] = {0x1E};
