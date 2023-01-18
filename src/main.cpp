@@ -53,13 +53,14 @@ void loop() {
     // gpio_write(LED_PIN, GPIO_LOW);
     // DELAY_MICROS(1000000);
     Accel data = lsm6dsox_read_accel(&imuConf);
-    Serial.printf("Accel X: %f g\n", data.accelX);
+    Serial.printf("Accel X: %f g, Accel Y: % f g, Accel Z: %f g\n", data.accelX,
+                  data.accelY, data.accelZ);
 
     // BaroData data = ms5637_read(&baroConf, OSR_8192);
     // Serial.printf("Pressure: %f mbar, Temperature %f degC\n",
     // data.pressure,
     //               data.temperature);
-    DELAY(100);
+    DELAY(500);
     //  SDDevice device{.cs = 1};
     //  sd_init(&device);
 }

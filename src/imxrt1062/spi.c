@@ -105,6 +105,7 @@ Status spi_exchange(SpiDevice* dev, uint8_t* tx_buf, uint8_t* rx_buf,
         .txData = tx_buf,
         .rxData = rx_buf,
         .dataSize = len,
+        .configFlags = kLPSPI_MasterPcsContinuous,
     };
     if (LPSPI_MasterTransferBlocking(base, &transfer) != kStatus_Success) {
         return ERROR;
