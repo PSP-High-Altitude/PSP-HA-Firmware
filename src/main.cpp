@@ -31,10 +31,10 @@ void setup() {
     delay(200);
     // ms5637_init(&baroConf);
     lsm6dsox_init(&imuConf);
-    lsm6dsox_config_accel(&imuConf, LSM6DSOX_XL_RATE_6_66_KHZ,
-                          LSM6DSOX_XL_RANGE_16_G);
-    lsm6dsox_config_gyro(&imuConf, LSM6DSOX_G_RATE_6_66_KHZ,
-                         LSM6DSOX_G_RANGE_2000_DPS);
+    lsm6dsox_config_accel(&imuConf, LSM6DSOX_XL_RATE_12_5_HZ,
+                          LSM6DSOX_XL_RANGE_2_G);
+    lsm6dsox_config_gyro(&imuConf, LSM6DSOX_G_RATE_12_5_HZ,
+                         LSM6DSOX_G_RANGE_250_DPS);
 }
 
 void loop() {
@@ -56,15 +56,18 @@ void loop() {
     // DELAY_MICROS(1000000);
     // gpio_write(LED_PIN, GPIO_LOW);
     // DELAY_MICROS(1000000);
-    Accel data = lsm6dsox_read_accel(&imuConf);
-    Serial.printf("Accel X: %f g, Accel Y: % f g, Accel Z: %f g\n", data.accelX,
-                  data.accelY, data.accelZ);
+    Accel accelData = lsm6dsox_read_accel(&imuConf);
+    Serial.printf("Accel X: %f g, Accel Y: % f g, Accel Z: %f g\n",
+                  accelData.accelX, accelData.accelY, accelData.accelZ);
+    Gyro gyroData = lsm6dsox_read_gyro(&imuConf);
+    Serial.printf("Gyro X: %f dps, Gyro Y: % f dps, Gyro Z: %f dps\n",
+                  gyroData.gyroX, gyroData.gyroY, gyroData.gyroZ);
 
     // BaroData data = ms5637_read(&baroConf, OSR_8192);
     // Serial.printf("Pressure: %f mbar, Temperature %f degC\n",
     // data.pressure,
     //               data.temperature);
-    DELAY(500);
+    DELAY(1000);
     //  SDDevice device{.cs = 1};
     //  sd_init(&device);
 }

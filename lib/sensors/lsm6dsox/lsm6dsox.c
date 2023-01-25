@@ -2,6 +2,8 @@
 
 #include <string.h>
 
+#include "time.h"
+
 Lsm6dsoxAccelRange g_current_accel_range = LSM6DSOX_XL_RANGE_16_G;
 Lsm6dsoxGyroRange g_current_gyro_range = LSM6DSOX_G_RANGE_2000_DPS;
 
@@ -51,17 +53,25 @@ Status lsm6dsox_init(SpiDevice* device) {
     tx_buf = 0x85;
     lsm6dsox_write(device, LSM6DSOX_CTRL3_C, &tx_buf, 1);  // Reset
 
+    DELAY_MICROS(5);
+
     // Disable I3C and DEN value
     tx_buf = 0x02;
     lsm6dsox_write(device, LSM6DSOX_CTRL9_XL, &tx_buf, 1);
+
+    DELAY_MICROS(5);
 
     // Enable and configure the accel to 16g range and 6.66khz rate
     tx_buf = LSM6DSOX_XL_RANGE_16_G | LSM6DSOX_XL_RATE_6_66_KHZ;
     lsm6dsox_write(device, LSM6DSOX_CTRL1_XL, &tx_buf, 1);
 
+    DELAY_MICROS(5);
+
     // Enable and configure the gyro to 2000dps range and 6.66khz rate
     tx_buf = LSM6DSOX_G_RANGE_2000_DPS | LSM6DSOX_G_RATE_6_66_KHZ;
     lsm6dsox_write(device, LSM6DSOX_CTRL2_G, &tx_buf, 1);
+
+    DELAY_MICROS(5);
 
     return OK;
 }
@@ -156,6 +166,8 @@ Status lsm6dsox_config_accel(SpiDevice* device, Lsm6dsoxAccelDataRate rate,
     Status status = lsm6dsox_write(device, LSM6DSOX_CTRL1_XL, &tx_buf,
                                    1);  // Configure the accelerometer to the
                                         // specified range and measurement rate
+    DELAY_MICROS(5);
+
     if (status != OK) {
         return status;
     }
@@ -164,6 +176,8 @@ Status lsm6dsox_config_accel(SpiDevice* device, Lsm6dsoxAccelDataRate rate,
 
     status = lsm6dsox_read(device, LSM6DSOX_CTRL1_XL, &rx_buf,
                            1);  // Verify the settings
+
+    DELAY_MICROS(5);
 
     if (status != OK) {
         return status;
@@ -191,6 +205,8 @@ Status lsm6dsox_config_gyro(SpiDevice* device, Lsm6dsoxGyroDataRate rate,
                                    1);  // Configure the gyroscope to the
                                         // specified range and measurement rate
 
+    DELAY_MICROS(5);
+
     if (status != OK) {
         return status;
     }
@@ -199,6 +215,8 @@ Status lsm6dsox_config_gyro(SpiDevice* device, Lsm6dsoxGyroDataRate rate,
 
     status = lsm6dsox_read(device, LSM6DSOX_CTRL2_G, &rx_buf,
                            1);  // Verify the settings
+
+    DELAY_MICROS(5);
 
     if (status != OK) {
         return status;
