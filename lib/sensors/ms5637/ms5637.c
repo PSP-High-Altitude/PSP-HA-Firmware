@@ -91,7 +91,7 @@ static uint32_t read_D1(I2cDevice* device, AdcSpeed speed) {
     if (i2c_write(device, tx_buf, 1) != OK) {
         return D_READ_ERROR;
     }
-    DELAY(conversion_delay_ms[speed / 2]);
+    DELAY(conversion_delay_ms[speed / 2] + 1);
     tx_buf[0] = 0x00;
     while (!D1) {
         // Send ADC read command
@@ -115,7 +115,7 @@ static uint32_t read_D2(I2cDevice* device, AdcSpeed speed) {
     if (i2c_write(device, tx_buf, 1) != OK) {
         return D_READ_ERROR;
     }
-    DELAY(conversion_delay_ms[speed / 2]);
+    DELAY(conversion_delay_ms[speed / 2] + 1);
     tx_buf[0] = 0x00;
     while (!D2) {
         // Send ADC read command

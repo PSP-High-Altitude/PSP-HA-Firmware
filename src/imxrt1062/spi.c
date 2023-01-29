@@ -14,7 +14,7 @@ static Status spi_setup(SpiDevice* dev) {
     }
     LPSPI_Type* base = NULL;
     switch (dev->periph) {
-        case SPI0:
+        case P_SPI0:
             base = LPSPI1;
             switch (dev->cs) {
                 case 0:
@@ -28,10 +28,10 @@ static Status spi_setup(SpiDevice* dev) {
             IOMUXC_SetPinMux(IOMUXC_GPIO_SD_B0_02_LPSPI1_SDO, 1);  // pin 43
             IOMUXC_SetPinMux(IOMUXC_GPIO_SD_B0_00_LPSPI1_SCK, 1);  // pin 45
             break;
-        case SPI1:
+        case P_SPI1:
             return PARAMETER_ERROR;
             break;
-        case SPI2:
+        case P_SPI2:
             base = LPSPI3;
             switch (dev->cs) {
                 case 0:
@@ -45,7 +45,7 @@ static Status spi_setup(SpiDevice* dev) {
             IOMUXC_SetPinMux(IOMUXC_GPIO_AD_B1_14_LPSPI3_SDO, 1);  // pin 26
             IOMUXC_SetPinMux(IOMUXC_GPIO_AD_B1_15_LPSPI3_SCK, 1);  // pin 27
             break;
-        case SPI3:
+        case P_SPI3:
             base = LPSPI4;
             switch (dev->cs) {
                 case 0:
@@ -88,16 +88,16 @@ Status spi_exchange(SpiDevice* dev, uint8_t* tx_buf, uint8_t* rx_buf,
     }
     LPSPI_Type* base = NULL;
     switch (dev->periph) {
-        case SPI0:
+        case P_SPI0:
             base = LPSPI1;
             break;
-        case SPI1:
+        case P_SPI1:
             base = LPSPI2;
             break;
-        case SPI2:
+        case P_SPI2:
             base = LPSPI3;
             break;
-        case SPI3:
+        case P_SPI3:
             base = LPSPI4;
             break;
     }
