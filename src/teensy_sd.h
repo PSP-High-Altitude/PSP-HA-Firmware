@@ -13,6 +13,8 @@ typedef struct {
 
 Status sd_init(SDDevice* device);
 
+Status sd_reinit(SDDevice* device);
+
 Status sd_write(uint64_t timestamp, Accel* accel, Gyro* gyro, BaroData* baro);
 
 #endif  // TEENSY_SD_H

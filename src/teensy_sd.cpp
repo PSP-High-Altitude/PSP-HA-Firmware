@@ -36,7 +36,24 @@ Status sd_init(SDDevice* device) {
     return OK;
 }
 
+Status sd_reinit(SDDevice* device) {
+    if (!SD.begin(device->cs)) {
+        return HARDWARE_ERROR;
+    }
+
+    if (!SD.exists(s_filename)) {
+        return HARDWARE_ERROR;
+    }
+
+    return OK;
+}
+
 Status sd_write(uint64_t timestamp, Accel* accel, Gyro* gyro, BaroData* baro) {
+    // Detect if the card got disconnected
+    if (!SD.exists(s_filename)) {
+        return ERROR;
+    }
+
     File file = SD.open(s_filename, FILE_WRITE);
 
     int retval =
