@@ -7,6 +7,8 @@ typedef enum {
     ERROR,
     DATA_ERROR,
     HARDWARE_ERROR,
+    TESTING_ERROR,
+    PARAMETER_ERROR  // Error with invalid parameter being passed
 } Status;
 
 #endif  // STATUS_H
