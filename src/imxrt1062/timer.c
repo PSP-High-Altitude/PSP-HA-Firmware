@@ -1,4 +1,4 @@
-#include "time.h"
+#include "timer.h"
 
 #include "imxrt1062/MIMXRT1062/drivers/fsl_clock.h"
 #include "imxrt1062/MIMXRT1062/drivers/fsl_qtmr.h"

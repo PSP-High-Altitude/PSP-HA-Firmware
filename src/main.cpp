@@ -6,7 +6,7 @@ extern "C" {
 #include "gpio/gpio.h"
 #include "lsm6dsox/lsm6dsox.h"
 #include "ms5637/ms5637.h"
-#include "time.h"
+#include "timer.h"
 }
 
 #define LED_PIN 13

@@ -2,7 +2,7 @@
 
 #include <string.h>
 
-#include "time.h"
+#include "timer.h"
 
 Lsm6dsoxAccelRange g_current_accel_range = LSM6DSOX_XL_RANGE_16_G;
 Lsm6dsoxGyroRange g_current_gyro_range = LSM6DSOX_G_RANGE_2000_DPS;

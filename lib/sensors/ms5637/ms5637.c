@@ -1,6 +1,6 @@
 #include "ms5637.h"
 
-#include "time.h"
+#include "timer.h"
 
 static uint32_t read_D1(I2cDevice* device, AdcSpeed speed);
 static uint32_t read_D2(I2cDevice* device, AdcSpeed speed);
