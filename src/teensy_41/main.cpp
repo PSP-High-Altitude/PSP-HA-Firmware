@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <stdint.h>
-#include <teensy_sd.h>
+#include <teensy_41/teensy_sd.h>
 
 extern "C" {
 #include "gpio/gpio.h"
