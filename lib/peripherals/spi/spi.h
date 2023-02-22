@@ -10,14 +10,22 @@
 #include <status.h>
 
 typedef enum {
-    P_SPI0 = 0,
     P_SPI1 = 1,
     P_SPI2 = 2,
     P_SPI3 = 3,
+    P_SPI4 = 4,
 } SpiPeriph;
 
+typedef enum {
+    SPI_SPEED_INVALID = 0,
+    SPI_SPEED_100kHz = 100000,
+    SPI_SPEED_500kHz = 500000,
+    SPI_SPEED_1MHz = 1000000,
+    SPI_SPEED_10MHz = 10000000,
+} SpiSpeed;
+
 typedef struct {
-    uint32_t clk;  // Clock target (in Hz)
+    SpiSpeed clk;
     bool cpol;
     bool cpha;
     uint8_t cs;

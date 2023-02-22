@@ -17,6 +17,12 @@
         "fsl_gpt.h": "c",
         "fsl_clock.h": "c",
         "fsl_qtmr.h": "c",
-        "pin_mux.h": "c"
+        "pin_mux.h": "c",
+        "stm32g4xx_hal.h": "c",
+        "stm32g4xx_hal_conf.h": "c",
+        "i2c.h": "c",
+        "typeinfo": "cpp",
+        "clocks.h": "c",
+        "time.h": "c"
     }
 }

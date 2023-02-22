@@ -16,7 +16,7 @@ extern "C" {
 #ifdef SERIAL_ENABLED
 #define PRINT(...) Serial.printf(__VA_ARGS__);
 #define PRINT_STATUS(name, status)               \
-    if (status == OK)                            \
+    if (status == STATUS_OK)                     \
         Serial.printf("%s returned OK\n", name); \
     else                                         \
         Serial.printf("%s returned error code %d\n", name, status);
@@ -30,14 +30,14 @@ uint32_t lastTime = 0;
 I2cDevice baroConf = {
     .address = 0x76,
     .clk = I2C_SPEED_STANDARD,
-    .periph = I2C3,
+    .periph = P_I2C4,
 };
 SpiDevice imuConf = {
-    .clk = 1000000,
+    .clk = SPI_SPEED_1MHz,
     .cpol = 0,
     .cpha = 0,
     .cs = 0,
-    .periph = P_SPI2,
+    .periph = P_SPI3,
 };
 SDDevice sdDev{.cs = BUILTIN_SDCARD};
 
@@ -98,8 +98,8 @@ void loop() {
     PRINT("%d ", MILLIS())
     PRINT_STATUS("sd_write", sd_write_status)
 
-    if (sd_write_status != OK) {
-        while (sd_reinit(&sdDev) != OK) {
+    if (sd_write_status != STATUS_OK) {
+        while (sd_reinit(&sdDev) != STATUS_OK) {
         }
     }
 }

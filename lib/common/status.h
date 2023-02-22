@@ -2,13 +2,13 @@
 #define STATUS_H
 
 typedef enum {
-    OK,
-    BUSY,
-    ERROR,
-    DATA_ERROR,
-    HARDWARE_ERROR,
-    TESTING_ERROR,
-    PARAMETER_ERROR  // Error with invalid parameter being passed
+    STATUS_OK,
+    STATUS_BUSY,
+    STATUS_ERROR,
+    STATUS_DATA_ERROR,
+    STATUS_HARDWARE_ERROR,
+    STATUS_TESTING_ERROR,
+    STATUS_PARAMETER_ERROR  // Error with invalid parameter being passed
 } Status;
 
 #endif  // STATUS_H

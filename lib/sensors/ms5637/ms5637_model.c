@@ -24,43 +24,43 @@ static uint16_t s_model_prom[7] = {
 Status ms5637_model_i2c_write(I2cDevice *device, uint8_t *tx_buf, size_t len) {
     if (device->address != MS5637_I2C_ADDR) {
         // This function shouldn't have been called with any other address
-        return TESTING_ERROR;
+        return STATUS_ERROR;
     }
 
     if (device->clk != I2C_SPEED_STANDARD && device->clk != I2C_SPEED_FAST) {
         // The device only supports standard and fast speed modes
-        return TESTING_ERROR;
+        return STATUS_ERROR;
     }
 
     if (len != 1) {
         // In theory the device should return a NACK for an invalid non-1 byte
         // write and the peripheral should raise an error (not tested)
-        return TESTING_ERROR;
+        return STATUS_ERROR;
     }
 
     if (tx_buf[0] == CMD_RESET) {
         // If we get a reset command, clear the command history and return
         s_command_history[0] = 0xFF;
         s_command_history[1] = 0xFF;
-        return OK;
+        return STATUS_OK;
     }
 
     // Save the current command in the history buffer
     s_command_history[1] = s_command_history[0];
     s_command_history[0] = tx_buf[0];
 
-    return OK;
+    return STATUS_OK;
 }
 
 Status ms5637_model_i2c_read(I2cDevice *device, uint8_t *rx_buf, size_t len) {
     if (device->address != MS5637_I2C_ADDR) {
         // This function shouldn't have been called with any other address
-        return TESTING_ERROR;
+        return STATUS_ERROR;
     }
 
     if (device->clk != I2C_SPEED_STANDARD && device->clk != I2C_SPEED_FAST) {
         // The device only supports standard and fast speed modes
-        return TESTING_ERROR;
+        return STATUS_ERROR;
     }
 
     // What we return depends on the previous commands
@@ -69,7 +69,7 @@ Status ms5637_model_i2c_read(I2cDevice *device, uint8_t *rx_buf, size_t len) {
         // command and value becoming available through the ADC read command,
         // and so it doesn't matter which conversion command is used
         if (len != 3) {
-            return TESTING_ERROR;
+            return STATUS_ERROR;
         }
         if ((s_command_history[1] & 0xF0) == CMD_CONV_D1_PREFIX) {
             rx_buf[0] = (s_model_d1 >> 16) & 0xFF;
@@ -80,21 +80,21 @@ Status ms5637_model_i2c_read(I2cDevice *device, uint8_t *rx_buf, size_t len) {
             rx_buf[1] = (s_model_d2 >> 8) & 0xFF;
             rx_buf[2] = (s_model_d2 >> 0) & 0xFF;
         } else {
-            return TESTING_ERROR;
+            return STATUS_ERROR;
         }
     } else if ((s_command_history[0] & 0xF0) == CMD_READ_PROM_PREFIX) {
         size_t prom_addr = (s_command_history[0] >> 1) & 0b111;
         if (prom_addr > 6) {
-            return TESTING_ERROR;
+            return STATUS_ERROR;
         }
         if (len != 2) {
-            return TESTING_ERROR;
+            return STATUS_ERROR;
         }
         rx_buf[0] = (s_model_prom[prom_addr] >> 8) & 0xFF;
         rx_buf[1] = (s_model_prom[prom_addr] >> 0) & 0xFF;
     }
 
-    return OK;
+    return STATUS_OK;
 }
 
 // NOTE: this is a vendor-provided function for calculating the CRC stored in
