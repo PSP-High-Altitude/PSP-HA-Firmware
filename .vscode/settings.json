@@ -23,6 +23,9 @@
         "i2c.h": "c",
         "typeinfo": "cpp",
         "clocks.h": "c",
-        "time.h": "c"
+        "time.h": "c",
+        "usbd_def.h": "c",
+        "ms5637.h": "c",
+        "usb_device.h": "c"
     }
 }

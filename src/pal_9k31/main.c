@@ -1,3 +1,8 @@
+#include <errno.h>
+#include <sys/unistd.h>
+
+#include "USB_Device/App/usb_device.h"
+#include "USB_Device/App/usbd_cdc_if.h"
 #include "board.h"
 #include "clocks.h"
 #include "gpio/gpio.h"
@@ -9,10 +14,23 @@
 
 #define TARGET_RATE 100
 
+int _write(int file, char *data, int len) {
+    if ((file != STDOUT_FILENO) && (file != STDERR_FILENO)) {
+        errno = EBADF;
+        return -1;
+    }
+
+    HAL_StatusTypeDef status = CDC_Transmit_FS((uint8_t *)data, len);
+
+    return (status == HAL_OK ? len : 0);
+}
+
 int main(void) {
     HAL_Init();
     init_clocks();
     init_timers();
+
+    MX_USB_Device_Init();
 
     uint32_t lastTime = 0;
 
@@ -48,6 +66,8 @@ int main(void) {
         DELAY(1000);
     }*/
 
+    printf("PAL 9000 initialization took %lld milliseconds\n", MILLIS());
+
     while (1) {
         while (MILLIS() - lastTime < 1000 / TARGET_RATE) {
         }
@@ -56,6 +76,12 @@ int main(void) {
         lsm6dsox_read_accel(&imuConf);
         lsm6dsox_read_gyro(&imuConf);
         ms5637_read(&baroConf, OSR_256);
+    }
+}
+
+void Error_Handler(void) {
+    __disable_irq();
+    while (1) {
     }
 }
 
