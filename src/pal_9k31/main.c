@@ -6,6 +6,7 @@
 #include "board.h"
 #include "clocks.h"
 #include "gpio/gpio.h"
+#include "iis2mdc/iis2mdc.h"
 #include "lsm6dsox/lsm6dsox.h"
 #include "ms5637/ms5637.h"
 #include "timer.h"
@@ -34,6 +35,11 @@ int main(void) {
 
     uint32_t lastTime = 0;
 
+    I2cDevice magConf = {
+        .address = 0x1E,
+        .clk = I2C_SPEED_STANDARD,
+        .periph = P_I2C3,
+    };
     I2cDevice baroConf = {
         .address = 0x76,
         .clk = I2C_SPEED_STANDARD,
@@ -46,6 +52,9 @@ int main(void) {
         .cs = 0,
         .periph = P_SPI1,
     };
+
+    // Initialize magnetometer
+    iis2mdc_init(&magConf, IIS2MDC_ODR_50_HZ);
 
     // Initialize barometer
     ms5637_init(&baroConf);
@@ -76,6 +85,7 @@ int main(void) {
         lsm6dsox_read_accel(&imuConf);
         lsm6dsox_read_gyro(&imuConf);
         ms5637_read(&baroConf, OSR_256);
+        iis2mdc_read(&magConf);
     }
 }
 
