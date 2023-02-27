@@ -57,7 +57,7 @@ uint64_t MICROS() {
     return (tim3_count << 32) + tim2_count;
 }
 
-uint64_t MILLIS() { return HAL_GetTick(); };
+uint64_t MILLIS() { return MICROS() / 1000; }
 
 void DELAY(uint16_t mS) {
     uint64_t start = MILLIS();

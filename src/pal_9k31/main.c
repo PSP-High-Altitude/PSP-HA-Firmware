@@ -8,6 +8,7 @@
 #include "gpio/gpio.h"
 #include "iis2mdc/iis2mdc.h"
 #include "lsm6dsox/lsm6dsox.h"
+#include "max_m10s.h"
 #include "ms5637/ms5637.h"
 #include "timer.h"
 
@@ -35,17 +36,22 @@ int main(void) {
 
     uint32_t lastTime = 0;
 
-    I2cDevice magConf = {
+    I2cDevice mag_conf = {
         .address = 0x1E,
         .clk = I2C_SPEED_STANDARD,
         .periph = P_I2C3,
     };
-    I2cDevice baroConf = {
+    I2cDevice baro_conf = {
         .address = 0x76,
         .clk = I2C_SPEED_STANDARD,
         .periph = P_I2C3,
     };
-    SpiDevice imuConf = {
+    I2cDevice gps_conf = {
+        .address = 0x42,
+        .clk = I2C_SPEED_STANDARD,
+        .periph = P_I2C2,
+    };
+    SpiDevice imu_conf = {
         .clk = SPI_SPEED_1MHz,
         .cpol = 0,
         .cpha = 0,
@@ -54,19 +60,22 @@ int main(void) {
     };
 
     // Initialize magnetometer
-    iis2mdc_init(&magConf, IIS2MDC_ODR_50_HZ);
+    iis2mdc_init(&mag_conf, IIS2MDC_ODR_50_HZ);
 
     // Initialize barometer
-    ms5637_init(&baroConf);
+    ms5637_init(&baro_conf);
 
     // Initialize IMU
-    lsm6dsox_init(&imuConf);
+    lsm6dsox_init(&imu_conf);
 
-    lsm6dsox_config_accel(&imuConf, LSM6DSOX_XL_RATE_208_HZ,
+    lsm6dsox_config_accel(&imu_conf, LSM6DSOX_XL_RATE_208_HZ,
                           LSM6DSOX_XL_RANGE_8_G);
 
-    lsm6dsox_config_gyro(&imuConf, LSM6DSOX_G_RATE_208_HZ,
+    lsm6dsox_config_gyro(&imu_conf, LSM6DSOX_G_RATE_208_HZ,
                          LSM6DSOX_G_RANGE_500_DPS);
+
+    // Initialize GPS
+    max_m10s_init(&gps_conf);
 
     /*while (1) {
         gpio_write(LED_PIN, GPIO_HIGH);
@@ -82,10 +91,10 @@ int main(void) {
         }
         lastTime = MILLIS();
 
-        lsm6dsox_read_accel(&imuConf);
-        lsm6dsox_read_gyro(&imuConf);
-        ms5637_read(&baroConf, OSR_256);
-        iis2mdc_read(&magConf);
+        lsm6dsox_read_accel(&imu_conf);
+        lsm6dsox_read_gyro(&imu_conf);
+        ms5637_read(&baro_conf, OSR_256);
+        iis2mdc_read(&mag_conf);
     }
 }
 

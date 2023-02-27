@@ -1,9 +1,12 @@
 #include "max_m10s.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+
 #include "string.h"
 
-static uint64_t* ubx_cfg_valget(I2cDevice*, Max_M10S_Layer_TypeDef, uint32_t*,
-                                size_t);
+static Status ubx_cfg_valget(I2cDevice*, Max_M10S_Layer_TypeDef, uint32_t*,
+                             size_t, uint64_t*);
 
 static Status ubx_cfg_valset(I2cDevice* device, Max_M10S_Layer_TypeDef layer,
                              uint32_t* keys, uint64_t* values,
@@ -23,18 +26,20 @@ Status max_m10s_init(I2cDevice* device) {
     } else {
         return STATUS_ERROR;
     }
+    return STATUS_OK;
 }
 
-static uint64_t* ubx_cfg_valget(I2cDevice* device, Max_M10S_Layer_TypeDef layer,
-                                uint32_t* keys, size_t num_keys) {
+__attribute__((unused)) static Status ubx_cfg_valget(
+    I2cDevice* device, Max_M10S_Layer_TypeDef layer, uint32_t* keys,
+    size_t num_keys, uint64_t* values) {
     size_t tx_buf_len = 12 + 4 * num_keys;
     uint8_t* tx_buf = malloc(tx_buf_len);
     tx_buf[0] = 0xB5;
     tx_buf[1] = 0x62;
     tx_buf[2] = 0x06;
     tx_buf[3] = 0x8B;
-    tx_buf[4] = ((4 + 4 * num_keys) >> 8) & 0xFF;
-    tx_buf[5] = (4 + 4 * num_keys) & 0xFF;
+    tx_buf[4] = (4 + 4 * num_keys) & 0xFF;
+    tx_buf[5] = ((4 + 4 * num_keys) >> 8) & 0xFF;
     tx_buf[6] = 0;
     tx_buf[7] = (uint8_t)layer;
     tx_buf[8] = 0;
@@ -53,7 +58,10 @@ static uint64_t* ubx_cfg_valget(I2cDevice* device, Max_M10S_Layer_TypeDef layer,
     tx_buf[tx_buf_len - 2] = CK_A;
     tx_buf[tx_buf_len - 1] = CK_B;
 
-    i2c_write(device, tx_buf, tx_buf_len);
+    if (i2c_write(device, tx_buf, tx_buf_len) != STATUS_OK) {
+        free(tx_buf);
+        return STATUS_ERROR;
+    }
     free(tx_buf);
 
     uint32_t message_header = 0;
@@ -64,18 +72,26 @@ static uint64_t* ubx_cfg_valget(I2cDevice* device, Max_M10S_Layer_TypeDef layer,
         while (!bytes_avail) {
             uint8_t addr_buf[1] = {0xFD};
             uint8_t rx_buf[2];
-            i2c_write(device, addr_buf, 1);
-            i2c_read(device, rx_buf, 2);
+            if (i2c_write(device, addr_buf, 1) != STATUS_OK) {
+                free(message_buf);
+                return STATUS_ERROR;
+            }
+            if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
+                free(message_buf);
+                return STATUS_ERROR;
+            }
             bytes_avail = (rx_buf[0] << 8) + rx_buf[1];
         }
         message_buf = malloc(bytes_avail);
-        i2c_read(device, message_buf, bytes_avail);
+        if (i2c_read(device, message_buf, bytes_avail) != STATUS_OK) {
+            free(message_buf);
+            return STATUS_ERROR;
+        }
         for (uint8_t i = 0; i < 3; i++) {
             message_header = message_buf[i] << (i * 8);
         }
     }
 
-    uint64_t values[num_keys];
     uint16_t message_idx = 10;
     for (uint8_t i = 0; i < num_keys; i++) {
         message_idx += 4;
@@ -89,13 +105,13 @@ static uint64_t* ubx_cfg_valget(I2cDevice* device, Max_M10S_Layer_TypeDef layer,
 
     free(message_buf);
 
-    return values;
+    return STATUS_OK;
 }
 
 static Status ubx_cfg_valset(I2cDevice* device, Max_M10S_Layer_TypeDef layer,
                              uint32_t* keys, uint64_t* values,
                              uint8_t* value_lens, size_t num_items) {
-    uint16_t total_len;
+    uint16_t total_len = 0;
     for (uint8_t i = 0; i < num_items; i++) {
         total_len += 4 + value_lens[i];
     }
@@ -105,8 +121,8 @@ static Status ubx_cfg_valset(I2cDevice* device, Max_M10S_Layer_TypeDef layer,
     tx_buf[1] = 0x62;
     tx_buf[2] = 0x06;
     tx_buf[3] = 0x8A;
-    tx_buf[4] = ((4 + total_len) >> 8) & 0xFF;
-    tx_buf[5] = (4 + total_len) & 0xFF;
+    tx_buf[4] = (4 + total_len) & 0xFF;
+    tx_buf[5] = ((4 + total_len) >> 8) & 0xFF;
     tx_buf[6] = 0;
     tx_buf[7] = (uint8_t)layer;
     tx_buf[8] = 0;
@@ -131,7 +147,10 @@ static Status ubx_cfg_valset(I2cDevice* device, Max_M10S_Layer_TypeDef layer,
     tx_buf[tx_buf_len - 2] = CK_A;
     tx_buf[tx_buf_len - 1] = CK_B;
 
-    i2c_write(device, tx_buf, tx_buf_len);
+    if (i2c_write(device, tx_buf, tx_buf_len) != STATUS_OK) {
+        free(tx_buf);
+        return STATUS_ERROR;
+    }
     free(tx_buf);
 
     uint32_t message_header = 0;
@@ -142,20 +161,159 @@ static Status ubx_cfg_valset(I2cDevice* device, Max_M10S_Layer_TypeDef layer,
         while (!bytes_avail) {
             uint8_t addr_buf[1] = {0xFD};
             uint8_t rx_buf[2];
-            i2c_write(device, addr_buf, 1);
-            i2c_read(device, rx_buf, 2);
+            if (i2c_write(device, addr_buf, 1) != STATUS_OK) {
+                return STATUS_ERROR;
+            }
+            if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
+                return STATUS_ERROR;
+            }
             bytes_avail = (rx_buf[0] << 8) + rx_buf[1];
         }
         message_buf = malloc(bytes_avail);
-        i2c_read(device, message_buf, bytes_avail);
+        if (i2c_read(device, message_buf, bytes_avail) != STATUS_OK) {
+            free(message_buf);
+            return STATUS_ERROR;
+        }
         for (uint8_t i = 0; i < 3; i++) {
             message_header = message_buf[i] << (i * 8);
         }
     }
+
+    free(message_buf);
 
     if (message_header == 0x010562B5) {
         return STATUS_OK;
     } else {
         return STATUS_ERROR;
     }
+}
+
+Status max_m10s_poll_fix(I2cDevice* device, GPS_Fix_TypeDef* fix) {
+    size_t tx_buf_len = 8;
+    uint8_t* tx_buf = malloc(tx_buf_len);
+    tx_buf[0] = 0xB5;
+    tx_buf[1] = 0x62;
+    tx_buf[2] = 0x01;
+    tx_buf[3] = 0x07;
+    tx_buf[4] = 0;
+    tx_buf[5] = 0;
+
+    uint8_t CK_A = 0;
+    uint8_t CK_B = 0;
+    for (uint16_t i = 2; i < tx_buf_len - 2; i++) {
+        CK_A += tx_buf[i];
+        CK_B += CK_A;
+    }
+    tx_buf[tx_buf_len - 2] = CK_A;
+    tx_buf[tx_buf_len - 1] = CK_B;
+
+    if (i2c_write(device, tx_buf, tx_buf_len) != STATUS_OK) {
+        free(tx_buf);
+        return STATUS_ERROR;
+    }
+    free(tx_buf);
+
+    uint32_t message_header = 0;
+    uint8_t* message_buf;
+    uint16_t bytes_avail = 0;
+    while (message_header != 0x070162B5) {
+        bytes_avail = 0;
+        while (!bytes_avail) {
+            uint8_t addr_buf[1] = {0xFD};
+            uint8_t rx_buf[2];
+            if (i2c_write(device, addr_buf, 1) != STATUS_OK) {
+                return STATUS_ERROR;
+            }
+            if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
+                return STATUS_ERROR;
+            }
+            bytes_avail = (rx_buf[0] << 8) + rx_buf[1];
+        }
+        message_buf = malloc(bytes_avail);
+        if (i2c_read(device, message_buf, bytes_avail) != STATUS_OK) {
+            free(message_buf);
+            return STATUS_ERROR;
+        }
+        for (uint8_t i = 0; i < 3; i++) {
+            message_header = message_buf[i] << (i * 8);
+        }
+    }
+
+    if ((message_buf[5] << 8) + message_buf[4] != 92) {
+        free(message_buf);
+        return STATUS_ERROR;
+    }
+
+    fix->year = message_buf[10] + (message_buf[11] << 8);
+    fix->month = message_buf[12];
+    fix->day = message_buf[13];
+    fix->hour = message_buf[14];
+    fix->min = message_buf[15];
+    fix->sec = message_buf[16];
+    fix->date_valid = message_buf[17] & 0x1;
+    fix->time_valid = (message_buf[17] & 0x2) >> 1;
+    fix->time_resolved = (message_buf[17] & 0x4) >> 2;
+    fix->fix_type = message_buf[26];
+    fix->fix_valid = message_buf[27] & 0x1;
+    fix->diff_used = (message_buf[27] & 0x2) >> 1;
+    fix->psm_state = (message_buf[27] & 0x1C) >> 2;
+    fix->hdg_veh_valid = (message_buf[27] & 0x20) >> 5;
+    fix->carrier_phase = (message_buf[27] & 0xC0) >> 6;
+    fix->num_sats = message_buf[29];
+    fix->lon =
+        (float)((int32_t)(message_buf[30] + (message_buf[31] << 8) +
+                          (message_buf[32] << 16) + (message_buf[33] << 24))) /
+        10000000.0;
+    fix->lat =
+        (float)((int32_t)(message_buf[34] + (message_buf[35] << 8) +
+                          (message_buf[36] << 16) + (message_buf[37] << 24))) /
+        10000000.0;
+    fix->height =
+        (float)((int32_t)(message_buf[38] + (message_buf[39] << 8) +
+                          (message_buf[40] << 16) + (message_buf[41] << 24))) /
+        1000.0;
+    fix->height_msl =
+        (float)((int32_t)(message_buf[42] + (message_buf[43] << 8) +
+                          (message_buf[44] << 16) + (message_buf[45] << 24))) /
+        1000.0;
+    fix->accuracy_horiz =
+        (float)((uint32_t)(message_buf[46] + (message_buf[47] << 8) +
+                           (message_buf[48] << 16) + (message_buf[49] << 24))) /
+        1000.0;
+    fix->accuracy_vertical =
+        (float)((uint32_t)(message_buf[50] + (message_buf[51] << 8) +
+                           (message_buf[52] << 16) + (message_buf[53] << 24))) /
+        1000.0;
+    fix->vel_north =
+        (float)((int32_t)(message_buf[54] + (message_buf[55] << 8) +
+                          (message_buf[56] << 16) + (message_buf[57] << 24))) /
+        1000.0;
+    fix->vel_east =
+        (float)((int32_t)(message_buf[58] + (message_buf[59] << 8) +
+                          (message_buf[60] << 16) + (message_buf[61] << 24))) /
+        1000.0;
+    fix->vel_down =
+        (float)((int32_t)(message_buf[62] + (message_buf[63] << 8) +
+                          (message_buf[64] << 16) + (message_buf[65] << 24))) /
+        1000.0;
+    fix->ground_speed =
+        (float)((int32_t)(message_buf[66] + (message_buf[67] << 8) +
+                          (message_buf[68] << 16) + (message_buf[69] << 24))) /
+        1000.0;
+    fix->hdg =
+        (float)((int32_t)(message_buf[70] + (message_buf[71] << 8) +
+                          (message_buf[72] << 16) + (message_buf[73] << 24))) /
+        100000.0;
+    fix->accuracy_speed =
+        (float)((int32_t)(message_buf[74] + (message_buf[75] << 8) +
+                          (message_buf[76] << 16) + (message_buf[77] << 24))) /
+        1000.0;
+    fix->accuracy_hdg =
+        (float)((int32_t)(message_buf[78] + (message_buf[79] << 8) +
+                          (message_buf[80] << 16) + (message_buf[81] << 24))) /
+        1000.0;
+    fix->invalid_llh = message_buf[84] & 0x1;
+
+    free(message_buf);
+    return STATUS_OK;
 }
