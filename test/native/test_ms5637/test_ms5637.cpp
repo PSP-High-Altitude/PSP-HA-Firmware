@@ -10,18 +10,18 @@ TEST(TestMS5637, Init) {
     I2cDevice device = {
         .address = 0b1110110,
         .clk = I2C_SPEED_FAST,
-        .periph = I2C0,
+        .periph = P_I2C1,
     };
-    EXPECT_EQ(ms5637_init(&device), OK);
+    EXPECT_EQ(ms5637_init(&device), STATUS_OK);
 }
 
 TEST(TestMS5637, ReadDefault) {
     I2cDevice device = {
         .address = 0b1110110,
         .clk = I2C_SPEED_FAST,
-        .periph = I2C0,
+        .periph = P_I2C1,
     };
-    EXPECT_EQ(ms5637_init(&device), OK);
+    EXPECT_EQ(ms5637_init(&device), STATUS_OK);
 
     BaroData data = ms5637_read(&device, OSR_8192);
     EXPECT_NEAR(data.pressure, 1100.02, 0.1);
