@@ -60,18 +60,28 @@ void init_clocks() {
     periph_conf.PeriphClockSelection = RCC_PERIPHCLK_I2C4;
     HAL_RCCEx_PeriphCLKConfig(&periph_conf);
 
+    periph_conf.PeriphClockSelection = RCC_PERIPHCLK_QSPI;
+    periph_conf.QspiClockSelection = RCC_QSPICLKSOURCE_SYSCLK;
+    HAL_RCCEx_PeriphCLKConfig(&periph_conf);
+
+    // Initialize I2C clocks
     __HAL_RCC_I2C2_CLK_ENABLE();
     __HAL_RCC_I2C3_CLK_ENABLE();
     __HAL_RCC_I2C4_CLK_ENABLE();
 
+    // Initialize SPI clocks
     __HAL_RCC_SPI1_CLK_ENABLE();
     __HAL_RCC_SPI2_CLK_ENABLE();
     __HAL_RCC_SPI4_CLK_ENABLE();
 
+    // Initialize GPIO clocks
     __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_GPIOC_CLK_ENABLE();
     __HAL_RCC_GPIOD_CLK_ENABLE();
     __HAL_RCC_GPIOE_CLK_ENABLE();
     __HAL_RCC_GPIOF_CLK_ENABLE();
+
+    // Initialize QSPI clocks
+    __HAL_RCC_QSPI_CLK_ENABLE();
 }
