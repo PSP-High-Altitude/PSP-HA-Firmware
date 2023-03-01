@@ -1,15 +1,13 @@
 #ifndef QSPI_H
 #define QSPI_H
 
+#include <stdbool.h>
+
 #include "status.h"
 
 typedef enum {
-    P_QSPI1 = 1,
-} QSpiPeriph;
-
-typedef enum {
-    P_QSPI_BK1 = 1,
-    P_QSPI_BK2 = 2,
+    QSPI_BK1 = 0,
+    QSPI_BK2 = 1,
 } QSpiBank;
 
 typedef enum {
@@ -24,7 +22,6 @@ typedef struct {
     QSpiSpeed clk;
     bool cpol;
     bool cpha;
-    QSpiPeriph periph;
     QSpiBank bank;
 } QSpiDevice;
 

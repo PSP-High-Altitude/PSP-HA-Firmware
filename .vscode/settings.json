@@ -27,6 +27,7 @@
         "usbd_def.h": "c",
         "ms5637.h": "c",
         "usb_device.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "status.h": "c"
     }
 }

@@ -7,10 +7,10 @@
 #include "status.h"
 
 typedef enum {
-    P_I2C1 = 1,
-    P_I2C2 = 2,
-    P_I2C3 = 3,
-    P_I2C4 = 4,
+    P_I2C1 = 0,
+    P_I2C2 = 1,
+    P_I2C3 = 2,
+    P_I2C4 = 3,
 } I2cPeriph;
 
 typedef enum {

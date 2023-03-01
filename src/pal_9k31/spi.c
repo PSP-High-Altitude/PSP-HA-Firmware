@@ -6,6 +6,9 @@
 static SPI_HandleTypeDef* spi_handles[] = {NULL, NULL, NULL, NULL};
 
 static Status spi_setup(SpiDevice* dev) {
+    if (dev->periph < 0 || dev->periph > 3) {
+        return STATUS_PARAMETER_ERROR;
+    }
     if (spi_handles[dev->periph] != NULL) {
         return STATUS_OK;
     }
@@ -55,8 +58,6 @@ static Status spi_setup(SpiDevice* dev) {
             pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PE6];
             HAL_GPIO_Init(GPIOE, &pin_conf);  // MOSI: pin PE6
             break;
-        default:
-            return STATUS_PARAMETER_ERROR;
     }
     uint32_t prescale = 0;
     switch (dev->clk) {

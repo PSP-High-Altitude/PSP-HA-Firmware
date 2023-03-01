@@ -45,6 +45,9 @@ static uint32_t getTimings(I2cDevice *dev) {
 }
 
 static Status i2cSetup(I2cDevice *dev) {
+    if (dev->periph < 0 || dev->periph > 3) {
+        return STATUS_PARAMETER_ERROR;
+    }
     if (i2c_handles[dev->periph] != NULL) {
         return STATUS_OK;
     }
@@ -83,8 +86,6 @@ static Status i2cSetup(I2cDevice *dev) {
             pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PC7];
             HAL_GPIO_Init(GPIOC, &pin_conf);  // SDA: pin PC7
             break;
-        default:
-            return STATUS_PARAMETER_ERROR;
     }
     I2C_InitTypeDef init_conf = {
         .AddressingMode = I2C_ADDRESSINGMODE_7BIT,

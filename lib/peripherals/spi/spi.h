@@ -10,10 +10,10 @@
 #include <status.h>
 
 typedef enum {
-    P_SPI1 = 1,
-    P_SPI2 = 2,
-    P_SPI3 = 3,
-    P_SPI4 = 4,
+    P_SPI1 = 0,
+    P_SPI2 = 1,
+    P_SPI3 = 2,
+    P_SPI4 = 3,
 } SpiPeriph;
 
 typedef enum {
