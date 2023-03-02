@@ -87,8 +87,8 @@ static Status write_enable() {
     return qspi_cmd(&dev, &cmd);
 }
 
-static Status program_load_x4(uint32_t col_addr, uint8_t plane, void *buffer,
-                              uint32_t size) {
+static Status program_load_x4(uint32_t col_addr, uint8_t plane,
+                              const void *buffer, uint32_t size) {
     QSPI_CommandTypeDef cmd = mt29f2g_default_cmd;
     cmd.Address = (plane << 12) + col_addr;
     cmd.AddressSize = MT29F2G_CMD_PROGRAM_LOAD_X4.n_addr;
@@ -119,8 +119,8 @@ static Status block_erase(uint32_t row_addr) {
     return qspi_cmd(&dev, &cmd);
 }
 
-int8_t mt29f2g_read(const struct lfs_config *c, lfs_block_t block,
-                    lfs_off_t off, void *buffer, lfs_size_t size) {
+int mt29f2g_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
+                 void *buffer, lfs_size_t size) {
     uint8_t num_pages = ((size + off) / 2176) - (off / 2176);
     if (num_pages > 2) {
         uint8_t page = (off / 2176);
@@ -210,8 +210,8 @@ int8_t mt29f2g_read(const struct lfs_config *c, lfs_block_t block,
     return 0;
 }
 
-int8_t mt29f2g_prog(const struct lfs_config *c, lfs_block_t block,
-                    lfs_off_t off, const void *buffer, lfs_size_t size) {
+int mt29f2g_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
+                 const void *buffer, lfs_size_t size) {
     uint8_t page = (off / 2176);
     uint32_t row_addr = ((block / 2) << 6) + page;
     uint16_t col_addr = off % 2176;
@@ -252,12 +252,12 @@ int8_t mt29f2g_prog(const struct lfs_config *c, lfs_block_t block,
     return 0;
 }
 
-int8_t mt29f2g_erase(const struct lfs_config *c, lfs_block_t block) {
+int mt29f2g_erase(const struct lfs_config *c, lfs_block_t block) {
     uint32_t row_addr = ((block / 2) << 6);
     if (write_enable() != STATUS_OK) {
         return LFS_ERR_IO;
     }
-    if (program_execute(row_addr) != STATUS_OK) {
+    if (block_erase(row_addr) != STATUS_OK) {
         return LFS_ERR_IO;
     }
     if (poll_oip() != STATUS_OK) {
@@ -266,4 +266,4 @@ int8_t mt29f2g_erase(const struct lfs_config *c, lfs_block_t block) {
     return 0;
 }
 
-int8_t mt29f2g_sync(const struct lfs_config *c) { return 0; }
+int mt29f2g_sync(const struct lfs_config *c) { return 0; }

@@ -39,18 +39,21 @@ int main(void) {
     HAL_Init();
     init_clocks();
     init_timers();
-    init_flash();
     MX_USB_Device_Init();
 
-    uint32_t boot_count = 0;
-    lfs_file_open(&lfs, &file, "boot_count", LFS_O_RDWR | LFS_O_CREAT);
-    lfs_file_read(&lfs, &file, &boot_count, sizeof(boot_count));
-    boot_count += 1;
-    lfs_file_rewind(&lfs, &file);
-    lfs_file_write(&lfs, &file, &boot_count, sizeof(boot_count));
-    lfs_file_close(&lfs, &file);
+    if (init_flash() != STATUS_OK) {
+        printf("Flash initialization failed.\n");
+    } else {
+        uint32_t boot_count = 0;
+        lfs_file_open(&lfs, &file, "boot_count", LFS_O_RDWR | LFS_O_CREAT);
+        lfs_file_read(&lfs, &file, &boot_count, sizeof(boot_count));
+        boot_count += 1;
+        lfs_file_rewind(&lfs, &file);
+        lfs_file_write(&lfs, &file, &boot_count, sizeof(boot_count));
+        lfs_file_close(&lfs, &file);
 
-    printf("Welcome to PAL 9000, boot %d\n", boot_count);
+        printf("Welcome to PAL 9000, boot %lu\n", boot_count);
+    }
 
     I2cDevice mag_conf = {
         .address = 0x1E,
@@ -117,10 +120,10 @@ int main(void) {
 
 Status init_flash() {
     const struct lfs_config cfg = {
-        .read = mt29f2g_read,
-        .prog = mt29f2g_prog,
-        .erase = mt29f2g_erase,
-        .sync = mt29f2g_sync,
+        .read = &mt29f2g_read,
+        .prog = &mt29f2g_prog,
+        .erase = &mt29f2g_erase,
+        .sync = &mt29f2g_sync,
 
         .read_size = 16,
         .prog_size = 16,
@@ -133,9 +136,14 @@ Status init_flash() {
     int err = lfs_mount(&lfs, &cfg);
 
     if (err) {
-        lfs_format(&lfs, &cfg);
-        lfs_mount(&lfs, &cfg);
+        if (lfs_format(&lfs, &cfg)) {
+            return STATUS_ERROR;
+        }
+        if (lfs_mount(&lfs, &cfg)) {
+            return STATUS_ERROR;
+        }
     }
+    return STATUS_OK;
 }
 
 void Error_Handler(void) {

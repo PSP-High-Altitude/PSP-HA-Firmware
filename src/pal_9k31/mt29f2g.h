@@ -13,15 +13,15 @@ typedef struct {
     uint32_t n_data;
 } MT29F2G_CmdTypeDef;
 
-int8_t mt29f2g_read(const struct lfs_config *c, lfs_block_t block,
-                    lfs_off_t off, void *buffer, lfs_size_t size);
+int mt29f2g_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
+                 void *buffer, lfs_size_t size);
 
-int8_t mt29f2g_prog(const struct lfs_config *c, lfs_block_t block,
-                    lfs_off_t off, const void *buffer, lfs_size_t size);
+int mt29f2g_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
+                 const void *buffer, lfs_size_t size);
 
-int8_t mt29f2g_erase(const struct lfs_config *c, lfs_block_t block);
+int mt29f2g_erase(const struct lfs_config *c, lfs_block_t block);
 
-int8_t mt29f2g_sync(const struct lfs_config *c);
+int mt29f2g_sync(const struct lfs_config *c);
 
 static const QSPI_CommandTypeDef mt29f2g_default_cmd = {
     .AddressMode = QSPI_ADDRESS_1_LINE,
