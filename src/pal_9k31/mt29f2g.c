@@ -78,6 +78,47 @@ static Status read_cache_x4(uint32_t col_addr, uint8_t plane, void *buffer,
     return (qspi_read(&dev, &cmd, (uint8_t *)buffer));
 }
 
+static Status write_enable() {
+    QSPI_CommandTypeDef cmd = mt29f2g_default_cmd;
+    cmd.AddressSize = MT29F2G_CMD_WRITE_ENABLE.n_addr;
+    cmd.DummyCycles = MT29F2G_CMD_WRITE_ENABLE.n_dummy;
+    cmd.NbData = MT29F2G_CMD_WRITE_ENABLE.n_data;
+    cmd.Instruction = MT29F2G_CMD_WRITE_ENABLE.op_code;
+    return qspi_cmd(&dev, &cmd);
+}
+
+static Status program_load_x4(uint32_t col_addr, uint8_t plane, void *buffer,
+                              uint32_t size) {
+    QSPI_CommandTypeDef cmd = mt29f2g_default_cmd;
+    cmd.Address = (plane << 12) + col_addr;
+    cmd.AddressSize = MT29F2G_CMD_PROGRAM_LOAD_X4.n_addr;
+    cmd.DummyCycles = MT29F2G_CMD_PROGRAM_LOAD_X4.n_dummy;
+    cmd.NbData = MT29F2G_CMD_PROGRAM_LOAD_X4.n_data;
+    cmd.Instruction = MT29F2G_CMD_PROGRAM_LOAD_X4.op_code;
+    cmd.NbData = size;
+    return (qspi_write(&dev, &cmd, (uint8_t *)buffer));
+}
+
+static Status program_execute(uint32_t row_addr) {
+    QSPI_CommandTypeDef cmd = mt29f2g_default_cmd;
+    cmd.Address = row_addr;
+    cmd.AddressSize = MT29F2G_CMD_PROGRAM_EXECUTE.n_addr;
+    cmd.DummyCycles = MT29F2G_CMD_PROGRAM_EXECUTE.n_dummy;
+    cmd.NbData = MT29F2G_CMD_PROGRAM_EXECUTE.n_data;
+    cmd.Instruction = MT29F2G_CMD_PROGRAM_EXECUTE.op_code;
+    return qspi_cmd(&dev, &cmd);
+}
+
+static Status block_erase(uint32_t row_addr) {
+    QSPI_CommandTypeDef cmd = mt29f2g_default_cmd;
+    cmd.Address = row_addr;
+    cmd.AddressSize = MT29F2G_CMD_BLOCK_ERASE.n_addr;
+    cmd.DummyCycles = MT29F2G_CMD_BLOCK_ERASE.n_dummy;
+    cmd.NbData = MT29F2G_CMD_BLOCK_ERASE.n_data;
+    cmd.Instruction = MT29F2G_CMD_BLOCK_ERASE.op_code;
+    return qspi_cmd(&dev, &cmd);
+}
+
 int8_t mt29f2g_read(const struct lfs_config *c, lfs_block_t block,
                     lfs_off_t off, void *buffer, lfs_size_t size) {
     uint8_t num_pages = ((size + off) / 2176) - (off / 2176);
@@ -170,8 +211,59 @@ int8_t mt29f2g_read(const struct lfs_config *c, lfs_block_t block,
 }
 
 int8_t mt29f2g_prog(const struct lfs_config *c, lfs_block_t block,
-                    lfs_off_t off, const void *buffer, lfs_size_t size);
+                    lfs_off_t off, const void *buffer, lfs_size_t size) {
+    uint8_t page = (off / 2176);
+    uint32_t row_addr = ((block / 2) << 6) + page;
+    uint16_t col_addr = off % 2176;
+    uint8_t plane = block % 2;
+    uint32_t buf_offset = 0;
+    while (page < (size + off) / 2176 - 1) {
+        if (write_enable() != STATUS_OK) {
+            return LFS_ERR_IO;
+        }
+        if (program_load_x4(col_addr, plane, buffer + buf_offset,
+                            2176 - col_addr) != STATUS_OK) {
+            return LFS_ERR_IO;
+        }
+        if (program_execute(row_addr) != STATUS_OK) {
+            return LFS_ERR_IO;
+        }
+        if (poll_oip() != STATUS_OK) {
+            return LFS_ERR_IO;
+        }
+        buf_offset += 2176 - col_addr;
+        col_addr = 0;
+        page++;
+        row_addr++;
+    }
+    if (write_enable() != STATUS_OK) {
+        return LFS_ERR_IO;
+    }
+    if (program_load_x4(col_addr, plane, buffer + buf_offset,
+                        (size + off) % 2176) != STATUS_OK) {
+        return LFS_ERR_IO;
+    }
+    if (program_execute(row_addr) != STATUS_OK) {
+        return LFS_ERR_IO;
+    }
+    if (poll_oip() != STATUS_OK) {
+        return LFS_ERR_IO;
+    }
+    return 0;
+}
 
-int8_t mt29f2g_erase(const struct lfs_config *c, lfs_block_t block);
+int8_t mt29f2g_erase(const struct lfs_config *c, lfs_block_t block) {
+    uint32_t row_addr = ((block / 2) << 6);
+    if (write_enable() != STATUS_OK) {
+        return LFS_ERR_IO;
+    }
+    if (program_execute(row_addr) != STATUS_OK) {
+        return LFS_ERR_IO;
+    }
+    if (poll_oip() != STATUS_OK) {
+        return LFS_ERR_IO;
+    }
+    return 0;
+}
 
-int8_t mt29f2g_sync(const struct lfs_config *c);
+int8_t mt29f2g_sync(const struct lfs_config *c) { return 0; }

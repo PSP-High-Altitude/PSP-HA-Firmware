@@ -7,14 +7,22 @@
 #include "clocks.h"
 #include "gpio/gpio.h"
 #include "iis2mdc/iis2mdc.h"
+#include "lfs.h"
 #include "lsm6dsox/lsm6dsox.h"
 #include "max_m10s.h"
 #include "ms5637/ms5637.h"
+#include "mt29f2g.h"
+#include "status.h"
 #include "timer.h"
 
 #define LED_PIN PIN_PC0
 
 #define TARGET_RATE 100
+
+lfs_t lfs;
+lfs_file_t file;
+
+Status init_flash();
 
 int _write(int file, char *data, int len) {
     if ((file != STDOUT_FILENO) && (file != STDERR_FILENO)) {
@@ -31,10 +39,18 @@ int main(void) {
     HAL_Init();
     init_clocks();
     init_timers();
-
+    init_flash();
     MX_USB_Device_Init();
 
-    uint32_t lastTime = 0;
+    uint32_t boot_count = 0;
+    lfs_file_open(&lfs, &file, "boot_count", LFS_O_RDWR | LFS_O_CREAT);
+    lfs_file_read(&lfs, &file, &boot_count, sizeof(boot_count));
+    boot_count += 1;
+    lfs_file_rewind(&lfs, &file);
+    lfs_file_write(&lfs, &file, &boot_count, sizeof(boot_count));
+    lfs_file_close(&lfs, &file);
+
+    printf("Welcome to PAL 9000, boot %d\n", boot_count);
 
     I2cDevice mag_conf = {
         .address = 0x1E,
@@ -86,6 +102,7 @@ int main(void) {
 
     printf("PAL 9000 initialization took %lld milliseconds\n", MILLIS());
 
+    uint32_t lastTime = 0;
     while (1) {
         while (MILLIS() - lastTime < 1000 / TARGET_RATE) {
         }
@@ -95,6 +112,29 @@ int main(void) {
         lsm6dsox_read_gyro(&imu_conf);
         ms5637_read(&baro_conf, OSR_256);
         iis2mdc_read(&mag_conf);
+    }
+}
+
+Status init_flash() {
+    const struct lfs_config cfg = {
+        .read = mt29f2g_read,
+        .prog = mt29f2g_prog,
+        .erase = mt29f2g_erase,
+        .sync = mt29f2g_sync,
+
+        .read_size = 16,
+        .prog_size = 16,
+        .block_size = 139264,
+        .block_count = 2048,
+        .cache_size = 16,
+        .lookahead_size = 16,
+        .block_cycles = 750,
+    };
+    int err = lfs_mount(&lfs, &cfg);
+
+    if (err) {
+        lfs_format(&lfs, &cfg);
+        lfs_mount(&lfs, &cfg);
     }
 }
 
