@@ -13,7 +13,7 @@ static Status qspi_setup(QSpiDevice* dev) {
     GPIO_InitTypeDef pin_conf = {
         .Mode = GPIO_MODE_AF_PP,
         .Pull = GPIO_NOPULL,
-        .Speed = GPIO_SPEED_FREQ_HIGH,
+        .Speed = GPIO_SPEED_FREQ_VERY_HIGH,
     };
     if (dev->bank == QSPI_BK1) {
         pin_conf.Alternate = GPIO_AF10_QUADSPI;
@@ -52,7 +52,7 @@ static Status qspi_setup(QSpiDevice* dev) {
     QSPI_InitTypeDef init_conf = {
         .ClockPrescaler = prescale,
         .FifoThreshold = 1,
-        .SampleShifting = QSPI_SAMPLE_SHIFTING_NONE,
+        .SampleShifting = QSPI_SAMPLE_SHIFTING_HALFCYCLE,
         .FlashSize = 30,
         .ChipSelectHighTime = QSPI_CS_HIGH_TIME_1_CYCLE,
         .ClockMode = QSPI_CLOCK_MODE_0,
@@ -73,6 +73,17 @@ Status qspi_cmd(QSpiDevice* dev, QSPI_CommandTypeDef* cmd) {
         return STATUS_PARAMETER_ERROR;
     }
     if (HAL_QSPI_Command(qspi_handle, cmd, 100) != HAL_OK) {
+        return STATUS_ERROR;
+    }
+    return STATUS_OK;
+}
+
+Status qspi_auto_poll_cmd(QSpiDevice* dev, QSPI_CommandTypeDef* cmd,
+                          QSPI_AutoPollingTypeDef* cfg) {
+    if (qspi_setup(dev) != STATUS_OK) {
+        return STATUS_PARAMETER_ERROR;
+    }
+    if (HAL_QSPI_AutoPolling(qspi_handle, cmd, cfg, 100) != HAL_OK) {
         return STATUS_ERROR;
     }
     return STATUS_OK;

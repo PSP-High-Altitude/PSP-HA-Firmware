@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #include "status.h"
+#include "stm32g4xx_hal.h"
 
 typedef enum {
     QSPI_BK1 = 0,
@@ -20,9 +21,13 @@ typedef enum {
 
 typedef struct {
     QSpiSpeed clk;
-    bool cpol;
-    bool cpha;
     QSpiBank bank;
 } QSpiDevice;
+
+Status qspi_auto_poll_cmd(QSpiDevice* dev, QSPI_CommandTypeDef* cmd,
+                          QSPI_AutoPollingTypeDef* cfg);
+Status qspi_cmd(QSpiDevice* dev, QSPI_CommandTypeDef* cmd);
+Status qspi_write(QSpiDevice* dev, QSPI_CommandTypeDef* cmd, uint8_t* tx_buf);
+Status qspi_read(QSpiDevice* dev, QSPI_CommandTypeDef* cmd, uint8_t* rx_buf);
 
 #endif
