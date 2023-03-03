@@ -39,8 +39,13 @@ int main(void) {
     HAL_Init();
     init_clocks();
     init_timers();
+    HAL_Delay(1000);
     MX_USB_Device_Init();
+    HAL_Delay(1000);
+    uint8_t str[] = "Hello\r\n";
+    CDC_Transmit_FS(str, 6);
 
+    /*
     if (init_flash() != STATUS_OK) {
         printf("Flash initialization failed.\n");
     } else {
@@ -54,6 +59,7 @@ int main(void) {
 
         printf("Welcome to PAL 9000, boot %lu\n", boot_count);
     }
+    */
 
     I2cDevice mag_conf = {
         .address = 0x1E,
