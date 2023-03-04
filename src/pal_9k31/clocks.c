@@ -2,10 +2,7 @@
 
 #include "stm32g4xx_hal.h"
 
-void init_clocks() {
-    __HAL_RCC_SYSCFG_CLK_ENABLE();
-    __HAL_RCC_PWR_CLK_ENABLE();
-
+void SystemClock_Config() {
     // CORE FREQUENCY: 168Mhz
 
     RCC_OscInitTypeDef RCC_OscInitStruct = {0};

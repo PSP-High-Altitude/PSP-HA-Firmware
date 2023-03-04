@@ -3,42 +3,21 @@
 #include "pal_9k31/board.h"
 #include "stm32g4xx_hal.h"
 
-static I2C_HandleTypeDef *i2c_handles[] = {NULL, NULL, NULL, NULL};
+static I2C_HandleTypeDef i2c1_handle = {.State = 0};
+static I2C_HandleTypeDef i2c2_handle = {.State = 0};
+static I2C_HandleTypeDef i2c3_handle = {.State = 0};
+static I2C_HandleTypeDef i2c4_handle = {.State = 0};
+static I2C_HandleTypeDef *i2c_handles[4] = {&i2c1_handle, &i2c2_handle,
+                                            &i2c3_handle, &i2c4_handle};
 
 static uint32_t getTimings(I2cDevice *dev) {
-    uint32_t presc;
-    uint32_t scll;
-    uint32_t sclh;
-    uint32_t sdadel;
-    uint32_t scldel;
     switch (dev->clk) {
         case I2C_SPEED_STANDARD:
-            presc = 3;
-            scll = 0x13;
-            sclh = 0xF;
-            sdadel = 0x2;
-            scldel = 0x4;
-            return (presc << 28) | (scldel << 20) | (sdadel << 16) |
-                   (sclh << 8) | scll;
-            break;
+            return 0x00303D5B;
         case I2C_SPEED_FAST:
-            presc = 1;
-            scll = 0x9;
-            sclh = 0x3;
-            sdadel = 0x2;
-            scldel = 0x3;
-            return (presc << 28) | (scldel << 20) | (sdadel << 16) |
-                   (sclh << 8) | scll;
-            break;
+            return 0x0010061A;
         case I2C_SPEED_FAST_PLUS:
-            presc = 0;
-            scll = 0x4;
-            sclh = 0x2;
-            sdadel = 0x0;
-            scldel = 0x2;
-            return (presc << 28) | (scldel << 20) | (sdadel << 16) |
-                   (sclh << 8) | scll;
-            break;
+            return 0x00000107;
         default:
             return 0;
     }
@@ -48,7 +27,7 @@ static Status i2cSetup(I2cDevice *dev) {
     if (dev->periph < 0 || dev->periph > 3) {
         return STATUS_PARAMETER_ERROR;
     }
-    if (i2c_handles[dev->periph] != NULL) {
+    if (i2c_handles[dev->periph]->State != 0) {
         return STATUS_OK;
     }
     I2C_TypeDef *base = NULL;
@@ -88,19 +67,31 @@ static Status i2cSetup(I2cDevice *dev) {
             break;
     }
     I2C_InitTypeDef init_conf = {
+        .OwnAddress1 = 0,
+        .DualAddressMode = I2C_DUALADDRESS_DISABLE,
+        .OwnAddress2 = 0,
+        .OwnAddress2Masks = I2C_OA2_NOMASK,
+        .GeneralCallMode = I2C_GENERALCALL_DISABLE,
+        .NoStretchMode = I2C_NOSTRETCH_DISABLE,
         .AddressingMode = I2C_ADDRESSINGMODE_7BIT,
         .Timing = getTimings(dev),
     };
     if (!init_conf.Timing) {
         return STATUS_PARAMETER_ERROR;
     }
-    I2C_HandleTypeDef handle = {
-        .Init = init_conf,
-        .Instance = base,
-        .Mode = HAL_I2C_MODE_MASTER,
-    };
-    HAL_I2C_Init(&handle);
-    i2c_handles[dev->periph] = &handle;
+    I2C_HandleTypeDef *handle = i2c_handles[dev->periph];
+    (*handle).Init = init_conf;
+    (*handle).Instance = base;
+    if (HAL_I2C_Init(handle) != HAL_OK) {
+        return STATUS_ERROR;
+    }
+    if (HAL_I2CEx_ConfigAnalogFilter(handle, I2C_ANALOGFILTER_ENABLE) !=
+        HAL_OK) {
+        return STATUS_ERROR;
+    }
+    if (HAL_I2CEx_ConfigDigitalFilter(handle, 0) != HAL_OK) {
+        return STATUS_ERROR;
+    }
     return STATUS_OK;
 }
 

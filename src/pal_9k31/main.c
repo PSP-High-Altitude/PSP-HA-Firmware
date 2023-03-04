@@ -5,6 +5,7 @@
 #include "USB_Device/App/usbd_cdc_if.h"
 #include "board.h"
 #include "clocks.h"
+#include "data.h"
 #include "gpio/gpio.h"
 #include "iis2mdc/iis2mdc.h"
 #include "lfs.h"
@@ -15,14 +16,24 @@
 #include "status.h"
 #include "timer.h"
 
-#define LED_PIN PIN_PC0
+#ifdef USE_SPI_CRC
+#undef USE_SPI_CRC
+#endif
+#define USE_SPI_CRC 0
+
+#define LED_PIN PIN_PC1
+#define BUZZER_PIN PIN_PB9
 
 #define TARGET_RATE 100
+
+#define DEBUG
 
 lfs_t lfs;
 lfs_file_t file;
 
 Status init_flash();
+
+extern PCD_HandleTypeDef hpcd_USB_FS;
 
 int _write(int file, char *data, int len) {
     if ((file != STDOUT_FILENO) && (file != STDERR_FILENO)) {
@@ -30,20 +41,42 @@ int _write(int file, char *data, int len) {
         return -1;
     }
 
-    HAL_StatusTypeDef status = CDC_Transmit_FS((uint8_t *)data, len);
+#ifdef DEBUG
+    uint64_t start_time = MILLIS();
+    USBD_StatusTypeDef rc = USBD_OK;
+    do {
+        rc = CDC_Transmit_FS((uint8_t *)data, len);
+    } while (USBD_BUSY == rc && MILLIS() - start_time < 10);
 
-    return (status == HAL_OK ? len : 0);
+    if (USBD_FAIL == rc) {
+        return 0;
+    }
+#endif
+    return len;
 }
 
 int main(void) {
     HAL_Init();
-    init_clocks();
+    SystemClock_Config();
     init_timers();
-    HAL_Delay(1000);
+    gpio_write(PIN_PA4, GPIO_HIGH);
+    gpio_write(PIN_PB12, GPIO_HIGH);
+    gpio_write(PIN_PE4, GPIO_HIGH);
+    DELAY(1000);
     MX_USB_Device_Init();
-    HAL_Delay(1000);
-    uint8_t str[] = "Hello\r\n";
-    CDC_Transmit_FS(str, 6);
+    DELAY(1000);
+    printf("Starting initialization...\n");
+
+    /*
+    gpio_write(BUZZER_PIN, GPIO_HIGH);
+    DELAY(50);
+    gpio_write(BUZZER_PIN, GPIO_LOW);
+    DELAY(50);
+    gpio_write(BUZZER_PIN, GPIO_HIGH);
+    DELAY(50);
+    gpio_write(BUZZER_PIN, GPIO_LOW);
+    DELAY(50);
+    */
 
     /*
     if (init_flash() != STATUS_OK) {
@@ -63,17 +96,17 @@ int main(void) {
 
     I2cDevice mag_conf = {
         .address = 0x1E,
-        .clk = I2C_SPEED_STANDARD,
+        .clk = I2C_SPEED_FAST,
         .periph = P_I2C3,
     };
     I2cDevice baro_conf = {
         .address = 0x76,
-        .clk = I2C_SPEED_STANDARD,
+        .clk = I2C_SPEED_FAST,
         .periph = P_I2C3,
     };
     I2cDevice gps_conf = {
         .address = 0x42,
-        .clk = I2C_SPEED_STANDARD,
+        .clk = I2C_SPEED_FAST,
         .periph = P_I2C2,
     };
     SpiDevice imu_conf = {
@@ -85,30 +118,81 @@ int main(void) {
     };
 
     // Initialize magnetometer
-    iis2mdc_init(&mag_conf, IIS2MDC_ODR_50_HZ);
+    if (iis2mdc_init(&mag_conf, IIS2MDC_ODR_50_HZ) == STATUS_OK) {
+        printf("Magnetometer initialization successful\n");
+    } else {
+        printf("Magnetometer initialization failed\n");
+    }
 
     // Initialize barometer
-    ms5637_init(&baro_conf);
+    if (ms5637_init(&baro_conf) == STATUS_OK) {
+        printf("Barometer initialization successful\n");
+    } else {
+        printf("Barometer initialization failed\n");
+    }
 
     // Initialize IMU
-    lsm6dsox_init(&imu_conf);
+    if (lsm6dsox_init(&imu_conf) == STATUS_OK) {
+        printf("IMU initialization successful\n");
+    } else {
+        printf("IMU initialization failed\n");
+    }
 
-    lsm6dsox_config_accel(&imu_conf, LSM6DSOX_XL_RATE_208_HZ,
-                          LSM6DSOX_XL_RANGE_8_G);
+    if (lsm6dsox_config_accel(&imu_conf, LSM6DSOX_XL_RATE_208_HZ,
+                              LSM6DSOX_XL_RANGE_8_G) == STATUS_OK) {
+        printf("IMU accel range set successfully\n");
+    } else {
+        printf("IMU configuration failed\n");
+    }
 
-    lsm6dsox_config_gyro(&imu_conf, LSM6DSOX_G_RATE_208_HZ,
-                         LSM6DSOX_G_RANGE_500_DPS);
+    if (lsm6dsox_config_gyro(&imu_conf, LSM6DSOX_G_RATE_208_HZ,
+                             LSM6DSOX_G_RANGE_500_DPS) == STATUS_OK) {
+        printf("IMU gyro range set successfully\n");
+    } else {
+        printf("IMU configuration failed\n");
+    }
 
     // Initialize GPS
-    max_m10s_init(&gps_conf);
+    if (max_m10s_init(&gps_conf) == STATUS_OK) {
+        printf("GPS initialization successful\n");
+    } else {
+        printf("GPS initialization failed\n");
+    }
 
-    /*while (1) {
+    printf("\n");
+
+    while (1) {
         gpio_write(LED_PIN, GPIO_HIGH);
         DELAY(1000);
         gpio_write(LED_PIN, GPIO_LOW);
         DELAY(1000);
-    }*/
-
+        Accel accel = lsm6dsox_read_accel(&imu_conf);
+        Gyro gyro = lsm6dsox_read_gyro(&imu_conf);
+        BaroData baro = ms5637_read(&baro_conf, OSR_256);
+        Mag mag = iis2mdc_read(&mag_conf);
+        if (isnan(baro.pressure)) {
+            printf("Barometer read error\n");
+        } else {
+            printf("Temperature %6f (deg C)\n", baro.temperature);
+            printf("Pressure %6f (mbar)\n", baro.pressure);
+        }
+        if (isnan(accel.accelX) || isnan(gyro.gyroX)) {
+            printf("IMU read error\n");
+        } else {
+            printf("Acceleration - x: %6f, y: %6f, z: %6f (g)\n", accel.accelX,
+                   accel.accelY, accel.accelZ);
+            printf("Rotation - x: %6f, y: %6f, z: %6f (deg/s)\n", gyro.gyroX,
+                   gyro.gyroY, gyro.gyroZ);
+        }
+        if (isnan(mag.magX)) {
+            printf("Magnetometer read error\n");
+        } else {
+            printf("Magnetic Field - x: %6f, y: %6f, z: %6f (G)\n", mag.magX,
+                   mag.magY, mag.magZ);
+        }
+        printf("\n");
+    }
+    /*
     printf("PAL 9000 initialization took %lld milliseconds\n", MILLIS());
 
     uint32_t lastTime = 0;
@@ -122,6 +206,7 @@ int main(void) {
         ms5637_read(&baro_conf, OSR_256);
         iis2mdc_read(&mag_conf);
     }
+    */
 }
 
 Status init_flash() {
@@ -187,3 +272,5 @@ void SVC_Handler(void) {}
 void DebugMon_Handler(void) {}
 
 void PendSV_Handler(void) {}
+
+void USB_LP_IRQHandler(void) { HAL_PCD_IRQHandler(&hpcd_USB_FS); }

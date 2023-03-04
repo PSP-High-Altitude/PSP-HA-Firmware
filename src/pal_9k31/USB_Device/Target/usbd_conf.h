@@ -75,10 +75,10 @@
 /*---------- -----------*/
 #define USBD_LPM_ENABLED     1U
 /*---------- -----------*/
-#define USBD_SELF_POWERED     1U
+#define USBD_SELF_POWERED 0U
 
-/****************************************/
-/* #define for FS and HS identification */
+ /****************************************/
+ /* #define for FS and HS identification */
 #define DEVICE_FS 		0
 
 /**

@@ -44,9 +44,12 @@ Mag iis2mdc_read(I2cDevice* device) {
         return mag;
     }
 
-    mag.magX = (((uint16_t)buf[1] << 8) | (uint16_t)buf[0]) * 1.5;
-    mag.magY = (((uint16_t)buf[3] << 8) | (uint16_t)buf[2]) * 1.5;
-    mag.magZ = (((uint16_t)buf[5] << 8) | (uint16_t)buf[4]) * 1.5;
+    mag.magX =
+        (int16_t)(((uint16_t)buf[1] << 8) | (uint16_t)buf[0]) * 1.5 / 1000;
+    mag.magY =
+        (int16_t)(((uint16_t)buf[3] << 8) | (uint16_t)buf[2]) * 1.5 / 1000;
+    mag.magZ =
+        (int16_t)(((uint16_t)buf[5] << 8) | (uint16_t)buf[4]) * 1.5 / 1000;
 
     return mag;
 }

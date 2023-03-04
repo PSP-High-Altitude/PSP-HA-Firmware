@@ -34,7 +34,7 @@ GpioValue gpio_read(uint8_t pin) {
     uint32_t gpio_pin = GPIO_PIN_TO_NUM[pin];
     GPIO_TypeDef *base = GPIO_PIN_TO_BASE[pin];
     GPIO_InitTypeDef conf = {
-        .Mode = GPIO_MODE_OUTPUT_PP,
+        .Mode = GPIO_MODE_INPUT,
         .Pin = gpio_pin,
         .Pull = GPIO_NOPULL,
         .Speed = GPIO_SPEED_FREQ_HIGH,

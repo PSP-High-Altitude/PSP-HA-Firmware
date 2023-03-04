@@ -29,6 +29,11 @@
         "usb_device.h": "c",
         "stdio.h": "c",
         "status.h": "c",
-        "lfs.h": "c"
+        "lfs.h": "c",
+        "usbd_cdc_if.h": "c",
+        "timer.h": "c",
+        "qspi.h": "c",
+        "mt29f2g.h": "c",
+        "stm32g4xx_hal_gpio_ex.h": "c"
     }
 }
