@@ -7,9 +7,8 @@
 #include <stdint.h>
 
 // PSPHAA library
-#include <status.h>
-
-#include "stm32g4xx_hal.h"
+#include "gpio/gpio.h"
+#include "status.h"
 
 typedef enum {
     P_SPI1 = 0,
@@ -34,9 +33,14 @@ typedef struct {
     SpiPeriph periph;
 } SpiDevice;
 
-uint8_t spi_exchange(SpiDevice* dev, uint8_t* tx_buf, uint8_t* rx_buf,
-                     uint8_t len);
+Status spi_setup(SpiDevice* dev);
 
-SPI_HandleTypeDef* get_handle(SpiDevice* dev);
+Status spi_set_cs(SpiDevice* dev, GpioValue val);
+
+Status spi_exchange_nosetup(SpiDevice* dev, uint8_t* tx_buf, uint8_t* rx_buf,
+                            uint8_t len);
+
+Status spi_exchange(SpiDevice* dev, uint8_t* tx_buf, uint8_t* rx_buf,
+                    uint8_t len);
 
 #endif // SPI_H

@@ -6,6 +6,7 @@
 #include "board.h"
 #include "clocks.h"
 #include "data.h"
+#include "fatfs/sd.h"
 #include "gpio/gpio.h"
 #include "iis2mdc/iis2mdc.h"
 #include "lfs.h"
@@ -116,6 +117,13 @@ int main(void) {
         .cs = 0,
         .periph = P_SPI1,
     };
+    SpiDevice sd_conf = {
+        .clk = SPI_SPEED_1MHz,
+        .cpol = 0,
+        .cpha = 0,
+        .cs = 0,
+        .periph = P_SPI4,
+    };
 
     // Initialize magnetometer
     if (iis2mdc_init(&mag_conf, IIS2MDC_ODR_50_HZ) == STATUS_OK) {
@@ -157,6 +165,13 @@ int main(void) {
         printf("GPS initialization successful\n");
     } else {
         printf("GPS initialization failed\n");
+    }
+
+    // Initialize SD card
+    if (sd_init(&sd_conf) == STATUS_OK) {
+        printf("SD card initialization successful\n");
+    } else {
+        printf("SD card initialization failed\n");
     }
 
     printf("\n");
