@@ -193,6 +193,7 @@ int main(void) {
             printf("Temperature %6f (deg C)\n", baro.temperature);
             printf("Pressure %6f (mbar)\n", baro.pressure);
         }
+
         if (isnan(accel.accelX) || isnan(gyro.gyroX)) {
             printf("IMU read error\n");
         } else {
@@ -201,18 +202,26 @@ int main(void) {
             printf("Rotation - x: %6f, y: %6f, z: %6f (deg/s)\n", gyro.gyroX,
                    gyro.gyroY, gyro.gyroZ);
         }
+
         if (isnan(mag.magX)) {
             printf("Magnetometer read error\n");
         } else {
             printf("Magnetic Field - x: %6f, y: %6f, z: %6f (G)\n", mag.magX,
                    mag.magY, mag.magZ);
         }
+
         if (max_m10s_poll_fix(&gps_conf, &fix) == STATUS_OK) {
             printf(
                 "Latitude: %f (deg), Longitude: %f (deg), Altitude: %f (m)\n",
                 fix.lat, fix.lon, fix.height_msl);
         } else {
             printf("GPS read error\n");
+        }
+
+        if (sd_write(MILLIS(), &accel, &gyro, &baro, &mag, &fix) == STATUS_OK) {
+            printf("Logged successfully\n");
+        } else {
+            printf("SD write error\n");
         }
         printf("\n");
     }
