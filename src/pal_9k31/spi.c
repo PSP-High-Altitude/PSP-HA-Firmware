@@ -14,7 +14,7 @@ static SPI_HandleTypeDef* spi_handles[] = {&spi1_handle, &spi2_handle,
                                            &spi3_handle, &spi4_handle};
 static uint8_t cs_pin[4] = {PIN_PA4, PIN_PB12, 0, PIN_PE4};
 
-static Status spi_setup(SpiDevice* dev) {
+Status spi_setup(SpiDevice* dev) {
     if (dev->periph < 0 || dev->periph > 3) {
         return STATUS_PARAMETER_ERROR;
     }
@@ -107,17 +107,28 @@ static Status spi_setup(SpiDevice* dev) {
     return STATUS_OK;
 }
 
-uint8_t spi_exchange(SpiDevice* dev, uint8_t* tx_buf, uint8_t* rx_buf,
-                     uint8_t len) {
-    uint8_t status;
+Status spi_set_cs(SpiDevice* dev, GpioValue val) {
+    return gpio_write(cs_pin[dev->periph], val);
+}
+
+Status spi_exchange_nosetup(SpiDevice* dev, uint8_t* tx_buf, uint8_t* rx_buf,
+                            uint8_t len) {
+    if (HAL_SPI_TransmitReceive(spi_handles[dev->periph], tx_buf, rx_buf, len,
+                                100) != HAL_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+    return STATUS_OK;
+}
+
+Status spi_exchange(SpiDevice* dev, uint8_t* tx_buf, uint8_t* rx_buf,
+                    uint8_t len) {
     if (spi_setup(dev) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
     }
     gpio_write(cs_pin[dev->periph], GPIO_LOW);
-    if ((status = HAL_SPI_TransmitReceive(spi_handles[dev->periph], tx_buf,
-                                          rx_buf, len, 100)) != HAL_OK) {
+    if (spi_exchange_nosetup(dev, tx_buf, rx_buf, len) != STATUS_OK) {
         gpio_write(cs_pin[dev->periph], GPIO_HIGH);
-        return status;
+        return STATUS_HARDWARE_ERROR;
     }
     gpio_write(cs_pin[dev->periph], GPIO_HIGH);
     return STATUS_OK;

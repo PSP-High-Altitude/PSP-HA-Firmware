@@ -5,7 +5,6 @@
 #include <stdint.h>
 
 #include "status.h"
-#include "stm32g4xx_hal.h"
 
 typedef enum {
     P_I2C1 = 0,
