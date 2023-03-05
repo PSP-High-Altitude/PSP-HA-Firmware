@@ -170,6 +170,8 @@ int main(void) {
         Gyro gyro = lsm6dsox_read_gyro(&imu_conf);
         BaroData baro = ms5637_read(&baro_conf, OSR_256);
         Mag mag = iis2mdc_read(&mag_conf);
+        GPS_Fix_TypeDef fix;
+
         if (isnan(baro.pressure)) {
             printf("Barometer read error\n");
         } else {
@@ -189,6 +191,13 @@ int main(void) {
         } else {
             printf("Magnetic Field - x: %6f, y: %6f, z: %6f (G)\n", mag.magX,
                    mag.magY, mag.magZ);
+        }
+        if (max_m10s_poll_fix(&gps_conf, &fix) == STATUS_OK) {
+            printf(
+                "Latitude: %f (deg), Longitude: %f (deg), Altitude: %f (m)\n",
+                fix.lat, fix.lon, fix.height_msl);
+        } else {
+            printf("GPS read error\n");
         }
         printf("\n");
     }

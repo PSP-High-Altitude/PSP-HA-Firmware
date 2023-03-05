@@ -43,9 +43,9 @@ void SystemClock_Config() {
 
     RCC_PeriphCLKInitTypeDef periph_conf = {
         .I2c1ClockSelection = RCC_I2C1CLKSOURCE_HSI,
-        .I2c2ClockSelection = RCC_I2C1CLKSOURCE_HSI,
-        .I2c3ClockSelection = RCC_I2C1CLKSOURCE_HSI,
-        .I2c4ClockSelection = RCC_I2C1CLKSOURCE_HSI,
+        .I2c2ClockSelection = RCC_I2C2CLKSOURCE_HSI,
+        .I2c3ClockSelection = RCC_I2C3CLKSOURCE_HSI,
+        .I2c4ClockSelection = RCC_I2C4CLKSOURCE_HSI,
     };
 
     periph_conf.PeriphClockSelection = RCC_PERIPHCLK_I2C1;
