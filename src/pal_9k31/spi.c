@@ -113,15 +113,12 @@ uint8_t spi_exchange(SpiDevice* dev, uint8_t* tx_buf, uint8_t* rx_buf,
     if (spi_setup(dev) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
     }
-    DELAY_MICROS(10);
     gpio_write(cs_pin[dev->periph], GPIO_LOW);
-    DELAY_MICROS(1);
     if ((status = HAL_SPI_TransmitReceive(spi_handles[dev->periph], tx_buf,
                                           rx_buf, len, 100)) != HAL_OK) {
         gpio_write(cs_pin[dev->periph], GPIO_HIGH);
         return status;
     }
-    DELAY_MICROS(1);
     gpio_write(cs_pin[dev->periph], GPIO_HIGH);
     return STATUS_OK;
 }

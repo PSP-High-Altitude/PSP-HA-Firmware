@@ -83,6 +83,10 @@ __attribute__((unused)) static Status ubx_cfg_valget(
             bytes_avail = (rx_buf[0] << 8) + rx_buf[1];
         }
         message_buf = malloc(bytes_avail);
+        uint8_t addr_buf[1] = {0xFF};
+        if (i2c_write(device, addr_buf, 1) != STATUS_OK) {
+            return STATUS_ERROR;
+        }
         if (i2c_read(device, message_buf, bytes_avail) != STATUS_OK) {
             free(message_buf);
             return STATUS_ERROR;
@@ -116,19 +120,19 @@ static Status ubx_cfg_valset(I2cDevice* device, Max_M10S_Layer_TypeDef layer,
         total_len += 4 + value_lens[i];
     }
     size_t tx_buf_len = 12 + total_len;
-    uint8_t* tx_buf = malloc(tx_buf_len);
+    uint8_t tx_buf[tx_buf_len];
     tx_buf[0] = 0xB5;
     tx_buf[1] = 0x62;
     tx_buf[2] = 0x06;
     tx_buf[3] = 0x8A;
     tx_buf[4] = (4 + total_len) & 0xFF;
     tx_buf[5] = ((4 + total_len) >> 8) & 0xFF;
-    tx_buf[6] = 0;
+    tx_buf[6] = 1;
     tx_buf[7] = (uint8_t)layer;
     tx_buf[8] = 0;
     tx_buf[9] = 0;
     uint16_t tx_buf_idx = 10;
-    for (uint16_t i = 0; i < total_len; i++) {
+    for (uint16_t i = 0; i < num_items; i++) {
         for (uint8_t j = 0; j < 4; j++) {
             tx_buf[tx_buf_idx] = (keys[i] >> (j * 8)) & 0xFF;
             tx_buf_idx += 1;
@@ -147,15 +151,19 @@ static Status ubx_cfg_valset(I2cDevice* device, Max_M10S_Layer_TypeDef layer,
     tx_buf[tx_buf_len - 2] = CK_A;
     tx_buf[tx_buf_len - 1] = CK_B;
 
+    printf("gps msg\n");
+    for (uint16_t i = 0; i < tx_buf_len; i++) {
+        printf("%x\n", tx_buf[i]);
+    }
     if (i2c_write(device, tx_buf, tx_buf_len) != STATUS_OK) {
-        free(tx_buf);
+        printf("failed here\n");
         return STATUS_ERROR;
     }
-    free(tx_buf);
 
     uint32_t message_header = 0;
     uint8_t* message_buf;
     uint16_t bytes_avail = 0;
+    printf("gps msg rx\n");
     while (message_header != 0x010562B5 && message_header != 0x000562B5) {
         bytes_avail = 0;
         while (!bytes_avail) {
@@ -167,9 +175,14 @@ static Status ubx_cfg_valset(I2cDevice* device, Max_M10S_Layer_TypeDef layer,
             if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
                 return STATUS_ERROR;
             }
+            printf("%x\n", (uint16_t)(rx_buf[0] << 8) + rx_buf[1]);
             bytes_avail = (rx_buf[0] << 8) + rx_buf[1];
         }
         message_buf = malloc(bytes_avail);
+        uint8_t addr_buf[1] = {0xFF};
+        if (i2c_write(device, addr_buf, 1) != STATUS_OK) {
+            return STATUS_ERROR;
+        }
         if (i2c_read(device, message_buf, bytes_avail) != STATUS_OK) {
             free(message_buf);
             return STATUS_ERROR;
@@ -190,7 +203,7 @@ static Status ubx_cfg_valset(I2cDevice* device, Max_M10S_Layer_TypeDef layer,
 
 Status max_m10s_poll_fix(I2cDevice* device, GPS_Fix_TypeDef* fix) {
     size_t tx_buf_len = 8;
-    uint8_t* tx_buf = malloc(tx_buf_len);
+    uint8_t tx_buf[tx_buf_len];
     tx_buf[0] = 0xB5;
     tx_buf[1] = 0x62;
     tx_buf[2] = 0x01;
@@ -208,10 +221,8 @@ Status max_m10s_poll_fix(I2cDevice* device, GPS_Fix_TypeDef* fix) {
     tx_buf[tx_buf_len - 1] = CK_B;
 
     if (i2c_write(device, tx_buf, tx_buf_len) != STATUS_OK) {
-        free(tx_buf);
         return STATUS_ERROR;
     }
-    free(tx_buf);
 
     uint32_t message_header = 0;
     uint8_t* message_buf;
@@ -230,6 +241,10 @@ Status max_m10s_poll_fix(I2cDevice* device, GPS_Fix_TypeDef* fix) {
             bytes_avail = (rx_buf[0] << 8) + rx_buf[1];
         }
         message_buf = malloc(bytes_avail);
+        uint8_t addr_buf[1] = {0xFF};
+        if (i2c_write(device, addr_buf, 1) != STATUS_OK) {
+            return STATUS_ERROR;
+        }
         if (i2c_read(device, message_buf, bytes_avail) != STATUS_OK) {
             free(message_buf);
             return STATUS_ERROR;

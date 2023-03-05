@@ -34,6 +34,9 @@
         "timer.h": "c",
         "qspi.h": "c",
         "mt29f2g.h": "c",
-        "stm32g4xx_hal_gpio_ex.h": "c"
+        "stm32g4xx_hal_gpio_ex.h": "c",
+        "ff_gen_drv.h": "c",
+        "ff.h": "c",
+        "ffconf.h": "c"
     }
 }
