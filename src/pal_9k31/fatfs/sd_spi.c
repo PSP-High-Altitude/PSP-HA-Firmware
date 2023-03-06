@@ -135,7 +135,7 @@ static void deselect(void) {
 
 static int select(void) /* 1:OK, 0:Timeout */
 {
-    spi_set_cs(&s_sd_spi_device, GPIO_HIGH); /* Set CS# low */
+    spi_set_cs(&s_sd_spi_device, GPIO_LOW); /* Set CS# low */
     xchg_spi(0xFF);                /* Dummy clock (force DO enabled) */
     if (wait_ready(500)) return 1; /* Wait for card ready */
 
