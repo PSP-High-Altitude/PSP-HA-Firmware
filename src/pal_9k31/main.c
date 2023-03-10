@@ -14,6 +14,7 @@
 #include "max_m10s.h"
 #include "ms5637/ms5637.h"
 #include "mt29f2g.h"
+#include "qspi/qspi.h"
 #include "status.h"
 #include "timer.h"
 
@@ -22,7 +23,8 @@
 #endif
 #define USE_SPI_CRC 0
 
-#define LED_PIN PIN_PC1
+#define YELLOW_PIN PIN_PC1
+#define BLUE_PIN PIN_PC1
 #define BUZZER_PIN PIN_PB9
 
 #define TARGET_RATE 100
@@ -32,7 +34,7 @@
 lfs_t lfs;
 lfs_file_t file;
 
-Status init_flash();
+Status init_flash_fs();
 
 extern PCD_HandleTypeDef hpcd_USB_FS;
 
@@ -67,6 +69,11 @@ int main(void) {
     MX_USB_Device_Init();
     DELAY(1000);
     printf("Starting initialization...\n");
+    if (mt29f2g_init() == STATUS_OK) {
+        printf("Flash chip initialization successful\n");
+    } else {
+        printf("Flash chip initialization failed\n");
+    }
 
     /*
     gpio_write(BUZZER_PIN, GPIO_HIGH);
@@ -79,9 +86,8 @@ int main(void) {
     DELAY(50);
     */
 
-    /*
-    if (init_flash() != STATUS_OK) {
-        printf("Flash initialization failed.\n");
+    if (init_flash_fs() != STATUS_OK) {
+        printf("Flash filesystem initialization failed.\n");
     } else {
         uint32_t boot_count = 0;
         lfs_file_open(&lfs, &file, "boot_count", LFS_O_RDWR | LFS_O_CREAT);
@@ -93,7 +99,6 @@ int main(void) {
 
         printf("Welcome to PAL 9000, boot %lu\n", boot_count);
     }
-    */
 
     I2cDevice mag_conf = {
         .address = 0x1E,
@@ -176,16 +181,27 @@ int main(void) {
 
     printf("\n");
 
+    Accel accel;
+    Gyro gyro;
+    BaroData baro;
+    Mag mag;
+    GPS_Fix_TypeDef fix;
+
     while (1) {
-        gpio_write(LED_PIN, GPIO_HIGH);
+        gpio_write(YELLOW_PIN, GPIO_HIGH);
+        if (fix.fix_valid) {
+            gpio_write(BLUE_PIN, GPIO_HIGH);
+        } else {
+            gpio_write(BLUE_PIN, GPIO_LOW);
+        }
         DELAY(1000);
-        gpio_write(LED_PIN, GPIO_LOW);
+        gpio_write(YELLOW_PIN, GPIO_LOW);
         DELAY(1000);
-        Accel accel = lsm6dsox_read_accel(&imu_conf);
-        Gyro gyro = lsm6dsox_read_gyro(&imu_conf);
-        BaroData baro = ms5637_read(&baro_conf, OSR_256);
-        Mag mag = iis2mdc_read(&mag_conf);
-        GPS_Fix_TypeDef fix;
+
+        accel = lsm6dsox_read_accel(&imu_conf);
+        gyro = lsm6dsox_read_gyro(&imu_conf);
+        baro = ms5637_read(&baro_conf, OSR_256);
+        mag = iis2mdc_read(&mag_conf);
 
         if (isnan(baro.pressure)) {
             printf("Barometer read error\n");
@@ -212,8 +228,10 @@ int main(void) {
 
         if (max_m10s_poll_fix(&gps_conf, &fix) == STATUS_OK) {
             printf(
-                "Latitude: %f (deg), Longitude: %f (deg), Altitude: %f (m)\n",
+                "Latitude: %f (deg), Longitude: %f (deg), Altitude: %f "
+                "(m)\n",
                 fix.lat, fix.lon, fix.height_msl);
+            printf("Sats: %d, Valid fix: %d\n", fix.num_sats, fix.fix_valid);
         } else {
             printf("GPS read error\n");
         }
@@ -225,24 +243,9 @@ int main(void) {
         }
         printf("\n");
     }
-    /*
-    printf("PAL 9000 initialization took %lld milliseconds\n", MILLIS());
-
-    uint32_t lastTime = 0;
-    while (1) {
-        while (MILLIS() - lastTime < 1000 / TARGET_RATE) {
-        }
-        lastTime = MILLIS();
-
-        lsm6dsox_read_accel(&imu_conf);
-        lsm6dsox_read_gyro(&imu_conf);
-        ms5637_read(&baro_conf, OSR_256);
-        iis2mdc_read(&mag_conf);
-    }
-    */
 }
 
-Status init_flash() {
+Status init_flash_fs() {
     const struct lfs_config cfg = {
         .read = &mt29f2g_read,
         .prog = &mt29f2g_prog,
@@ -258,7 +261,6 @@ Status init_flash() {
         .block_cycles = 750,
     };
     int err = lfs_mount(&lfs, &cfg);
-
     if (err) {
         if (lfs_format(&lfs, &cfg)) {
             return STATUS_ERROR;

@@ -1,11 +1,12 @@
 #include "mt29f2g.h"
 
 #include "qspi/qspi.h"
+#include "stdio.h"
 #include "stm32g4xx_hal.h"
 #include "timer.h"
 
 static QSpiDevice dev = {
-    .bank = 1,
+    .bank = QSPI_BK1,
     .clk = QSPI_SPEED_20MHz,
 };
 
@@ -19,7 +20,7 @@ static Status poll_oip() {
     cmd.DataMode = QSPI_DATA_1_LINE;
     QSPI_AutoPollingTypeDef auto_conf = mt29f2g_default_auto;
     auto_conf.Mask = MT29F2G_STATUS_OIP;
-    auto_conf.Match = MT29F2G_STATUS_OIP;
+    auto_conf.Match = 0U;
     return qspi_auto_poll_cmd(&dev, &cmd, &auto_conf);
 }
 
@@ -75,6 +76,7 @@ static Status read_cache_x4(uint32_t col_addr, uint8_t plane, void *buffer,
     cmd.NbData = MT29F2G_CMD_READ_FROM_CACHE_X4.n_data;
     cmd.Instruction = MT29F2G_CMD_READ_FROM_CACHE_X4.op_code;
     cmd.NbData = size;
+    cmd.DataMode = QSPI_DATA_4_LINES;
     return (qspi_read(&dev, &cmd, (uint8_t *)buffer));
 }
 
@@ -87,6 +89,15 @@ static Status write_enable() {
     return qspi_cmd(&dev, &cmd);
 }
 
+static Status reset() {
+    QSPI_CommandTypeDef cmd = mt29f2g_default_cmd;
+    cmd.AddressSize = MT29F2G_CMD_RESET.n_addr;
+    cmd.DummyCycles = MT29F2G_CMD_PAGE_READ.n_dummy;
+    cmd.NbData = MT29F2G_CMD_RESET.n_data;
+    cmd.Instruction = MT29F2G_CMD_RESET.op_code;
+    return qspi_cmd(&dev, &cmd);
+}
+
 static Status program_load_x4(uint32_t col_addr, uint8_t plane,
                               const void *buffer, uint32_t size) {
     QSPI_CommandTypeDef cmd = mt29f2g_default_cmd;
@@ -96,6 +107,7 @@ static Status program_load_x4(uint32_t col_addr, uint8_t plane,
     cmd.NbData = MT29F2G_CMD_PROGRAM_LOAD_X4.n_data;
     cmd.Instruction = MT29F2G_CMD_PROGRAM_LOAD_X4.op_code;
     cmd.NbData = size;
+    cmd.DataMode = QSPI_DATA_4_LINES;
     return (qspi_write(&dev, &cmd, (uint8_t *)buffer));
 }
 
@@ -117,6 +129,68 @@ static Status block_erase(uint32_t row_addr) {
     cmd.NbData = MT29F2G_CMD_BLOCK_ERASE.n_data;
     cmd.Instruction = MT29F2G_CMD_BLOCK_ERASE.op_code;
     return qspi_cmd(&dev, &cmd);
+}
+
+Status mt29f2g_init() {
+    if (reset() != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    if (poll_oip() != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    uint8_t tx_buf[] = {0x40};
+    QSPI_CommandTypeDef cmd = mt29f2g_default_cmd;
+    cmd.Address = 0xB0;
+    cmd.AddressSize = MT29F2G_CMD_SET_FEATURES.n_addr;
+    cmd.DummyCycles = MT29F2G_CMD_SET_FEATURES.n_dummy;
+    cmd.NbData = MT29F2G_CMD_SET_FEATURES.n_data;
+    cmd.Instruction = MT29F2G_CMD_SET_FEATURES.op_code;
+    cmd.DataMode = QSPI_DATA_1_LINE;
+    if (qspi_write(&dev, &cmd, tx_buf) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    if (read_page(0x1) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    if (poll_oip() != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    uint8_t rx_buf[4];
+    if (read_cache_x4(0x0, 0x0, rx_buf, 4) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    if (rx_buf[0] != 0x4F || rx_buf[1] != 0x4E || rx_buf[2] != 0x46 ||
+        rx_buf[3] != 0x49) {
+        return STATUS_ERROR;
+    }
+
+    tx_buf[0] = 0x00;
+    cmd = mt29f2g_default_cmd;
+    cmd.Address = 0xB0;
+    cmd.AddressSize = MT29F2G_CMD_SET_FEATURES.n_addr;
+    cmd.DummyCycles = MT29F2G_CMD_SET_FEATURES.n_dummy;
+    cmd.NbData = MT29F2G_CMD_SET_FEATURES.n_data;
+    cmd.Instruction = MT29F2G_CMD_SET_FEATURES.op_code;
+    cmd.DataMode = QSPI_DATA_1_LINE;
+    if (qspi_write(&dev, &cmd, tx_buf) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    if (reset() != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    if (poll_oip() != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    return STATUS_OK;
 }
 
 int mt29f2g_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,

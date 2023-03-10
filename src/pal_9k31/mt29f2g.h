@@ -2,6 +2,7 @@
 #define MT29F2G_H
 
 #include "littlefs/lfs.h"
+#include "qspi/qspi.h"
 #include "status.h"
 #include "stdint.h"
 #include "stm32g4xx_hal.h"
@@ -12,6 +13,8 @@ typedef struct {
     const uint32_t n_dummy;
     uint32_t n_data;
 } MT29F2G_CmdTypeDef;
+
+Status mt29f2g_init();
 
 int mt29f2g_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
                  void *buffer, lfs_size_t size);
@@ -26,17 +29,19 @@ int mt29f2g_sync(const struct lfs_config *c);
 static const QSPI_CommandTypeDef mt29f2g_default_cmd = {
     .AddressMode = QSPI_ADDRESS_1_LINE,
     .AlternateByteMode = QSPI_ALTERNATE_BYTES_NONE,
-    .DataMode = QSPI_DATA_4_LINES,
+    .AlternateBytesSize = QSPI_ALTERNATE_BYTES_8_BITS,
+    .DataMode = QSPI_DATA_NONE,
     .InstructionMode = QSPI_INSTRUCTION_1_LINE,
     .SIOOMode = QSPI_SIOO_INST_EVERY_CMD,
     .DdrMode = QSPI_DDR_MODE_DISABLE,
+    .DdrHoldHalfCycle = QSPI_DDR_HHC_ANALOG_DELAY,
 };
 
 static const QSPI_AutoPollingTypeDef mt29f2g_default_auto = {
     .AutomaticStop = QSPI_AUTOMATIC_STOP_ENABLE,
     .MatchMode = QSPI_MATCH_MODE_AND,
     .StatusBytesSize = 1,
-    .Interval = 8,
+    .Interval = 0x10,
 };
 
 __attribute__((unused)) static MT29F2G_CmdTypeDef MT29F2G_CMD_RESET = {
