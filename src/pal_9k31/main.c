@@ -86,6 +86,7 @@ int main(void) {
     DELAY(50);
     */
 
+    /*
     if (init_flash_fs() != STATUS_OK) {
         printf("Flash filesystem initialization failed.\n");
     } else {
@@ -99,6 +100,7 @@ int main(void) {
 
         printf("Welcome to PAL 9000, boot %lu\n", boot_count);
     }
+    */
 
     I2cDevice mag_conf = {
         .address = 0x1E,
@@ -284,21 +286,25 @@ void NMI_Handler(void) {}
 
 void HardFault_Handler(void) {
     while (1) {
+        printf("hard fault\n");
     }
 }
 
 void MemManage_Handler(void) {
     while (1) {
+        printf("memmanage\n");
     }
 }
 
 void BusFault_Handler(void) {
     while (1) {
+        printf("bus fault\n");
     }
 }
 
 void UsageFault_Handler(void) {
     while (1) {
+        printf("usage fault\n");
     }
 }
 
