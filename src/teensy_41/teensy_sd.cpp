@@ -4,7 +4,7 @@ static char s_filename[12] = "data_00.csv";
 
 Status sd_init(SDDevice* device) {
     if (!SD.begin(device->cs)) {
-        return HARDWARE_ERROR;
+        return STATUS_HARDWARE_ERROR;
     }
 
     // Increment the suffix of the filename until we find an unused name
@@ -45,7 +45,7 @@ Status sd_reinit(SDDevice* device) {
         return STATUS_HARDWARE_ERROR;
     }
 
-    return OK;
+    return STATUS_OK;
 }
 
 Status sd_write(uint64_t timestamp, Accel* accel, Gyro* gyro, BaroData* baro) {

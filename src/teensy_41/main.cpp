@@ -11,7 +11,7 @@ extern "C" {
 
 #define LED_PIN 13
 #define TARGET_RATE 100  // Hz
-// #define SERIAL_ENABLED
+#define SERIAL_ENABLED
 
 #ifdef SERIAL_ENABLED
 #define PRINT(...) Serial.printf(__VA_ARGS__);

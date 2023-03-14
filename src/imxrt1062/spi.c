@@ -8,7 +8,7 @@
 
 static bool spi_enabled[] = {0, 0, 0, 0};
 
-static Status spi_setup(SpiDevice* dev) {
+Status spi_setup(SpiDevice* dev) {
     if (spi_enabled[dev->periph]) {
         return STATUS_OK;
     }
