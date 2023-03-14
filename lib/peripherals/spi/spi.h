@@ -38,9 +38,9 @@ Status spi_setup(SpiDevice* dev);
 Status spi_set_cs(SpiDevice* dev, GpioValue val);
 
 Status spi_exchange_nosetup(SpiDevice* dev, uint8_t* tx_buf, uint8_t* rx_buf,
-                            uint8_t len);
+                            uint16_t len);
 
 Status spi_exchange(SpiDevice* dev, uint8_t* tx_buf, uint8_t* rx_buf,
-                    uint8_t len);
+                    uint16_t len);
 
 #endif // SPI_H

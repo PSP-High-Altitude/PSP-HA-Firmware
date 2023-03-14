@@ -49,17 +49,67 @@ static volatile UINT Timer1,
 static BYTE CardType; /* Card type flags */
 
 /*-----------------------------------------------------------------------*/
+/* CRC functions (from https://github.com/hazelnusse/crc7)               */
+/*-----------------------------------------------------------------------*/
+
+static uint8_t s_crc_table[256];
+
+void generate_crc_table() {
+    int i, j;
+    uint8_t CRCPoly = 0x89;  // the value of our CRC-7 polynomial
+
+    // generate a table value for all 256 possible byte values
+    for (i = 0; i < 256; ++i) {
+        s_crc_table[i] = (i & 0x80) ? i ^ CRCPoly : i;
+        for (j = 1; j < 8; ++j) {
+            s_crc_table[i] <<= 1;
+            if (s_crc_table[i] & 0x80) s_crc_table[i] ^= CRCPoly;
+        }
+    }
+}
+
+// adds a message byte to the current CRC-7 to get a the new CRC-7
+uint8_t crc_add(uint8_t CRC, uint8_t message_byte) {
+    return s_crc_table[(CRC << 1) ^ message_byte];
+}
+
+// returns the CRC-7 for a message of "length" bytes
+uint8_t get_crc(uint8_t message[], int length) {
+    int i;
+    uint8_t CRC = 0;
+
+    for (i = 0; i < length; ++i) {
+        CRC = crc_add(CRC, message[i]);
+    }
+
+    return CRC;
+}
+
+// returns the CRC-7 for a message of "length" bytes
+uint8_t get_cmd_crc(BYTE cmd, DWORD arg) {
+    uint8_t crc = 0;
+    crc = crc_add(crc, cmd | 0x40);        /* Start bit + CMD */
+    crc = crc_add(crc, (BYTE)(arg >> 24)); /* Argument[31..24] */
+    crc = crc_add(crc, (BYTE)(arg >> 16)); /* Argument[23..16] */
+    crc = crc_add(crc, (BYTE)(arg >> 8));  /* Argument[15..8] */
+    crc = crc_add(crc, (BYTE)arg);         /* Argument[7..0] */
+    return (crc << 1) | 0x01;              /* Set stop bit */
+}
+
+/*-----------------------------------------------------------------------*/
 /* SPI controls (Platform dependent)                                     */
 /*-----------------------------------------------------------------------*/
 
 static SpiDevice s_sd_spi_device;
-static uint8_t nop_buf[512] = {0};  // ugly but better than having to create yet
-static uint8_t void_buf[512];       // another version of the SPI drivers
+static uint8_t nop_buf[512] = {[0 ... 511] 0xFF};  // ugly but better than
+                                                   // having to create yet
+static uint8_t void_buf[512];                      // another SPI wrapper
 
 /* Initialize MMC interface */
 void sd_spi_init(SpiDevice *device) {
     // Create a local copy (actual setup will be done later)
     s_sd_spi_device = *device;
+    generate_crc_table();
 }
 
 /* Exchange a byte */
@@ -227,9 +277,10 @@ static BYTE send_cmd(/* Return value: R1 resp (bit7==1:Failed to send) */
     xchg_spi((BYTE)(arg >> 16)); /* Argument[23..16] */
     xchg_spi((BYTE)(arg >> 8));  /* Argument[15..8] */
     xchg_spi((BYTE)arg);         /* Argument[7..0] */
-    n = 0x01;                    /* Dummy CRC + Stop */
+    n = 0xFF;                    /* Dummy CRC + Stop */
     if (cmd == CMD0) n = 0x95;   /* Valid CRC for CMD0(0) */
     if (cmd == CMD8) n = 0x87;   /* Valid CRC for CMD8(0x1AA) */
+    // n = get_cmd_crc(cmd, arg);
     xchg_spi(n);
 
     /* Receive command resp */

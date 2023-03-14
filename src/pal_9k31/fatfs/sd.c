@@ -29,28 +29,34 @@ Status sd_init(SpiDevice* dev) {
         }
     }
 
-    FIL* file = NULL;
-    f_open(file, s_filename, FA_OPEN_APPEND | FA_WRITE);
-    f_printf(file,
-             "Timestamp,Ax,Ay,Az,Rx,Ry,Rz,Temp,Pressure,Mx,My,Mz,Lat,Lon,Alt");
+    FIL file;
+    if (f_open(&file, s_filename, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+    f_printf(
+        &file,
+        "Timestamp,Ax,Ay,Az,Rx,Ry,Rz,Temp,Pressure,Mx,My,Mz,Lat,Lon,Alt\n");
+    if (f_close(&file) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
 
     return STATUS_OK;
 }
 
 Status sd_write(uint64_t timestamp, Accel* accel, Gyro* gyro, BaroData* baro,
                 Mag* mag, GPS_Fix_TypeDef* fix) {
-    FIL* file = NULL;
-    if (f_open(file, s_filename, FA_OPEN_APPEND | FA_WRITE)) {
-        return STATUS_ERROR;
+    FIL file;
+    if (f_open(&file, s_filename, FA_OPEN_APPEND | FA_WRITE) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
     }
-    f_printf(file, "%lld,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f", timestamp,
+    f_printf(&file, "%lld,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,", timestamp,
              accel->accelX, accel->accelY, accel->accelZ, gyro->gyroX,
              gyro->gyroY, gyro->gyroZ);
-    f_printf(file, "%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f\n",
+    f_printf(&file, "%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f\n",
              baro->temperature, baro->pressure, mag->magX, mag->magY, mag->magZ,
              fix->lat, fix->lon, fix->height_msl);
-    if (f_close(file)) {
-        return STATUS_ERROR;
+    if (f_close(&file) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
     }
 
     return STATUS_OK;

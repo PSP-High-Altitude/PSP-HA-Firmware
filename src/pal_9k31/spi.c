@@ -112,7 +112,7 @@ Status spi_set_cs(SpiDevice* dev, GpioValue val) {
 }
 
 Status spi_exchange_nosetup(SpiDevice* dev, uint8_t* tx_buf, uint8_t* rx_buf,
-                            uint8_t len) {
+                            uint16_t len) {
     if (HAL_SPI_TransmitReceive(spi_handles[dev->periph], tx_buf, rx_buf, len,
                                 100) != HAL_OK) {
         return STATUS_HARDWARE_ERROR;
@@ -121,7 +121,7 @@ Status spi_exchange_nosetup(SpiDevice* dev, uint8_t* tx_buf, uint8_t* rx_buf,
 }
 
 Status spi_exchange(SpiDevice* dev, uint8_t* tx_buf, uint8_t* rx_buf,
-                    uint8_t len) {
+                    uint16_t len) {
     if (spi_setup(dev) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
     }
