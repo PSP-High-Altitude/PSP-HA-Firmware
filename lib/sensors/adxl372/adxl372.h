@@ -145,11 +145,11 @@ typedef enum {
 } Adxl372Modes;
 
 typedef enum {
-    ADXL372_200_HZ = 0x00,    // 000
-    ADXL372_400_HZ = 0x01,    // 001
-    ADXL372_800_HZ = 0x02,    // 010
-    ADXL372_1_600_HZ = 0x03,  // 011
-    ADXL372_3_200_HZ = 0x04,  // 100
+    ADXL372_200_HZ = (1 << 3) | 0x00,    // 000
+    ADXL372_400_HZ = (1 << 3) | 0x01,    // 001
+    ADXL372_800_HZ = (1 << 3) | 0x02,    // 010
+    ADXL372_1_600_HZ = (1 << 3) | 0x03,  // 011
+    ADXL372_3_200_HZ = (1 << 3) | 0x04,  // 100
 } Adxl372Bandwidths;
 
 // Initalize the sensor

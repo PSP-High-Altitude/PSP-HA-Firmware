@@ -38,7 +38,7 @@ static Status adxl372_read(SpiDevice* device, uint8_t address, uint8_t* rx_buf,
     // Create rx buffer with space for the initial blank byte
     uint8_t rx_buf_new[len + 1];
 
-    tx_buf[0] = address | 0x80;  // Add address and read bit to tx buffer
+    tx_buf[0] = (address << 1) | 1;  // Add address and read bit to tx buffer
 
     // Exchange the address and read len bits then copy all but the first byte
     // received to the original rx_buf.
@@ -61,7 +61,7 @@ static Status adxl372_write(SpiDevice* device, uint8_t address, uint8_t* tx_buf,
 
     // Create new tx buffer
     uint8_t tx_buf_new[len + 1];
-    tx_buf_new[0] = address & 0x7F;  // Add address and write bit to tx buffer
+    tx_buf_new[0] = address << 1;  // Add address and write bit to tx buffer
     memcpy(tx_buf_new + 1, tx_buf,
            len);  // Copy bytes to end of the new tx buffer
 

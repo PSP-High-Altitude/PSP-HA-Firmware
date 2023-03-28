@@ -3,6 +3,7 @@
 
 #include "USB_Device/App/usb_device.h"
 #include "USB_Device/App/usbd_cdc_if.h"
+#include "adxl372/adxl372.h"
 #include "board.h"
 #include "clocks.h"
 #include "data.h"
@@ -131,6 +132,13 @@ int main(void) {
         .cs = 0,
         .periph = P_SPI4,
     };
+    SpiDevice acc_conf = {
+        .clk = SPI_SPEED_100kHz,
+        .cpol = 0,
+        .cpha = 0,
+        .cs = 0,
+        .periph = P_SPI2,
+    };
 
     // Initialize magnetometer
     if (iis2mdc_init(&mag_conf, IIS2MDC_ODR_50_HZ) == STATUS_OK) {
@@ -167,6 +175,14 @@ int main(void) {
         printf("IMU configuration failed\n");
     }
 
+    // Initialize accelerometer
+    if (adxl372_init(&acc_conf, ADXL372_200_HZ, ADXL372_OUT_RATE_400_HZ,
+                     ADXL372_MEASURE_MODE)) {
+        printf("Accelerometer initialization successful");
+    } else {
+        printf("Accelrometer initialization failed");
+    }
+
     // Initialize GPS
     if (max_m10s_init(&gps_conf) == STATUS_OK) {
         printf("GPS initialization successful\n");
@@ -183,7 +199,7 @@ int main(void) {
 
     printf("\n");
 
-    Accel accel;
+    Accel accel, acch;
     Gyro gyro;
     BaroData baro;
     Mag mag;
@@ -202,6 +218,7 @@ int main(void) {
 
         accel = lsm6dsox_read_accel(&imu_conf);
         gyro = lsm6dsox_read_gyro(&imu_conf);
+        acch = adxl372_read_accel(&acc_conf);
         baro = ms5637_read(&baro_conf, OSR_256);
         mag = iis2mdc_read(&mag_conf);
 
@@ -226,6 +243,13 @@ int main(void) {
         } else {
             printf("Magnetic Field - x: %6f, y: %6f, z: %6f (G)\n", mag.magX,
                    mag.magY, mag.magZ);
+        }
+
+        if (isnan(acch.accelX)) {
+            printf("Accelerometer read error\n");
+        } else {
+            printf("Acceleration - x: %6f, y: %6f, z: %6f (g)\n", acch.accelX,
+                   acch.accelY, acch.accelZ);
         }
 
         if (max_m10s_poll_fix(&gps_conf, &fix) == STATUS_OK) {
