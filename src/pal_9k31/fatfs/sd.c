@@ -5,6 +5,7 @@
 
 static FATFS s_fs;
 static char s_filename[12] = "data_00.csv";
+static FIL s_file;
 
 DWORD get_fattime() { return 0; }
 
@@ -40,22 +41,45 @@ Status sd_init(SpiDevice* dev) {
         return STATUS_HARDWARE_ERROR;
     }
 
+    if (f_open(&s_file, s_filename, FA_OPEN_APPEND | FA_WRITE) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
     return STATUS_OK;
 }
 
 Status sd_write(uint64_t timestamp, Accel* accel, Gyro* gyro, BaroData* baro,
                 Mag* mag, GPS_Fix_TypeDef* fix) {
-    FIL file;
-    if (f_open(&file, s_filename, FA_OPEN_APPEND | FA_WRITE) != FR_OK) {
+    if (f_printf(&s_file, "%lld,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,",
+                 timestamp, accel->accelX, accel->accelY, accel->accelZ,
+                 gyro->gyroX, gyro->gyroY, gyro->gyroZ) <= 0) {
         return STATUS_HARDWARE_ERROR;
     }
-    f_printf(&file, "%lld,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,", timestamp,
-             accel->accelX, accel->accelY, accel->accelZ, gyro->gyroX,
-             gyro->gyroY, gyro->gyroZ);
-    f_printf(&file, "%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f\n",
-             baro->temperature, baro->pressure, mag->magX, mag->magY, mag->magZ,
-             fix->lat, fix->lon, fix->height_msl);
-    if (f_close(&file) != FR_OK) {
+    if (f_printf(&s_file, "%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f,%9.6f\n",
+                 baro->temperature, baro->pressure, mag->magX, mag->magY,
+                 mag->magZ, fix->lat, fix->lon, fix->height_msl) <= 0) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    return STATUS_OK;
+}
+
+Status sd_reinit() {
+    if (f_mount(&s_fs, "", 0) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+    if (f_open(&s_file, s_filename, FA_OPEN_APPEND | FA_WRITE) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    return STATUS_OK;
+}
+
+Status sd_deinit() {
+    if (f_close(&s_file) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+    if (f_unmount("") != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 

@@ -24,11 +24,13 @@
 #endif
 #define USE_SPI_CRC 0
 
-#define YELLOW_PIN PIN_PC1
-#define BLUE_PIN PIN_PC1
+#define PIN_RED PIN_PC0
+#define PIN_YELLOW PIN_PC1
+#define PIN_GREEN PIN_PC2
+#define PIN_BLUE PIN_PC3
 #define BUZZER_PIN PIN_PB9
 
-#define TARGET_RATE 100
+#define TARGET_RATE 10  // Hz
 
 #define DEBUG
 
@@ -66,7 +68,7 @@ int main(void) {
     gpio_write(PIN_PA4, GPIO_HIGH);
     gpio_write(PIN_PB12, GPIO_HIGH);
     gpio_write(PIN_PE4, GPIO_HIGH);
-    DELAY(1000);
+    gpio_write(PIN_RED, GPIO_HIGH);
     MX_USB_Device_Init();
     DELAY(1000);
     printf("Starting initialization...\n");
@@ -126,14 +128,14 @@ int main(void) {
         .periph = P_SPI1,
     };
     SpiDevice sd_conf = {
-        .clk = SPI_SPEED_1MHz,
+        .clk = SPI_SPEED_10MHz,
         .cpol = 0,
         .cpha = 0,
         .cs = 0,
         .periph = P_SPI4,
     };
     SpiDevice acc_conf = {
-        .clk = SPI_SPEED_100kHz,
+        .clk = SPI_SPEED_1MHz,
         .cpol = 0,
         .cpha = 0,
         .cs = 0,
@@ -198,61 +200,68 @@ int main(void) {
     }
 
     printf("\n");
+    gpio_write(PIN_RED, GPIO_LOW);
 
     Accel accel, acch;
     Gyro gyro;
     BaroData baro;
     Mag mag;
     GPS_Fix_TypeDef fix;
+    uint64_t last_time = MILLIS();
+    uint64_t read_time = MILLIS();
 
     while (1) {
-        gpio_write(YELLOW_PIN, GPIO_HIGH);
-        if (fix.fix_valid) {
-            gpio_write(BLUE_PIN, GPIO_HIGH);
-        } else {
-            gpio_write(BLUE_PIN, GPIO_LOW);
-        }
-        DELAY(1000);
-        gpio_write(YELLOW_PIN, GPIO_LOW);
-        DELAY(1000);
-
         accel = lsm6dsox_read_accel(&imu_conf);
         gyro = lsm6dsox_read_gyro(&imu_conf);
         acch = adxl372_read_accel(&acc_conf);
         baro = ms5637_read(&baro_conf, OSR_256);
         mag = iis2mdc_read(&mag_conf);
 
+        while (MILLIS() - last_time < 1000 / TARGET_RATE)
+            ;
+        read_time = last_time = MILLIS();
+        gpio_write(PIN_YELLOW, GPIO_HIGH);
+
         if (isnan(baro.pressure)) {
             printf("Barometer read error\n");
         } else {
+            printf("Read baro in %d ms\n", (int)(MILLIS() - read_time));
             printf("Temperature %6f (deg C)\n", baro.temperature);
             printf("Pressure %6f (mbar)\n", baro.pressure);
         }
+        read_time = MILLIS();
 
         if (isnan(accel.accelX) || isnan(gyro.gyroX)) {
             printf("IMU read error\n");
         } else {
+            printf("Read IMU in %d ms\n", (int)(MILLIS() - read_time));
             printf("Acceleration - x: %6f, y: %6f, z: %6f (g)\n", accel.accelX,
                    accel.accelY, accel.accelZ);
             printf("Rotation - x: %6f, y: %6f, z: %6f (deg/s)\n", gyro.gyroX,
                    gyro.gyroY, gyro.gyroZ);
         }
+        read_time = MILLIS();
 
         if (isnan(mag.magX)) {
             printf("Magnetometer read error\n");
         } else {
+            printf("Read mag in %d ms\n", (int)(MILLIS() - read_time));
             printf("Magnetic Field - x: %6f, y: %6f, z: %6f (G)\n", mag.magX,
                    mag.magY, mag.magZ);
         }
+        read_time = MILLIS();
 
         if (isnan(acch.accelX)) {
             printf("Accelerometer read error\n");
         } else {
+            printf("Read acc in %d ms\n", (int)(MILLIS() - read_time));
             printf("Acceleration - x: %6f, y: %6f, z: %6f (g)\n", acch.accelX,
                    acch.accelY, acch.accelZ);
         }
+        read_time = MILLIS();
 
         if (max_m10s_poll_fix(&gps_conf, &fix) == STATUS_OK) {
+            printf("Read GPS in %d ms\n", (int)(MILLIS() - read_time));
             printf(
                 "Latitude: %f (deg), Longitude: %f (deg), Altitude: %f "
                 "(m)\n",
@@ -261,13 +270,31 @@ int main(void) {
         } else {
             printf("GPS read error\n");
         }
+        read_time = MILLIS();
 
         if (sd_write(MILLIS(), &accel, &gyro, &baro, &mag, &fix) == STATUS_OK) {
+            printf("Wrote SD card in %d ms\n", (int)(MILLIS() - read_time));
             printf("Logged successfully\n");
+            gpio_write(PIN_GREEN, GPIO_HIGH);
         } else {
             printf("SD write error\n");
+            gpio_write(PIN_GREEN, GPIO_LOW);
         }
         printf("\n");
+
+        gpio_write(PIN_YELLOW, GPIO_LOW);
+
+        // If PROG switch is set, unmount SD card and wait
+        if (gpio_read(PIN_PB8)) {
+            sd_deinit();
+            while (gpio_read(PIN_PB8)) {
+                gpio_write(PIN_GREEN, GPIO_HIGH);
+                DELAY(500);
+                gpio_write(PIN_GREEN, GPIO_LOW);
+                DELAY(500);
+            }
+            sd_reinit();
+        }
     }
 }
 
