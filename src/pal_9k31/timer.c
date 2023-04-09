@@ -5,7 +5,7 @@
 TIM_HandleTypeDef tim2_handle;
 TIM_HandleTypeDef tim3_handle;
 
-void init_timers() {
+void init_timers(uint32_t sensor_interval_ms) {
     __HAL_RCC_TIM2_CLK_ENABLE();
 
     TIM_Base_InitTypeDef tim2_conf = {

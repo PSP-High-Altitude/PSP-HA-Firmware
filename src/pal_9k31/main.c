@@ -30,9 +30,11 @@
 #define PIN_BLUE PIN_PC3
 #define BUZZER_PIN PIN_PB9
 
-#define TARGET_RATE 10  // Hz
+#define TARGET_INTERVAL 1000  // ms
 
 #define DEBUG
+
+TIM_HandleTypeDef tim6_handle;
 
 lfs_t lfs;
 lfs_file_t file;
@@ -61,10 +63,43 @@ int _write(int file, char *data, int len) {
     return len;
 }
 
+void init_tim6() {
+    __HAL_RCC_TIM6_CLK_ENABLE();
+
+    TIM_Base_InitTypeDef tim6_conf = {
+        .Prescaler = 16800,
+        .CounterMode = TIM_COUNTERMODE_UP,
+        .Period = TARGET_INTERVAL * 10,
+        .AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE,
+    };
+    tim6_handle.Init = tim6_conf;
+    tim6_handle.Instance = TIM6;
+    tim6_handle.Channel = TIM_CHANNEL_1;
+    TIM_MasterConfigTypeDef tim6_master_conf = {
+        .MasterOutputTrigger = TIM_TRGO_RESET,
+        .MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE,
+    };
+
+    HAL_TIM_Base_Init(&tim6_handle);
+    HAL_TIMEx_MasterConfigSynchronization(&tim6_handle, &tim6_master_conf);
+
+    HAL_NVIC_SetPriority(TIM6_DAC_IRQn, 1, 0);
+    HAL_NVIC_EnableIRQ(TIM6_DAC_IRQn);
+}
+
+void set_tim6_it(uint8_t setting) {
+    if (setting) {
+        HAL_TIM_Base_Start_IT(&tim6_handle);
+    } else {
+        HAL_TIM_Base_Stop_IT(&tim6_handle);
+    }
+}
+
 int main(void) {
     HAL_Init();
     SystemClock_Config();
     init_timers();
+    init_tim6();
     gpio_write(PIN_PA4, GPIO_HIGH);
     gpio_write(PIN_PB12, GPIO_HIGH);
     gpio_write(PIN_PE4, GPIO_HIGH);
@@ -210,6 +245,8 @@ int main(void) {
     uint64_t last_time = MILLIS();
     uint64_t read_time = MILLIS();
 
+    set_tim6_it(1);
+
     while (1) {
         accel = lsm6dsox_read_accel(&imu_conf);
         gyro = lsm6dsox_read_gyro(&imu_conf);
@@ -217,8 +254,6 @@ int main(void) {
         baro = ms5637_read(&baro_conf, OSR_256);
         mag = iis2mdc_read(&mag_conf);
 
-        while (MILLIS() - last_time < 1000 / TARGET_RATE)
-            ;
         read_time = last_time = MILLIS();
         gpio_write(PIN_YELLOW, GPIO_HIGH);
 
@@ -323,6 +358,13 @@ Status init_flash_fs() {
         }
     }
     return STATUS_OK;
+}
+
+void TIM6_DAC_IRQHandler(void) {
+    HAL_TIM_IRQHandler(&tim6_handle);
+    gpio_write(PIN_BLUE, GPIO_HIGH);
+    DELAY(TARGET_INTERVAL / 2);
+    gpio_write(PIN_BLUE, GPIO_LOW);
 }
 
 void Error_Handler(void) {
