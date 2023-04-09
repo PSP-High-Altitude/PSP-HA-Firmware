@@ -16,7 +16,10 @@ Status sd_reinit();
 
 Status sd_deinit();
 
-Status sd_write(uint64_t timestamp, Accel* accel, Gyro* gyro, BaroData* baro,
-                Mag* mag, GPS_Fix_TypeDef* fix);
+Status sd_flush();
+
+Status sd_write_sensor_data(volatile SensorData* dat);
+
+Status sd_write_gps_data(uint64_t timestamp, volatile GPS_Fix_TypeDef* fix);
 
 #endif  // SD_H

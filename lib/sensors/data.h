@@ -1,6 +1,7 @@
 #ifndef DATA_H
 #define DATA_H
 
+#include <max_m10s.h>
 #include <stdint.h>
 
 // Barometer MS5637
@@ -34,5 +35,14 @@ typedef struct {
     float magY;  // magnetic field vector y-axis in gauss
     float magZ;  // magnetic field vector z-axis in gauss
 } Mag;
+
+typedef struct {
+    uint64_t timestamp;
+    Accel acch;
+    Accel accel;
+    Gyro gyro;
+    Mag mag;
+    BaroData baro;
+} SensorData;
 
 #endif // DATA_H

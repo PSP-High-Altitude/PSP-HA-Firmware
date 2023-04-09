@@ -81,6 +81,9 @@ Status spi_setup(SpiDevice* dev) {
         case SPI_SPEED_10MHz:
             prescale = SPI_BAUDRATEPRESCALER_4;
             break;
+        case SPI_SPEED_20MHz:
+            prescale = SPI_BAUDRATEPRESCALER_2;
+            break;
         default:
             return STATUS_PARAMETER_ERROR;
     }

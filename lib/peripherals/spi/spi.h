@@ -23,6 +23,7 @@ typedef enum {
     SPI_SPEED_500kHz = 500000,
     SPI_SPEED_1MHz = 1000000,
     SPI_SPEED_10MHz = 10000000,
+    SPI_SPEED_20MHz = 20000000,
 } SpiSpeed;
 
 typedef struct {

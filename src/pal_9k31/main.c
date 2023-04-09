@@ -28,9 +28,12 @@
 #define PIN_YELLOW PIN_PC1
 #define PIN_GREEN PIN_PC2
 #define PIN_BLUE PIN_PC3
-#define BUZZER_PIN PIN_PB9
+#define PIN_PROG PIN_PB8
+#define PIN_BUZZER PIN_PB9
 
-#define TARGET_INTERVAL 1000  // ms
+#define TARGET_INTERVAL 30  // ms
+
+#define LOG_FIFO_LEN 256
 
 #define DEBUG
 
@@ -42,6 +45,52 @@ lfs_file_t file;
 Status init_flash_fs();
 
 extern PCD_HandleTypeDef hpcd_USB_FS;
+
+volatile static struct {
+    SensorData queue[LOG_FIFO_LEN];
+    size_t ridx;  // Next index that will be read from
+    size_t widx;  // Next index that will be written to
+    // ridx == widx -> FIFO is empty
+    // (ridx == widx - 1) mod LOG_FIFO_LEN -> FIFO is full
+} fifo;
+
+static I2cDevice s_mag_conf = {
+    .address = 0x1E,
+    .clk = I2C_SPEED_FAST,
+    .periph = P_I2C3,
+};
+static I2cDevice s_baro_conf = {
+    .address = 0x76,
+    .clk = I2C_SPEED_FAST,
+    .periph = P_I2C3,
+};
+static I2cDevice s_gps_conf = {
+    .address = 0x42,
+    .clk = I2C_SPEED_FAST,
+    .periph = P_I2C2,
+};
+static SpiDevice s_imu_conf = {
+    .clk = SPI_SPEED_1MHz,
+    .cpol = 0,
+    .cpha = 0,
+    .cs = 0,
+    .periph = P_SPI1,
+};
+static SpiDevice s_sd_conf = {
+    .clk = SPI_SPEED_20MHz,
+    .cpol = 0,
+    .cpha = 0,
+    .cs = 0,
+    .periph = P_SPI4,
+};
+static SpiDevice s_acc_conf = {
+    .clk = SPI_SPEED_1MHz,
+    .cpol = 0,
+    .cpha = 0,
+    .cs = 0,
+    .periph = P_SPI2,
+};
+uint32_t s_last_sensor_read_us;
 
 int _write(int file, char *data, int len) {
     if ((file != STDOUT_FILENO) && (file != STDERR_FILENO)) {
@@ -114,17 +163,6 @@ int main(void) {
     }
 
     /*
-    gpio_write(BUZZER_PIN, GPIO_HIGH);
-    DELAY(50);
-    gpio_write(BUZZER_PIN, GPIO_LOW);
-    DELAY(50);
-    gpio_write(BUZZER_PIN, GPIO_HIGH);
-    DELAY(50);
-    gpio_write(BUZZER_PIN, GPIO_LOW);
-    DELAY(50);
-    */
-
-    /*
     if (init_flash_fs() != STATUS_OK) {
         printf("Flash filesystem initialization failed.\n");
     } else {
@@ -140,72 +178,35 @@ int main(void) {
     }
     */
 
-    I2cDevice mag_conf = {
-        .address = 0x1E,
-        .clk = I2C_SPEED_FAST,
-        .periph = P_I2C3,
-    };
-    I2cDevice baro_conf = {
-        .address = 0x76,
-        .clk = I2C_SPEED_FAST,
-        .periph = P_I2C3,
-    };
-    I2cDevice gps_conf = {
-        .address = 0x42,
-        .clk = I2C_SPEED_FAST,
-        .periph = P_I2C2,
-    };
-    SpiDevice imu_conf = {
-        .clk = SPI_SPEED_1MHz,
-        .cpol = 0,
-        .cpha = 0,
-        .cs = 0,
-        .periph = P_SPI1,
-    };
-    SpiDevice sd_conf = {
-        .clk = SPI_SPEED_10MHz,
-        .cpol = 0,
-        .cpha = 0,
-        .cs = 0,
-        .periph = P_SPI4,
-    };
-    SpiDevice acc_conf = {
-        .clk = SPI_SPEED_1MHz,
-        .cpol = 0,
-        .cpha = 0,
-        .cs = 0,
-        .periph = P_SPI2,
-    };
-
     // Initialize magnetometer
-    if (iis2mdc_init(&mag_conf, IIS2MDC_ODR_50_HZ) == STATUS_OK) {
+    if (iis2mdc_init(&s_mag_conf, IIS2MDC_ODR_50_HZ) == STATUS_OK) {
         printf("Magnetometer initialization successful\n");
     } else {
         printf("Magnetometer initialization failed\n");
     }
 
     // Initialize barometer
-    if (ms5637_init(&baro_conf) == STATUS_OK) {
+    if (ms5637_init(&s_baro_conf) == STATUS_OK) {
         printf("Barometer initialization successful\n");
     } else {
         printf("Barometer initialization failed\n");
     }
 
     // Initialize IMU
-    if (lsm6dsox_init(&imu_conf) == STATUS_OK) {
+    if (lsm6dsox_init(&s_imu_conf) == STATUS_OK) {
         printf("IMU initialization successful\n");
     } else {
         printf("IMU initialization failed\n");
     }
 
-    if (lsm6dsox_config_accel(&imu_conf, LSM6DSOX_XL_RATE_208_HZ,
-                              LSM6DSOX_XL_RANGE_8_G) == STATUS_OK) {
+    if (lsm6dsox_config_accel(&s_imu_conf, LSM6DSOX_XL_RATE_208_HZ,
+                              LSM6DSOX_XL_RANGE_16_G) == STATUS_OK) {
         printf("IMU accel range set successfully\n");
     } else {
         printf("IMU configuration failed\n");
     }
 
-    if (lsm6dsox_config_gyro(&imu_conf, LSM6DSOX_G_RATE_208_HZ,
+    if (lsm6dsox_config_gyro(&s_imu_conf, LSM6DSOX_G_RATE_208_HZ,
                              LSM6DSOX_G_RANGE_500_DPS) == STATUS_OK) {
         printf("IMU gyro range set successfully\n");
     } else {
@@ -213,7 +214,7 @@ int main(void) {
     }
 
     // Initialize accelerometer
-    if (adxl372_init(&acc_conf, ADXL372_200_HZ, ADXL372_OUT_RATE_400_HZ,
+    if (adxl372_init(&s_acc_conf, ADXL372_200_HZ, ADXL372_OUT_RATE_400_HZ,
                      ADXL372_MEASURE_MODE)) {
         printf("Accelerometer initialization successful");
     } else {
@@ -221,108 +222,80 @@ int main(void) {
     }
 
     // Initialize GPS
-    if (max_m10s_init(&gps_conf) == STATUS_OK) {
+    if (max_m10s_init(&s_gps_conf) == STATUS_OK) {
         printf("GPS initialization successful\n");
     } else {
         printf("GPS initialization failed\n");
     }
 
     // Initialize SD card
-    if (sd_init(&sd_conf) == STATUS_OK) {
+    if (sd_init(&s_sd_conf) == STATUS_OK) {
         printf("SD card initialization successful\n");
     } else {
         printf("SD card initialization failed\n");
     }
 
+    set_tim6_it(1);
     printf("\n");
+
+    GPS_Fix_TypeDef fix;
+
+    fifo.ridx = 0;
+    fifo.widx = 0;
+
+    uint64_t start_time = MICROS();
+
     gpio_write(PIN_RED, GPIO_LOW);
 
-    Accel accel, acch;
-    Gyro gyro;
-    BaroData baro;
-    Mag mag;
-    GPS_Fix_TypeDef fix;
-    uint64_t last_time = MILLIS();
-    uint64_t read_time = MILLIS();
-
-    set_tim6_it(1);
-
     while (1) {
-        accel = lsm6dsox_read_accel(&imu_conf);
-        gyro = lsm6dsox_read_gyro(&imu_conf);
-        acch = adxl372_read_accel(&acc_conf);
-        baro = ms5637_read(&baro_conf, OSR_256);
-        mag = iis2mdc_read(&mag_conf);
-
-        read_time = last_time = MILLIS();
         gpio_write(PIN_YELLOW, GPIO_HIGH);
 
-        if (isnan(baro.pressure)) {
-            printf("Barometer read error\n");
-        } else {
-            printf("Read baro in %d ms\n", (int)(MILLIS() - read_time));
-            printf("Temperature %6f (deg C)\n", baro.temperature);
-            printf("Pressure %6f (mbar)\n", baro.pressure);
+        // Empty the FIFO to the SD card
+        start_time = MICROS();
+        uint32_t entries_read = 0;
+        while (fifo.ridx != fifo.widx) {
+            sd_write_sensor_data(&fifo.queue[fifo.ridx]);
+            if (fifo.ridx == LOG_FIFO_LEN - 1) {
+                fifo.ridx = 0;
+            } else {
+                fifo.ridx += 1;
+            }
+            entries_read += 1;
+            if (entries_read == LOG_FIFO_LEN) {
+                break;
+            }
         }
-        read_time = MILLIS();
+        printf("%lu FIFO entries read in %lu ms\n", entries_read,
+               (uint32_t)(MICROS() - start_time) / 1000);
 
-        if (isnan(accel.accelX) || isnan(gyro.gyroX)) {
-            printf("IMU read error\n");
-        } else {
-            printf("Read IMU in %d ms\n", (int)(MILLIS() - read_time));
-            printf("Acceleration - x: %6f, y: %6f, z: %6f (g)\n", accel.accelX,
-                   accel.accelY, accel.accelZ);
-            printf("Rotation - x: %6f, y: %6f, z: %6f (deg/s)\n", gyro.gyroX,
-                   gyro.gyroY, gyro.gyroZ);
-        }
-        read_time = MILLIS();
-
-        if (isnan(mag.magX)) {
-            printf("Magnetometer read error\n");
-        } else {
-            printf("Read mag in %d ms\n", (int)(MILLIS() - read_time));
-            printf("Magnetic Field - x: %6f, y: %6f, z: %6f (G)\n", mag.magX,
-                   mag.magY, mag.magZ);
-        }
-        read_time = MILLIS();
-
-        if (isnan(acch.accelX)) {
-            printf("Accelerometer read error\n");
-        } else {
-            printf("Read acc in %d ms\n", (int)(MILLIS() - read_time));
-            printf("Acceleration - x: %6f, y: %6f, z: %6f (g)\n", acch.accelX,
-                   acch.accelY, acch.accelZ);
-        }
-        read_time = MILLIS();
-
-        if (max_m10s_poll_fix(&gps_conf, &fix) == STATUS_OK) {
-            printf("Read GPS in %d ms\n", (int)(MILLIS() - read_time));
-            printf(
-                "Latitude: %f (deg), Longitude: %f (deg), Altitude: %f "
-                "(m)\n",
-                fix.lat, fix.lon, fix.height_msl);
+        // Check if we have a GPS fix
+        start_time = MICROS();
+        if (max_m10s_poll_fix(&s_gps_conf, &fix) == STATUS_OK) {
             printf("Sats: %d, Valid fix: %d\n", fix.num_sats, fix.fix_valid);
-        } else {
-            printf("GPS read error\n");
+            sd_write_gps_data(MILLIS(), &fix);
         }
-        read_time = MILLIS();
+        printf("GPS read in %lu ms\n",
+               (uint32_t)(MICROS() - start_time) / 1000);
 
-        if (sd_write(MILLIS(), &accel, &gyro, &baro, &mag, &fix) == STATUS_OK) {
-            printf("Wrote SD card in %d ms\n", (int)(MILLIS() - read_time));
-            printf("Logged successfully\n");
-            gpio_write(PIN_GREEN, GPIO_HIGH);
-        } else {
-            printf("SD write error\n");
+        // Flush I/O buffers
+        start_time = MICROS();
+        if (sd_flush() != STATUS_OK) {
+            printf("SD flush to disk failed\n");
             gpio_write(PIN_GREEN, GPIO_LOW);
+            sd_deinit();
+            sd_reinit();
+        } else {
+            gpio_write(PIN_GREEN, GPIO_HIGH);
         }
-        printf("\n");
+        printf("SD flush in %lu ms\n\n",
+               (uint32_t)(MICROS() - start_time) / 1000);
 
         gpio_write(PIN_YELLOW, GPIO_LOW);
 
         // If PROG switch is set, unmount SD card and wait
-        if (gpio_read(PIN_PB8)) {
+        if (gpio_read(PIN_PROG)) {
             sd_deinit();
-            while (gpio_read(PIN_PB8)) {
+            while (gpio_read(PIN_PROG)) {
                 gpio_write(PIN_GREEN, GPIO_HIGH);
                 DELAY(500);
                 gpio_write(PIN_GREEN, GPIO_LOW);
@@ -362,9 +335,26 @@ Status init_flash_fs() {
 
 void TIM6_DAC_IRQHandler(void) {
     HAL_TIM_IRQHandler(&tim6_handle);
-    gpio_write(PIN_BLUE, GPIO_HIGH);
-    DELAY(TARGET_INTERVAL / 2);
-    gpio_write(PIN_BLUE, GPIO_LOW);
+    if (!((fifo.widx == fifo.ridx - 1) ||
+          (fifo.ridx == 0 && fifo.widx == LOG_FIFO_LEN - 1))) {
+        // FIFO is not full
+        uint64_t start_time = MICROS();
+        SensorData log = {
+            .timestamp = MILLIS(),
+            .acch = adxl372_read_accel(&s_acc_conf),
+            .accel = lsm6dsox_read_accel(&s_imu_conf),
+            .gyro = lsm6dsox_read_gyro(&s_imu_conf),
+            .mag = iis2mdc_read(&s_mag_conf),
+            .baro = ms5637_read(&s_baro_conf, OSR_256),
+        };
+        s_last_sensor_read_us = MICROS() - start_time;
+        fifo.queue[fifo.widx] = log;
+        if (fifo.widx == LOG_FIFO_LEN - 1) {
+            fifo.widx = 0;
+        } else {
+            fifo.widx += 1;
+        }
+    }
 }
 
 void Error_Handler(void) {
