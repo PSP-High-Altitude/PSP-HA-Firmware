@@ -77,7 +77,7 @@ static SpiDevice s_imu_conf = {
     .periph = P_SPI1,
 };
 static SpiDevice s_sd_conf = {
-    .clk = SPI_SPEED_20MHz,
+    .clk = SPI_SPEED_10MHz,
     .cpol = 0,
     .cpha = 0,
     .cs = 0,
@@ -90,7 +90,8 @@ static SpiDevice s_acc_conf = {
     .cs = 0,
     .periph = P_SPI2,
 };
-uint32_t s_last_sensor_read_us;
+
+volatile uint32_t s_last_sensor_read_us;
 
 int _write(int file, char *data, int len) {
     if ((file != STDOUT_FILENO) && (file != STDERR_FILENO)) {
@@ -267,6 +268,8 @@ int main(void) {
         }
         printf("%lu FIFO entries read in %lu ms\n", entries_read,
                (uint32_t)(MICROS() - start_time) / 1000);
+        printf("Last sensor read took %lu us\n",
+               (uint32_t)s_last_sensor_read_us);
 
         // Check if we have a GPS fix
         start_time = MICROS();
@@ -292,16 +295,26 @@ int main(void) {
 
         gpio_write(PIN_YELLOW, GPIO_LOW);
 
+        if (fix.fix_valid) {
+            gpio_write(PIN_BLUE, GPIO_HIGH);
+        } else {
+            gpio_write(PIN_BLUE, GPIO_LOW);
+        }
+
         // If PROG switch is set, unmount SD card and wait
         if (gpio_read(PIN_PROG)) {
+            set_tim6_it(0);
             sd_deinit();
+            printf("SD safe to remove\n");
             while (gpio_read(PIN_PROG)) {
                 gpio_write(PIN_GREEN, GPIO_HIGH);
                 DELAY(500);
                 gpio_write(PIN_GREEN, GPIO_LOW);
                 DELAY(500);
             }
+            printf("Remounting SD\n\n");
             sd_reinit();
+            set_tim6_it(1);
         }
     }
 }
