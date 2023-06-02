@@ -3,7 +3,7 @@
 TEST(TestTests, Add2To2) {
     uint32_t a = 2;
     uint32_t b = 2;
-    EXPECT_EQ(a + b, 4);
+    EXPECT_EQ(a + b, 4U);
 }
 
 int main(int argc, char **argv) {

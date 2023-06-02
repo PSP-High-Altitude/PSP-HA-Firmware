@@ -14,7 +14,7 @@ Status gpio_mode(uint8_t pin, GpioMode mode) {
         .outputLogic = 0,
     };
     GPIO_PinInit(base, gpio_pin, &conf);
-    return OK;
+    return STATUS_OK;
 }
 
 Status gpio_write(uint8_t pin, GpioValue value) {
@@ -27,7 +27,7 @@ Status gpio_write(uint8_t pin, GpioValue value) {
         .outputLogic = value,
     };
     GPIO_PinInit(base, gpio_pin, &conf);
-    return OK;
+    return STATUS_OK;
 }
 
 GpioValue gpio_read(uint8_t pin) {

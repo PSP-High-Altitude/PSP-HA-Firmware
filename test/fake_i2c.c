@@ -11,7 +11,7 @@ Status i2c_write(I2cDevice *device, uint8_t *tx_buf, size_t len) {
             // If the address is unknown, the peripheral might not actually
             // raise an error, but we want to detect that something went wrong
             // for the purposes of testing, so raise a testing error
-            return TESTING_ERROR;
+            return STATUS_TESTING_ERROR;
     }
 }
 
@@ -23,6 +23,6 @@ Status i2c_read(I2cDevice *device, uint8_t *rx_buf, size_t len) {
             // If the address is unknown, the peripheral might not actually
             // raise an error, but we want to detect that something went wrong
             // for the purposes of testing, so raise a testing error
-            return TESTING_ERROR;
+            return STATUS_TESTING_ERROR;
     }
 }

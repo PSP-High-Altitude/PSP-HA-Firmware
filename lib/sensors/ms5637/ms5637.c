@@ -15,72 +15,72 @@ Status ms5637_init(I2cDevice* device) {
     uint8_t tx_buf[1] = {0x1E};
 
     // Send Reset Command
-    if (i2c_write(device, tx_buf, 1) != OK) {
-        return ERROR;
+    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
+        return STATUS_ERROR;
     };
 
     // Read Constants
     // Read C1
     tx_buf[0] = 0xA0 | (1 << 1);
-    if (i2c_write(device, tx_buf, 1) != OK) {
-        return ERROR;
+    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
+        return STATUS_ERROR;
     };
-    if (i2c_read(device, rx_buf, 2) != OK) {
-        return ERROR;
+    if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
+        return STATUS_ERROR;
     };
     data.C1 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
 
     // Read C2
     tx_buf[0] = 0xA0 | (2 << 1);
-    if (i2c_write(device, tx_buf, 1) != OK) {
-        return ERROR;
+    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
+        return STATUS_ERROR;
     };
-    if (i2c_read(device, rx_buf, 2) != OK) {
-        return ERROR;
+    if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
+        return STATUS_ERROR;
     };
     data.C2 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
 
     // Read C3
     tx_buf[0] = 0xA0 | (3 << 1);
-    if (i2c_write(device, tx_buf, 1) != OK) {
-        return ERROR;
+    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
+        return STATUS_ERROR;
     };
-    if (i2c_read(device, rx_buf, 2) != OK) {
-        return ERROR;
+    if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
+        return STATUS_ERROR;
     };
     data.C3 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
 
     // Read C4
     tx_buf[0] = 0xA0 | (4 << 1);
-    if (i2c_write(device, tx_buf, 1) != OK) {
-        return ERROR;
+    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
+        return STATUS_ERROR;
     };
-    if (i2c_read(device, rx_buf, 2) != OK) {
-        return ERROR;
+    if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
+        return STATUS_ERROR;
     };
     data.C4 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
 
     // Read C5
     tx_buf[0] = 0xA0 | (5 << 1);
-    if (i2c_write(device, tx_buf, 1) != OK) {
-        return ERROR;
+    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
+        return STATUS_ERROR;
     };
-    if (i2c_read(device, rx_buf, 2) != OK) {
-        return ERROR;
+    if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
+        return STATUS_ERROR;
     };
     data.C5 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
 
     // Read C6
     tx_buf[0] = 0xA0 | (6 << 1);
-    if (i2c_write(device, tx_buf, 1) != OK) {
-        return ERROR;
+    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
+        return STATUS_ERROR;
     };
-    if (i2c_read(device, rx_buf, 2) != OK) {
-        return ERROR;
+    if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
+        return STATUS_ERROR;
     };
     data.C6 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
 
-    return OK;
+    return STATUS_OK;
 }
 
 static uint32_t read_D1(I2cDevice* device, AdcSpeed speed) {
@@ -88,17 +88,17 @@ static uint32_t read_D1(I2cDevice* device, AdcSpeed speed) {
     uint8_t rx_buf[3];
     uint8_t tx_buf[1] = {0x40 | speed};
     // Start ADC conversion
-    if (i2c_write(device, tx_buf, 1) != OK) {
+    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
         return D_READ_ERROR;
     }
     DELAY(conversion_delay_ms[speed / 2] + 1);
     tx_buf[0] = 0x00;
     while (!D1) {
         // Send ADC read command
-        if (i2c_write(device, tx_buf, 1) != OK) {
+        if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
             return D_READ_ERROR;
         }
-        if (i2c_read(device, rx_buf, 3) != OK) {
+        if (i2c_read(device, rx_buf, 3) != STATUS_OK) {
             return D_READ_ERROR;
         }
         D1 = ((uint32_t)rx_buf[0] << 16) | ((uint32_t)rx_buf[1] << 8) |
@@ -112,17 +112,17 @@ static uint32_t read_D2(I2cDevice* device, AdcSpeed speed) {
     uint8_t rx_buf[3];
     uint8_t tx_buf[1] = {0x50 | speed};
     // Start ADC conversion
-    if (i2c_write(device, tx_buf, 1) != OK) {
+    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
         return D_READ_ERROR;
     }
     DELAY(conversion_delay_ms[speed / 2] + 1);
     tx_buf[0] = 0x00;
     while (!D2) {
         // Send ADC read command
-        if (i2c_write(device, tx_buf, 1) != OK) {
+        if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
             return D_READ_ERROR;
         }
-        if (i2c_read(device, rx_buf, 3) != OK) {
+        if (i2c_read(device, rx_buf, 3) != STATUS_OK) {
             return D_READ_ERROR;
         }
         D2 = ((uint32_t)rx_buf[0] << 16) | ((uint32_t)rx_buf[1] << 8) |

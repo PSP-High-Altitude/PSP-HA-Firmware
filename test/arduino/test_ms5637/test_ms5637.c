@@ -13,18 +13,18 @@ void test_ms5637_init() {
     I2cDevice device = {
         .address = 0b1110110,
         .clk = I2C_SPEED_FAST,
-        .periph = I2C0,
+        .periph = P_I2C1,
     };
-    TEST_ASSERT_EQUAL(ms5637_init(&device), OK);
+    TEST_ASSERT_EQUAL(ms5637_init(&device), STATUS_OK);
 }
 
 void test_ms5637_default_read() {
     I2cDevice device = {
         .address = 0b1110110,
         .clk = I2C_SPEED_FAST,
-        .periph = I2C0,
+        .periph = P_I2C1,
     };
-    TEST_ASSERT_EQUAL(ms5637_init(&device), OK);
+    TEST_ASSERT_EQUAL(ms5637_init(&device), STATUS_OK);
 
     BaroData data = ms5637_read(&device, OSR_8192);
     TEST_ASSERT_FLOAT_WITHIN(0.1, data.pressure, 1100.02);

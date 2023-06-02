@@ -4,7 +4,7 @@ static char s_filename[12] = "data_00.csv";
 
 Status sd_init(SDDevice* device) {
     if (!SD.begin(device->cs)) {
-        return HARDWARE_ERROR;
+        return STATUS_HARDWARE_ERROR;
     }
 
     // Increment the suffix of the filename until we find an unused name
@@ -21,7 +21,7 @@ Status sd_init(SDDevice* device) {
 
     File file = SD.open(s_filename, FILE_WRITE);
     if (!file) {
-        return ERROR;
+        return STATUS_ERROR;
     }
 
     file.println(
@@ -33,25 +33,25 @@ Status sd_init(SDDevice* device) {
 
     file.close();
 
-    return OK;
+    return STATUS_OK;
 }
 
 Status sd_reinit(SDDevice* device) {
     if (!SD.begin(device->cs)) {
-        return HARDWARE_ERROR;
+        return STATUS_HARDWARE_ERROR;
     }
 
     if (!SD.exists(s_filename)) {
-        return HARDWARE_ERROR;
+        return STATUS_HARDWARE_ERROR;
     }
 
-    return OK;
+    return STATUS_OK;
 }
 
 Status sd_write(uint64_t timestamp, Accel* accel, Gyro* gyro, BaroData* baro) {
     // Detect if the card got disconnected
     if (!SD.exists(s_filename)) {
-        return ERROR;
+        return STATUS_ERROR;
     }
 
     File file = SD.open(s_filename, FILE_WRITE);
@@ -64,8 +64,8 @@ Status sd_write(uint64_t timestamp, Accel* accel, Gyro* gyro, BaroData* baro) {
     file.close();
 
     if (retval > 0) {
-        return OK;
+        return STATUS_OK;
     } else {
-        return ERROR;
+        return STATUS_ERROR;
     }
 }
