@@ -36,18 +36,11 @@
 #define PIN_PROG PIN_PB8
 #define PIN_BUZZER PIN_PB9
 
-#define TARGET_INTERVAL 30  // ms
+#define TARGET_INTERVAL 25  // ms
 
-#define LOG_FIFO_LEN 32
+#define LOG_FIFO_LEN 256
 
 #define DEBUG
-
-TIM_HandleTypeDef tim6_handle;
-
-lfs_t lfs;
-lfs_file_t file;
-
-Status init_flash_fs();
 
 extern PCD_HandleTypeDef hpcd_USB_FS;
 
@@ -199,6 +192,8 @@ void print_sensors() {
             continue;
         }
 
+        gpio_write(PIN_YELLOW, GPIO_HIGH);
+
         TickType_t start_ticks = xTaskGetTickCount();
 
         uint32_t entries_read = 0;
@@ -206,8 +201,10 @@ void print_sensors() {
             Status code = sd_write_sensor_data(&fifo.queue[fifo.ridx]);
             if (code != STATUS_OK) {
                 printf("SD write error %d\n", code);
+                gpio_write(PIN_GREEN, GPIO_LOW);
                 break;
             }
+            gpio_write(PIN_GREEN, GPIO_HIGH);
             if (fifo.ridx == LOG_FIFO_LEN - 1) {
                 fifo.ridx = 0;
             } else {
@@ -215,11 +212,16 @@ void print_sensors() {
             }
             entries_read += 1;
             if (entries_read == LOG_FIFO_LEN) {
+                gpio_write(PIN_RED, GPIO_HIGH);
                 break;
             }
+            gpio_write(PIN_RED, GPIO_LOW);
         }
         sd_flush();
+
         TickType_t elapsed_time = xTaskGetTickCount() - start_ticks;
+
+        gpio_write(PIN_YELLOW, GPIO_LOW);
         printf("%lu entries read in %lu ticks\n", entries_read, elapsed_time);
     }
 }
@@ -300,7 +302,7 @@ int main(void) {
 
     xTaskCreate(blink_blue,            // Task function
                 "blink_blue",          // Task name
-                1024,                  // Stack size
+                256,                   // Stack size
                 NULL,                  // Parameters
                 tskIDLE_PRIORITY + 1,  // Priority
                 &s_blink_blue_handle   // Task handle

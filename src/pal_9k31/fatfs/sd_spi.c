@@ -15,10 +15,11 @@
 
 ---------------------------------------------------------------------------*/
 
+#include "FreeRTOS.h"
 #include "diskio.h"
 #include "gpio/gpio.h"
 #include "spi/spi.h"
-#include "timer.h"
+#include "task.h"
 
 /* MMC/SD command */
 #define CMD0 (0)           /* GO_IDLE_STATE */
@@ -159,12 +160,15 @@ static int wait_ready(        /* 1:Ready, 0:Timeout */
 ) {
     BYTE d;
 
-    uint64_t start_time = MILLIS();
+    uint64_t start_time = xTaskGetTickCount();
     do {
         d = xchg_spi(0xFF);
         /* This loop takes a time. Insert rot_rdq() here for multitask
          * envilonment. */
-    } while ((d != 0xFF) && (MILLIS() - start_time < wt));
+        if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+            taskYIELD();
+        }
+    } while ((d != 0xFF) && (xTaskGetTickCount() - start_time < wt));
     /* Wait for card goes ready or timeout */
 
     return (d == 0xFF) ? 1 : 0;
@@ -204,12 +208,15 @@ static int rcvr_datablock(            /* 1:OK, 0:Error */
     BYTE token;
     const uint64_t timeout = 200;
 
-    uint64_t start_time = MILLIS();
+    uint64_t start_time = xTaskGetTickCount();
     do { /* Wait for DataStart token in timeout of 200ms */
         token = xchg_spi(0xFF);
         /* This loop will take a time. Insert rot_rdq() here for multitask
          * envilonment. */
-    } while ((token == 0xFF) && (MILLIS() - start_time < timeout));
+        if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+            taskYIELD();
+        }
+    } while ((token == 0xFF) && (xTaskGetTickCount() - start_time < timeout));
 
     if (token != 0xFE)
         return 0; /* Function fails if invalid DataStart token or timeout */
