@@ -32,7 +32,7 @@
 #define PIN_PROG PIN_PB8
 #define PIN_BUZZER PIN_PB9
 
-#define TARGET_INTERVAL 10  // ms
+#define TARGET_INTERVAL 30  // ms
 
 #define LOG_FIFO_LEN 32
 
@@ -72,7 +72,7 @@ const osThreadAttr_t print_sensors_attributes = {
 osThreadId_t blink_blue_handle;
 const osThreadAttr_t blink_blue_attributes = {
     .name = "blink_blue",
-    .priority = (osPriority_t)osPriorityNormal,
+    .priority = (osPriority_t)osPriorityBelowNormal1,
     .stack_size = 128 * 4,
 };
 
@@ -99,7 +99,7 @@ static SpiDevice s_imu_conf = {
     .periph = P_SPI1,
 };
 static SpiDevice s_sd_conf = {
-    .clk = SPI_SPEED_10MHz,
+    .clk = SPI_SPEED_1MHz,
     .cpol = 0,
     .cpha = 0,
     .cs = 0,
@@ -191,13 +191,34 @@ void print_sensors_once(volatile SensorData *data) {
 void print_sensors() {
     while (1) {
         uint32_t notif_value;
-        if (!xTaskNotifyWait(0, 0xffffffffUL, &notif_value, portMAX_DELAY)) {
+        xTaskNotifyWait(0, 0xffffffffUL, &notif_value, 100);
+
+        // If PROG switch is set, unmount SD card and wait
+        if (gpio_read(PIN_PROG)) {
+            sd_deinit();
+            printf("SD safe to remove\n");
+            while (gpio_read(PIN_PROG)) {
+                gpio_write(PIN_GREEN, GPIO_HIGH);
+                vTaskDelay(pdMS_TO_TICKS(500));
+                gpio_write(PIN_GREEN, GPIO_LOW);
+                vTaskDelay(pdMS_TO_TICKS(500));
+            }
+            printf("Remounting SD\n\n");
+            sd_reinit();
+        }
+
+        if (notif_value == 0) {
             continue;
         }
 
+        TickType_t start_ticks = xTaskGetTickCount();
+
         uint32_t entries_read = 0;
         while (fifo.ridx != fifo.widx) {
-            print_sensors_once(&fifo.queue[fifo.ridx]);
+            if (sd_write_sensor_data(&fifo.queue[fifo.ridx]) == STATUS_OK) {
+                printf("SD write error\n");
+                break;
+            }
             if (fifo.ridx == LOG_FIFO_LEN - 1) {
                 fifo.ridx = 0;
             } else {
@@ -208,6 +229,9 @@ void print_sensors() {
                 break;
             }
         }
+        sd_flush();
+        TickType_t elapsed_time = xTaskGetTickCount() - start_ticks;
+        printf("%lu entries read in %lu ticks\n", entries_read, elapsed_time);
     }
 }
 
