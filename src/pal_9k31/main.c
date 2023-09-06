@@ -6,6 +6,7 @@
 #include "adxl372/adxl372.h"
 #include "board.h"
 #include "clocks.h"
+#include "cmsis_os.h"
 #include "data.h"
 #include "fatfs/sd.h"
 #include "gpio/gpio.h"
@@ -53,6 +54,34 @@ volatile static struct {
     // ridx == widx -> FIFO is empty
     // (ridx == widx - 1) mod LOG_FIFO_LEN -> FIFO is full
 } fifo;
+
+osThreadId_t defaultTaskHandle;
+const osThreadAttr_t defaultTask_attributes = {
+    .name = "defaultTask",
+    .priority = (osPriority_t)osPriorityNormal,
+    .stack_size = 128 * 4,
+};
+
+osThreadId_t blink_red_handle;
+const osThreadAttr_t blink_red_attributes = {
+    .name = "blink_red",
+    .priority = (osPriority_t)osPriorityNormal,
+    .stack_size = 128 * 4,
+};
+
+osThreadId_t blink_green_handle;
+const osThreadAttr_t blink_green_attributes = {
+    .name = "blink_green",
+    .priority = (osPriority_t)osPriorityNormal,
+    .stack_size = 128 * 4,
+};
+
+osThreadId_t blink_blue_handle;
+const osThreadAttr_t blink_blue_attributes = {
+    .name = "blink_blue",
+    .priority = (osPriority_t)osPriorityNormal,
+    .stack_size = 128 * 4,
+};
 
 static I2cDevice s_mag_conf = {
     .address = 0x1E,
@@ -113,35 +142,30 @@ int _write(int file, char *data, int len) {
     return len;
 }
 
-void init_tim6() {
-    __HAL_RCC_TIM6_CLK_ENABLE();
-
-    TIM_Base_InitTypeDef tim6_conf = {
-        .Prescaler = 16800,
-        .CounterMode = TIM_COUNTERMODE_UP,
-        .Period = TARGET_INTERVAL * 10,
-        .AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE,
-    };
-    tim6_handle.Init = tim6_conf;
-    tim6_handle.Instance = TIM6;
-    tim6_handle.Channel = TIM_CHANNEL_1;
-    TIM_MasterConfigTypeDef tim6_master_conf = {
-        .MasterOutputTrigger = TIM_TRGO_RESET,
-        .MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE,
-    };
-
-    HAL_TIM_Base_Init(&tim6_handle);
-    HAL_TIMEx_MasterConfigSynchronization(&tim6_handle, &tim6_master_conf);
-
-    HAL_NVIC_SetPriority(TIM6_DAC_IRQn, 1, 0);
-    HAL_NVIC_EnableIRQ(TIM6_DAC_IRQn);
+void blink_red_1hz() {
+    while (1) {
+        gpio_write(PIN_RED, GPIO_HIGH);
+        vTaskDelay(500);
+        gpio_write(PIN_RED, GPIO_LOW);
+        vTaskDelay(500);
+    }
 }
 
-void set_tim6_it(uint8_t setting) {
-    if (setting) {
-        HAL_TIM_Base_Start_IT(&tim6_handle);
-    } else {
-        HAL_TIM_Base_Stop_IT(&tim6_handle);
+void blink_green_2hz() {
+    while (1) {
+        gpio_write(PIN_GREEN, GPIO_HIGH);
+        vTaskDelay(250);
+        gpio_write(PIN_GREEN, GPIO_LOW);
+        vTaskDelay(250);
+    }
+}
+
+void blink_blue_4hz() {
+    while (1) {
+        gpio_write(PIN_BLUE, GPIO_HIGH);
+        vTaskDelay(125);
+        gpio_write(PIN_BLUE, GPIO_LOW);
+        vTaskDelay(125);
     }
 }
 
@@ -149,7 +173,6 @@ int main(void) {
     HAL_Init();
     SystemClock_Config();
     init_timers();
-    init_tim6();
     gpio_write(PIN_PA4, GPIO_HIGH);
     gpio_write(PIN_PB12, GPIO_HIGH);
     gpio_write(PIN_PE4, GPIO_HIGH);
@@ -157,27 +180,6 @@ int main(void) {
     MX_USB_Device_Init();
     DELAY(1000);
     printf("Starting initialization...\n");
-    if (mt29f2g_init() == STATUS_OK) {
-        printf("Flash chip initialization successful\n");
-    } else {
-        printf("Flash chip initialization failed\n");
-    }
-
-    /*
-    if (init_flash_fs() != STATUS_OK) {
-        printf("Flash filesystem initialization failed.\n");
-    } else {
-        uint32_t boot_count = 0;
-        lfs_file_open(&lfs, &file, "boot_count", LFS_O_RDWR | LFS_O_CREAT);
-        lfs_file_read(&lfs, &file, &boot_count, sizeof(boot_count));
-        boot_count += 1;
-        lfs_file_rewind(&lfs, &file);
-        lfs_file_write(&lfs, &file, &boot_count, sizeof(boot_count));
-        lfs_file_close(&lfs, &file);
-
-        printf("Welcome to PAL 9000, boot %lu\n", boot_count);
-    }
-    */
 
     // Initialize magnetometer
     if (iis2mdc_init(&s_mag_conf, IIS2MDC_ODR_50_HZ) == STATUS_OK) {
@@ -236,137 +238,17 @@ int main(void) {
         printf("SD card initialization failed\n");
     }
 
-    set_tim6_it(1);
-    printf("\n");
+    osKernelInitialize();
+    blink_red_handle = osThreadNew(blink_red_1hz, NULL, &blink_red_attributes);
+    blink_green_handle =
+        osThreadNew(blink_green_2hz, NULL, &blink_green_attributes);
+    blink_blue_handle =
+        osThreadNew(blink_blue_4hz, NULL, &blink_blue_attributes);
 
-    GPS_Fix_TypeDef fix;
-
-    fifo.ridx = 0;
-    fifo.widx = 0;
-
-    uint64_t start_time = MICROS();
-
-    gpio_write(PIN_RED, GPIO_LOW);
+    osKernelStart();
 
     while (1) {
-        gpio_write(PIN_YELLOW, GPIO_HIGH);
-
-        // Empty the FIFO to the SD card
-        start_time = MICROS();
-        uint32_t entries_read = 0;
-        while (fifo.ridx != fifo.widx) {
-            sd_write_sensor_data(&fifo.queue[fifo.ridx]);
-            if (fifo.ridx == LOG_FIFO_LEN - 1) {
-                fifo.ridx = 0;
-            } else {
-                fifo.ridx += 1;
-            }
-            entries_read += 1;
-            if (entries_read == LOG_FIFO_LEN) {
-                break;
-            }
-        }
-        printf("%lu FIFO entries read in %lu ms\n", entries_read,
-               (uint32_t)(MICROS() - start_time) / 1000);
-        printf("Last sensor read took %lu us\n",
-               (uint32_t)s_last_sensor_read_us);
-
-        // Check if we have a GPS fix
-        start_time = MICROS();
-        if (max_m10s_poll_fix(&s_gps_conf, &fix) == STATUS_OK) {
-            printf("Sats: %d, Valid fix: %d\n", fix.num_sats, fix.fix_valid);
-            sd_write_gps_data(MILLIS(), &fix);
-        }
-        printf("GPS read in %lu ms\n",
-               (uint32_t)(MICROS() - start_time) / 1000);
-
-        // Flush I/O buffers
-        start_time = MICROS();
-        if (sd_flush() != STATUS_OK) {
-            printf("SD flush to disk failed\n");
-            gpio_write(PIN_GREEN, GPIO_LOW);
-            sd_deinit();
-            sd_reinit();
-        } else {
-            gpio_write(PIN_GREEN, GPIO_HIGH);
-        }
-        printf("SD flush in %lu ms\n\n",
-               (uint32_t)(MICROS() - start_time) / 1000);
-
-        gpio_write(PIN_YELLOW, GPIO_LOW);
-
-        if (fix.fix_valid) {
-            gpio_write(PIN_BLUE, GPIO_HIGH);
-        } else {
-            gpio_write(PIN_BLUE, GPIO_LOW);
-        }
-
-        // If PROG switch is set, unmount SD card and wait
-        if (gpio_read(PIN_PROG)) {
-            set_tim6_it(0);
-            sd_deinit();
-            printf("SD safe to remove\n");
-            while (gpio_read(PIN_PROG)) {
-                gpio_write(PIN_GREEN, GPIO_HIGH);
-                DELAY(500);
-                gpio_write(PIN_GREEN, GPIO_LOW);
-                DELAY(500);
-            }
-            printf("Remounting SD\n\n");
-            sd_reinit();
-            set_tim6_it(1);
-        }
-    }
-}
-
-Status init_flash_fs() {
-    const struct lfs_config cfg = {
-        .read = &mt29f2g_read,
-        .prog = &mt29f2g_prog,
-        .erase = &mt29f2g_erase,
-        .sync = &mt29f2g_sync,
-
-        .read_size = 16,
-        .prog_size = 16,
-        .block_size = 139264,
-        .block_count = 2048,
-        .cache_size = 16,
-        .lookahead_size = 16,
-        .block_cycles = 750,
-    };
-    int err = lfs_mount(&lfs, &cfg);
-    if (err) {
-        if (lfs_format(&lfs, &cfg)) {
-            return STATUS_ERROR;
-        }
-        if (lfs_mount(&lfs, &cfg)) {
-            return STATUS_ERROR;
-        }
-    }
-    return STATUS_OK;
-}
-
-void TIM6_DAC_IRQHandler(void) {
-    HAL_TIM_IRQHandler(&tim6_handle);
-    if (!((fifo.widx == fifo.ridx - 1) ||
-          (fifo.ridx == 0 && fifo.widx == LOG_FIFO_LEN - 1))) {
-        // FIFO is not full
-        uint64_t start_time = MICROS();
-        SensorData log = {
-            .timestamp = MILLIS(),
-            .acch = adxl372_read_accel(&s_acc_conf),
-            .accel = lsm6dsox_read_accel(&s_imu_conf),
-            .gyro = lsm6dsox_read_gyro(&s_imu_conf),
-            .mag = iis2mdc_read(&s_mag_conf),
-            .baro = ms5637_read(&s_baro_conf, OSR_256),
-        };
-        s_last_sensor_read_us = MICROS() - start_time;
-        fifo.queue[fifo.widx] = log;
-        if (fifo.widx == LOG_FIFO_LEN - 1) {
-            fifo.widx = 0;
-        } else {
-            fifo.widx += 1;
-        }
+        printf("kernel exited\n");
     }
 }
 
