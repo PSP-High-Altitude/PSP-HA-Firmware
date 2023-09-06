@@ -6,7 +6,6 @@
 #include "adxl372/adxl372.h"
 #include "board.h"
 #include "clocks.h"
-#include "cmsis_os.h"
 #include "data.h"
 #include "fatfs/sd.h"
 #include "gpio/gpio.h"
@@ -18,7 +17,12 @@
 #include "mt29f2g.h"
 #include "qspi/qspi.h"
 #include "status.h"
+#include "stm32g474xx.h"
 #include "timer.h"
+
+// FreeRTOS
+#include "FreeRTOS.h"
+#include "task.h"
 
 #ifdef USE_SPI_CRC
 #undef USE_SPI_CRC
@@ -54,27 +58,6 @@ volatile static struct {
     // ridx == widx -> FIFO is empty
     // (ridx == widx - 1) mod LOG_FIFO_LEN -> FIFO is full
 } fifo;
-
-osThreadId_t read_sensors_handle;
-const osThreadAttr_t read_sensors_attributes = {
-    .name = "read_sensors",
-    .priority = (osPriority_t)osPriorityAboveNormal1,
-    .stack_size = 1024 * 4,
-};
-
-osThreadId_t print_sensors_handle;
-const osThreadAttr_t print_sensors_attributes = {
-    .name = "print_sensors",
-    .priority = (osPriority_t)osPriorityNormal,
-    .stack_size = 1024 * 4,
-};
-
-osThreadId_t blink_blue_handle;
-const osThreadAttr_t blink_blue_attributes = {
-    .name = "blink_blue",
-    .priority = (osPriority_t)osPriorityBelowNormal1,
-    .stack_size = 128 * 4,
-};
 
 static I2cDevice s_mag_conf = {
     .address = 0x1E,
@@ -133,6 +116,11 @@ int _write(int file, char *data, int len) {
     return len;
 }
 
+static TaskHandle_t s_blink_blue_handle;
+static TaskHandle_t s_read_sensors_handle;
+static TaskHandle_t s_print_sensors_handle;
+static TickType_t s_last_sensor_read_ticks;
+
 void blink_blue() {
     while (1) {
         gpio_write(PIN_BLUE, GPIO_HIGH);
@@ -141,8 +129,6 @@ void blink_blue() {
         vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
-
-static TickType_t s_last_sensor_read_ticks;
 
 void read_sensors() {
     s_last_sensor_read_ticks = xTaskGetTickCount();
@@ -164,8 +150,8 @@ void read_sensors() {
             } else {
                 fifo.widx += 1;
             }
+            xTaskNotifyGive(s_print_sensors_handle);
         }
-        xTaskNotifyGive(print_sensors_handle);
         vTaskDelayUntil(&s_last_sensor_read_ticks,
                         pdMS_TO_TICKS(TARGET_INTERVAL));
     }
@@ -205,6 +191,8 @@ void print_sensors() {
             }
             printf("Remounting SD\n\n");
             sd_reinit();
+            fifo.ridx = fifo.widx;
+            continue;
         }
 
         if (notif_value == 0) {
@@ -215,8 +203,9 @@ void print_sensors() {
 
         uint32_t entries_read = 0;
         while (fifo.ridx != fifo.widx) {
-            if (sd_write_sensor_data(&fifo.queue[fifo.ridx]) == STATUS_OK) {
-                printf("SD write error\n");
+            Status code = sd_write_sensor_data(&fifo.queue[fifo.ridx]);
+            if (code != STATUS_OK) {
+                printf("SD write error %d\n", code);
                 break;
             }
             if (fifo.ridx == LOG_FIFO_LEN - 1) {
@@ -304,20 +293,46 @@ int main(void) {
         printf("SD card initialization failed\n");
     }
 
+    // https://www.freertos.org/RTOS-Cortex-M3-M4.html
+    NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
+
     gpio_write(PIN_RED, GPIO_LOW);
 
-    osKernelInitialize();
+    xTaskCreate(blink_blue,            // Task function
+                "blink_blue",          // Task name
+                1024,                  // Stack size
+                NULL,                  // Parameters
+                tskIDLE_PRIORITY + 1,  // Priority
+                &s_blink_blue_handle   // Task handle
+    );
 
-    blink_blue_handle = osThreadNew(blink_blue, NULL, &blink_blue_attributes);
-    read_sensors_handle =
-        osThreadNew(read_sensors, NULL, &read_sensors_attributes);
-    print_sensors_handle =
-        osThreadNew(print_sensors, NULL, &print_sensors_attributes);
+    xTaskCreate(print_sensors,           // Task function
+                "print_sensors",         // Task name
+                8192,                    // Stack size
+                NULL,                    // Parameters
+                tskIDLE_PRIORITY + 2,    // Priority
+                &s_print_sensors_handle  // Task handle
+    );
 
-    osKernelStart();
+    xTaskCreate(read_sensors,           // Task function
+                "read_sensors",         // Task name
+                2048,                   // Stack size
+                NULL,                   // Parameters
+                tskIDLE_PRIORITY + 3,   // Priority
+                &s_read_sensors_handle  // Task handle
+    );
+
+    vTaskStartScheduler();
 
     while (1) {
         printf("kernel exited\n");
+    }
+}
+
+void vApplicationStackOverflowHook(TaskHandle_t xTask,
+                                   signed char *pcTaskName) {
+    while (1) {
+        printf("stack overflow in task '%s'", pcTaskName);
     }
 }
 
