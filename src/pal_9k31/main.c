@@ -32,9 +32,9 @@
 #define PIN_PROG PIN_PB8
 #define PIN_BUZZER PIN_PB9
 
-#define TARGET_INTERVAL 30  // ms
+#define TARGET_INTERVAL 10  // ms
 
-#define LOG_FIFO_LEN 256
+#define LOG_FIFO_LEN 32
 
 #define DEBUG
 
@@ -58,7 +58,7 @@ volatile static struct {
 osThreadId_t read_sensors_handle;
 const osThreadAttr_t read_sensors_attributes = {
     .name = "read_sensors",
-    .priority = (osPriority_t)osPriorityNormal,
+    .priority = (osPriority_t)osPriorityAboveNormal1,
     .stack_size = 1024 * 4,
 };
 
@@ -136,49 +136,78 @@ int _write(int file, char *data, int len) {
 void blink_blue() {
     while (1) {
         gpio_write(PIN_BLUE, GPIO_HIGH);
-        vTaskDelay(500);
+        vTaskDelay(pdMS_TO_TICKS(500));
         gpio_write(PIN_BLUE, GPIO_LOW);
-        vTaskDelay(500);
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 
-TickType_t s_last_sensor_read_us;
-volatile SensorData s_data;
+static TickType_t s_last_sensor_read_ticks;
 
 void read_sensors() {
-    s_last_sensor_read_us = xTaskGetTickCount();
+    s_last_sensor_read_ticks = xTaskGetTickCount();
     while (1) {
-        s_data.timestamp = xTaskGetTickCount();
-        s_data.accel = lsm6dsox_read_accel(&s_imu_conf);
-        s_data.gyro = lsm6dsox_read_gyro(&s_imu_conf);
-        s_data.baro = ms5637_read(&s_baro_conf, OSR_256);
-        s_data.mag = iis2mdc_read(&s_mag_conf);
-        s_data.acch = adxl372_read_accel(&s_acc_conf);
-        vTaskDelayUntil(&s_last_sensor_read_us, 10);
+        if (!((fifo.widx == fifo.ridx - 1) ||
+              (fifo.ridx == 0 && fifo.widx == LOG_FIFO_LEN - 1))) {
+            // FIFO is not full
+            SensorData log = {
+                .timestamp = xTaskGetTickCount(),
+                .acch = adxl372_read_accel(&s_acc_conf),
+                .accel = lsm6dsox_read_accel(&s_imu_conf),
+                .gyro = lsm6dsox_read_gyro(&s_imu_conf),
+                .mag = iis2mdc_read(&s_mag_conf),
+                .baro = ms5637_read(&s_baro_conf, OSR_256),
+            };
+            fifo.queue[fifo.widx] = log;
+            if (fifo.widx == LOG_FIFO_LEN - 1) {
+                fifo.widx = 0;
+            } else {
+                fifo.widx += 1;
+            }
+        }
+        xTaskNotifyGive(print_sensors_handle);
+        vTaskDelayUntil(&s_last_sensor_read_ticks,
+                        pdMS_TO_TICKS(TARGET_INTERVAL));
     }
+}
+
+void print_sensors_once(volatile SensorData *data) {
+    printf(
+        "%9.lu,"                // Timestamp
+        "%6.3f,%6.3f,%6.3f,"    // IMU acceleration
+        "%6.3f,%6.3f,%6.3f,"    // IMU rotation
+        "%6.3f,%6.3f,"          // Barometer
+        "%6.3f,%6.3f,%6.3f,"    // Magnetometer
+        "%6.3f,%6.3f,%6.3f\n",  // Accelerometer
+        //
+        (uint32_t)data->timestamp,  //
+        data->accel.accelX, data->accel.accelY, data->accel.accelZ,
+        data->gyro.gyroX, data->gyro.gyroY, data->gyro.gyroZ,
+        data->baro.temperature, data->baro.pressure, data->mag.magX,
+        data->mag.magY, data->mag.magZ, data->acch.accelX, data->acch.accelY,
+        data->acch.accelZ);
 }
 
 void print_sensors() {
     while (1) {
-        TickType_t last_timestamp = 0;
-        if (s_data.timestamp != last_timestamp) {
-            last_timestamp = s_data.timestamp;
-            printf(
-                "%9.lu,"                // Timestamp
-                "%6.3f,%6.3f,%6.3f,"    // IMU acceleration
-                "%6.3f,%6.3f,%6.3f,"    // IMU rotation
-                "%6.3f,%6.3f,"          // Barometer
-                "%6.3f,%6.3f,%6.3f,"    // Magnetometer
-                "%6.3f,%6.3f,%6.3f\n",  // Accelerometer
-                //
-                (uint32_t)s_data.timestamp,  //
-                s_data.accel.accelX, s_data.accel.accelY, s_data.accel.accelZ,
-                s_data.gyro.gyroX, s_data.gyro.gyroY, s_data.gyro.gyroZ,
-                s_data.baro.temperature, s_data.baro.pressure, s_data.mag.magX,
-                s_data.mag.magY, s_data.mag.magZ, s_data.acch.accelX,
-                s_data.acch.accelY, s_data.acch.accelZ);
+        uint32_t notif_value;
+        if (!xTaskNotifyWait(0, 0xffffffffUL, &notif_value, portMAX_DELAY)) {
+            continue;
         }
-        vTaskDelay(0);
+
+        uint32_t entries_read = 0;
+        while (fifo.ridx != fifo.widx) {
+            print_sensors_once(&fifo.queue[fifo.ridx]);
+            if (fifo.ridx == LOG_FIFO_LEN - 1) {
+                fifo.ridx = 0;
+            } else {
+                fifo.ridx += 1;
+            }
+            entries_read += 1;
+            if (entries_read == LOG_FIFO_LEN) {
+                break;
+            }
+        }
     }
 }
 
