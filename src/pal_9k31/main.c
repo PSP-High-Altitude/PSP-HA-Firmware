@@ -55,25 +55,18 @@ volatile static struct {
     // (ridx == widx - 1) mod LOG_FIFO_LEN -> FIFO is full
 } fifo;
 
-osThreadId_t defaultTaskHandle;
-const osThreadAttr_t defaultTask_attributes = {
-    .name = "defaultTask",
+osThreadId_t read_sensors_handle;
+const osThreadAttr_t read_sensors_attributes = {
+    .name = "read_sensors",
     .priority = (osPriority_t)osPriorityNormal,
-    .stack_size = 128 * 4,
+    .stack_size = 1024 * 4,
 };
 
-osThreadId_t blink_red_handle;
-const osThreadAttr_t blink_red_attributes = {
-    .name = "blink_red",
+osThreadId_t print_sensors_handle;
+const osThreadAttr_t print_sensors_attributes = {
+    .name = "print_sensors",
     .priority = (osPriority_t)osPriorityNormal,
-    .stack_size = 128 * 4,
-};
-
-osThreadId_t blink_green_handle;
-const osThreadAttr_t blink_green_attributes = {
-    .name = "blink_green",
-    .priority = (osPriority_t)osPriorityNormal,
-    .stack_size = 128 * 4,
+    .stack_size = 1024 * 4,
 };
 
 osThreadId_t blink_blue_handle;
@@ -120,8 +113,6 @@ static SpiDevice s_acc_conf = {
     .periph = P_SPI2,
 };
 
-volatile uint32_t s_last_sensor_read_us;
-
 int _write(int file, char *data, int len) {
     if ((file != STDOUT_FILENO) && (file != STDERR_FILENO)) {
         errno = EBADF;
@@ -142,30 +133,52 @@ int _write(int file, char *data, int len) {
     return len;
 }
 
-void blink_red_1hz() {
-    while (1) {
-        gpio_write(PIN_RED, GPIO_HIGH);
-        vTaskDelay(500);
-        gpio_write(PIN_RED, GPIO_LOW);
-        vTaskDelay(500);
-    }
-}
-
-void blink_green_2hz() {
-    while (1) {
-        gpio_write(PIN_GREEN, GPIO_HIGH);
-        vTaskDelay(250);
-        gpio_write(PIN_GREEN, GPIO_LOW);
-        vTaskDelay(250);
-    }
-}
-
-void blink_blue_4hz() {
+void blink_blue() {
     while (1) {
         gpio_write(PIN_BLUE, GPIO_HIGH);
-        vTaskDelay(125);
+        vTaskDelay(500);
         gpio_write(PIN_BLUE, GPIO_LOW);
-        vTaskDelay(125);
+        vTaskDelay(500);
+    }
+}
+
+TickType_t s_last_sensor_read_us;
+volatile SensorData s_data;
+
+void read_sensors() {
+    s_last_sensor_read_us = xTaskGetTickCount();
+    while (1) {
+        s_data.timestamp = xTaskGetTickCount();
+        s_data.accel = lsm6dsox_read_accel(&s_imu_conf);
+        s_data.gyro = lsm6dsox_read_gyro(&s_imu_conf);
+        s_data.baro = ms5637_read(&s_baro_conf, OSR_256);
+        s_data.mag = iis2mdc_read(&s_mag_conf);
+        s_data.acch = adxl372_read_accel(&s_acc_conf);
+        vTaskDelayUntil(&s_last_sensor_read_us, 10);
+    }
+}
+
+void print_sensors() {
+    while (1) {
+        TickType_t last_timestamp = 0;
+        if (s_data.timestamp != last_timestamp) {
+            last_timestamp = s_data.timestamp;
+            printf(
+                "%9.lu,"                // Timestamp
+                "%6.3f,%6.3f,%6.3f,"    // IMU acceleration
+                "%6.3f,%6.3f,%6.3f,"    // IMU rotation
+                "%6.3f,%6.3f,"          // Barometer
+                "%6.3f,%6.3f,%6.3f,"    // Magnetometer
+                "%6.3f,%6.3f,%6.3f\n",  // Accelerometer
+                //
+                (uint32_t)s_data.timestamp,  //
+                s_data.accel.accelX, s_data.accel.accelY, s_data.accel.accelZ,
+                s_data.gyro.gyroX, s_data.gyro.gyroY, s_data.gyro.gyroZ,
+                s_data.baro.temperature, s_data.baro.pressure, s_data.mag.magX,
+                s_data.mag.magY, s_data.mag.magZ, s_data.acch.accelX,
+                s_data.acch.accelY, s_data.acch.accelZ);
+        }
+        vTaskDelay(0);
     }
 }
 
@@ -219,9 +232,9 @@ int main(void) {
     // Initialize accelerometer
     if (adxl372_init(&s_acc_conf, ADXL372_200_HZ, ADXL372_OUT_RATE_400_HZ,
                      ADXL372_MEASURE_MODE)) {
-        printf("Accelerometer initialization successful");
+        printf("Accelerometer initialization successful\n");
     } else {
-        printf("Accelrometer initialization failed");
+        printf("Accelerometer initialization failed\n");
     }
 
     // Initialize GPS
@@ -238,12 +251,15 @@ int main(void) {
         printf("SD card initialization failed\n");
     }
 
+    gpio_write(PIN_RED, GPIO_LOW);
+
     osKernelInitialize();
-    blink_red_handle = osThreadNew(blink_red_1hz, NULL, &blink_red_attributes);
-    blink_green_handle =
-        osThreadNew(blink_green_2hz, NULL, &blink_green_attributes);
-    blink_blue_handle =
-        osThreadNew(blink_blue_4hz, NULL, &blink_blue_attributes);
+
+    blink_blue_handle = osThreadNew(blink_blue, NULL, &blink_blue_attributes);
+    read_sensors_handle =
+        osThreadNew(read_sensors, NULL, &read_sensors_attributes);
+    print_sensors_handle =
+        osThreadNew(print_sensors, NULL, &print_sensors_attributes);
 
     osKernelStart();
 
