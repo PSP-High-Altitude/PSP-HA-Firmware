@@ -16,8 +16,11 @@
 #include "ms5637/ms5637.h"
 #include "mt29f2g.h"
 #include "qspi/qspi.h"
+#include "stateestim.h"
 #include "status.h"
 #include "timer.h"
+
+#define PI 3.14159265359
 
 #ifdef USE_SPI_CRC
 #undef USE_SPI_CRC
@@ -90,6 +93,15 @@ static SpiDevice s_acc_conf = {
     .cs = 0,
     .periph = P_SPI2,
 };
+
+// State Estimation
+Vector v_a = {0};
+Vector v_ac = {0};
+Vector v_v = {0};
+Vector v_d = {0};
+Vector v_w = {0};
+Quaternion q = {0};
+uint64_t last_time = 0;
 
 volatile uint32_t s_last_sensor_read_us;
 
@@ -236,6 +248,7 @@ int main(void) {
         printf("SD card initialization failed\n");
     }
 
+    last_time = MICROS();
     set_tim6_it(1);
     printf("\n");
 
@@ -293,6 +306,8 @@ int main(void) {
         printf("SD flush in %lu ms\n\n",
                (uint32_t)(MICROS() - start_time) / 1000);
 
+        printf("x: %10.5f\ny: %10.5f\nz: %10.5f\n", v_d.x, v_d.y, v_d.z);
+
         gpio_write(PIN_YELLOW, GPIO_LOW);
 
         if (fix.fix_valid) {
@@ -348,15 +363,27 @@ Status init_flash_fs() {
 
 void TIM6_DAC_IRQHandler(void) {
     HAL_TIM_IRQHandler(&tim6_handle);
+    Accel acch = adxl372_read_accel(&s_acc_conf);
+    Accel accel = lsm6dsox_read_accel(&s_imu_conf);
+    Gyro gyro = lsm6dsox_read_gyro(&s_imu_conf);
+    float dt = (MICROS() - last_time) / 1000000.0;
+    last_time = MICROS();
+    v_a.x = accel.accelX;
+    v_a.y = accel.accelY;
+    v_a.z = accel.accelZ;
+    v_w.x = gyro.gyroX * PI / 180.0;
+    v_w.y = gyro.gyroY * PI / 180.0;
+    v_w.z = gyro.gyroZ * PI / 180.0;
+    UpdatePose(v_a, &v_ac, &v_v, &v_d, v_w, &q, dt);
     if (!((fifo.widx == fifo.ridx - 1) ||
           (fifo.ridx == 0 && fifo.widx == LOG_FIFO_LEN - 1))) {
         // FIFO is not full
         uint64_t start_time = MICROS();
         SensorData log = {
             .timestamp = MILLIS(),
-            .acch = adxl372_read_accel(&s_acc_conf),
-            .accel = lsm6dsox_read_accel(&s_imu_conf),
-            .gyro = lsm6dsox_read_gyro(&s_imu_conf),
+            .acch = acch,
+            .accel = accel,
+            .gyro = gyro,
             .mag = iis2mdc_read(&s_mag_conf),
             .baro = ms5637_read(&s_baro_conf, OSR_256),
         };
