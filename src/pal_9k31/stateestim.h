@@ -1,5 +1,6 @@
 #ifndef STATEESTIM_H
 #define STATEESTIM_H
+
 typedef struct {
     float x;
     float y;
