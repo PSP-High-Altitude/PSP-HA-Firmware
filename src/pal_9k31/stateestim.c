@@ -1,6 +1,10 @@
-#include <stateestim.h>
+#include "stateestim.h"
 
-static Quaternion QuatStep(Quaternion q, Vector w, float dt) {
+#include "math.h"
+
+#define PI 3.14159265359
+
+static Quaternion quat_step(Quaternion q, Vector w, float dt) {
     Quaternion out = {
         .w = dt * (-w.x * q.v.x - w.y * q.v.y - w.z * q.v.z + q.w) / 2,
         .v = {.x = dt * (w.x * q.w - w.y * q.v.z + w.z * q.v.y + q.v.x) / 2,
@@ -33,30 +37,60 @@ static Vector vadd(Vector v1, Vector v2) {
     return vout;
 }
 
-static Vector QuatRot(Vector v, Quaternion q) {
+static Vector quat_rot(Vector v, Quaternion q) {
     return vadd(vadd(vscale(q.v, 2 * vdot(q.v, v)),
                      vscale(v, q.w * q.w - vdot(q.v, q.v))),
                 vscale(vcross(q.v, v), 2 * q.w));
 }
 
-static Vector TrapInt(Vector vint, Vector v, Vector vprev, float dt) {
+static Vector trap_int(Vector vint, Vector v, Vector vprev, float dt) {
     return vadd(vint, vscale(vadd(v, vprev), dt * .5));
 }
 
-void UpdatePose(Vector v_a, Vector *v_ac, Vector *v_v, Vector *v_d, Vector v_w,
-                Quaternion *q, float dt) {
+/// @brief Converts 321 Euler angles (in degrees) to quaternion
+/// @param roll Roll (in degrees)
+/// @param pitch Pitch (in degrees)
+/// @param yaw Yaw (in degrees)
+/// @return
+Quaternion deg_eul_to_quat(float roll, float pitch, float yaw) {
+    double cr = cos(roll * PI / 360);
+    double sr = sin(roll * PI / 360);
+    double cp = cos(pitch * PI / 360);
+    double sp = sin(pitch * PI / 360);
+    double cy = cos(yaw * PI / 360);
+    double sy = sin(yaw * PI / 360);
+    Quaternion out = {.w = cr * cp * cy + sr * sp * sy,
+                      .v = {.x = sr * cp * cy - cr * sp * sy,
+                            .y = cr * sp * cy + sr * cp * sy,
+                            .z = cr * cp * sy - sr * sp * cy}};
+    return out;
+}
+
+/// @brief Updates current inertial rotation, acceleration, velocity, and
+/// position using current body acceleration and angular velocity.
+/// @param v_a Current body acceleration vector (m/s^2)
+/// @param v_w Current body angular velocity (in rad/s)
+/// @param dt Time between measurements (in s)
+/// @param *v_ac Pointer to inertial acceleration vector (m/s^2, updated in
+/// loop)
+/// @param *v_v Pointer to inertial velocity vector (in m/s, updated in loop)
+/// @param *v_d Pointer to inertial position vector (in m, updated in loop)
+/// @param *q_rot Pointer to stored rotation quaternion (updated in loop)
+void update_pose(Vector v_a, Vector v_w, float dt, Vector *v_ac, Vector *v_v,
+                 Vector *v_d, Quaternion *q_rot) {
     // Update the rotational state quaternion using angular velocity
-    *q = QuatStep(*q, v_w, dt);
+    *q_rot = quat_step(*q_rot, v_w, dt);
 
     // Save the previous inertial acceleration for integration
     Vector aprev = *v_ac;
     // Correct current acceleration to the inertial frame
-    *v_ac = QuatRot(v_a, *q);
+    *v_ac = quat_rot(v_a, *q_rot);
+    v_ac->z = v_ac->z - 9.81;
 
     // Save the previous inertial velocity for integration
     Vector vprev = *v_v;
     // Integrate acceleration trapezoidally and save to velocity
-    *v_v = TrapInt(*v_v, *v_ac, aprev, dt);
+    *v_v = trap_int(*v_v, *v_ac, aprev, dt);
     // Integrate velocity trapezoidally and save to position
-    *v_d = TrapInt(*v_d, *v_v, vprev, dt);
+    *v_d = trap_int(*v_d, *v_v, vprev, dt);
 }
