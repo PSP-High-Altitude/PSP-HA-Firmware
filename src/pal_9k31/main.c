@@ -75,7 +75,7 @@ static SpiDevice s_imu_conf = {
     .periph = P_SPI1,
 };
 static SpiDevice s_sd_conf = {
-    .clk = SPI_SPEED_1MHz,
+    .clk = SPI_SPEED_10MHz,
     .cpol = 0,
     .cpha = 0,
     .cs = 0,
@@ -109,19 +109,11 @@ int _write(int file, char *data, int len) {
     return len;
 }
 
-static TaskHandle_t s_blink_blue_handle;
 static TaskHandle_t s_read_sensors_handle;
-static TaskHandle_t s_print_sensors_handle;
-static TickType_t s_last_sensor_read_ticks;
+static TaskHandle_t s_read_gps_handle;
+static TaskHandle_t s_store_data_handle;
 
-void blink_blue() {
-    while (1) {
-        gpio_write(PIN_BLUE, GPIO_HIGH);
-        vTaskDelay(pdMS_TO_TICKS(500));
-        gpio_write(PIN_BLUE, GPIO_LOW);
-        vTaskDelay(pdMS_TO_TICKS(500));
-    }
-}
+static TickType_t s_last_sensor_read_ticks;
 
 void read_sensors() {
     s_last_sensor_read_ticks = xTaskGetTickCount();
@@ -143,31 +135,31 @@ void read_sensors() {
             } else {
                 fifo.widx += 1;
             }
-            xTaskNotifyGive(s_print_sensors_handle);
+            xTaskNotifyGive(s_store_data_handle);
         }
         vTaskDelayUntil(&s_last_sensor_read_ticks,
                         pdMS_TO_TICKS(TARGET_INTERVAL));
     }
 }
 
-void print_sensors_once(volatile SensorData *data) {
-    printf(
-        "%9.lu,"                // Timestamp
-        "%6.3f,%6.3f,%6.3f,"    // IMU acceleration
-        "%6.3f,%6.3f,%6.3f,"    // IMU rotation
-        "%6.3f,%6.3f,"          // Barometer
-        "%6.3f,%6.3f,%6.3f,"    // Magnetometer
-        "%6.3f,%6.3f,%6.3f\n",  // Accelerometer
-        //
-        (uint32_t)data->timestamp,  //
-        data->accel.accelX, data->accel.accelY, data->accel.accelZ,
-        data->gyro.gyroX, data->gyro.gyroY, data->gyro.gyroZ,
-        data->baro.temperature, data->baro.pressure, data->mag.magX,
-        data->mag.magY, data->mag.magZ, data->acch.accelX, data->acch.accelY,
-        data->acch.accelZ);
+static GPS_Fix_TypeDef s_last_fix;
+volatile static int s_fix_avail = 0;
+
+void read_gps() {
+    while (1) {
+        while (s_fix_avail) {
+            vTaskDelay(1);
+        }
+        if (max_m10s_poll_fix(&s_gps_conf, &s_last_fix) == STATUS_OK) {
+            gpio_write(PIN_BLUE, GPIO_HIGH);
+            s_fix_avail = 1;
+        } else {
+            gpio_write(PIN_BLUE, GPIO_LOW);
+        }
+    }
 }
 
-void print_sensors() {
+void store_data() {
     while (1) {
         uint32_t notif_value;
         xTaskNotifyWait(0, 0xffffffffUL, &notif_value, 100);
@@ -217,6 +209,12 @@ void print_sensors() {
             }
             gpio_write(PIN_RED, GPIO_LOW);
         }
+
+        if (s_fix_avail) {
+            sd_write_gps_data(xTaskGetTickCount(), &s_last_fix);
+            s_fix_avail = 0;
+        }
+
         sd_flush();
 
         TickType_t elapsed_time = xTaskGetTickCount() - start_ticks;
@@ -300,20 +298,12 @@ int main(void) {
 
     gpio_write(PIN_RED, GPIO_LOW);
 
-    xTaskCreate(blink_blue,            // Task function
-                "blink_blue",          // Task name
-                256,                   // Stack size
+    xTaskCreate(store_data,            // Task function
+                "store_data",          // Task name
+                2048,                  // Stack size
                 NULL,                  // Parameters
-                tskIDLE_PRIORITY + 1,  // Priority
-                &s_blink_blue_handle   // Task handle
-    );
-
-    xTaskCreate(print_sensors,           // Task function
-                "print_sensors",         // Task name
-                8192,                    // Stack size
-                NULL,                    // Parameters
-                tskIDLE_PRIORITY + 2,    // Priority
-                &s_print_sensors_handle  // Task handle
+                tskIDLE_PRIORITY + 2,  // Priority
+                &s_store_data_handle   // Task handle
     );
 
     xTaskCreate(read_sensors,           // Task function
@@ -322,6 +312,14 @@ int main(void) {
                 NULL,                   // Parameters
                 tskIDLE_PRIORITY + 3,   // Priority
                 &s_read_sensors_handle  // Task handle
+    );
+
+    xTaskCreate(read_gps,              // Task function
+                "read_gps",            // Task name
+                2048,                  // Stack size
+                NULL,                  // Parameters
+                tskIDLE_PRIORITY + 1,  // Priority
+                &s_read_gps_handle     // Task handle
     );
 
     vTaskStartScheduler();
@@ -335,6 +333,20 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask,
                                    signed char *pcTaskName) {
     while (1) {
         printf("stack overflow in task '%s'", pcTaskName);
+    }
+}
+
+extern void xPortSysTickHandler(void);
+
+void SysTick_Handler(void) {
+    HAL_IncTick();
+
+    /* Clear overflow flag */
+    SysTick->CTRL;
+
+    if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
+        /* Call tick handler */
+        xPortSysTickHandler();
     }
 }
 
