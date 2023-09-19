@@ -3,6 +3,7 @@
 #include "math.h"
 
 #define PI 3.14159265359
+#define G 9.80665
 
 static Quaternion quat_step(Quaternion q, Vector w, float dt) {
     Quaternion out = {
@@ -85,7 +86,7 @@ void update_pose(Vector v_a, Vector v_w, float dt, Vector *v_ac, Vector *v_v,
     Vector aprev = *v_ac;
     // Correct current acceleration to the inertial frame
     *v_ac = quat_rot(v_a, *q_rot);
-    v_ac->z = v_ac->z - 9.81;
+    v_ac->z = v_ac->z - G;
 
     // Save the previous inertial velocity for integration
     Vector vprev = *v_v;
