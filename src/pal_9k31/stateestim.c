@@ -11,7 +11,13 @@ static Quaternion quat_step(Quaternion q, Vector w, float dt) {
         .v = {.x = dt * (w.x * q.w - w.y * q.v.z + w.z * q.v.y + q.v.x) / 2,
               .y = dt * (w.x * q.v.z + w.y * q.w - w.z * q.v.x + q.v.y) / 2,
               .z = dt * (-w.x * q.v.y + w.y * q.v.x + w.z * q.w + q.v.z) / 2}};
+    out = qscale(out, 1 / sqrt(qdot(out, out)));
+
     return out;
+}
+
+static float qdot(Quaternion q1, Quaternion q2) {
+    return q1.w * q2.w + vdot(q1.v, q2.v);
 }
 
 static float vdot(Vector v1, Vector v2) {
@@ -31,6 +37,11 @@ static Vector vscale(Vector v, float k) {
     vout.y = v.y * k;
     vout.z = v.z * k;
     return vout;
+}
+
+static Quaternion qscale(Quaternion q, float k) {
+    Quaternion qout = {.w = q.w * k, .v = vscale(q.v, k)};
+    return qout;
 }
 
 static Vector vadd(Vector v1, Vector v2) {
