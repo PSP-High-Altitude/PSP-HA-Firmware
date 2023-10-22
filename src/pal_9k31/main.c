@@ -150,11 +150,13 @@ void read_gps() {
         while (s_fix_avail) {
             vTaskDelay(1);
         }
-        if (max_m10s_poll_fix(&s_gps_conf, &s_last_fix) == STATUS_OK) {
+        Status code = max_m10s_poll_fix(&s_gps_conf, &s_last_fix);
+        if (code == STATUS_OK) {
             gpio_write(PIN_BLUE, GPIO_HIGH);
             s_fix_avail = 1;
         } else {
             gpio_write(PIN_BLUE, GPIO_LOW);
+            printf("GPS read failed with code %d\n", code);
         }
     }
 }
@@ -168,6 +170,8 @@ void store_data() {
         if (gpio_read(PIN_PROG)) {
             sd_deinit();
             printf("SD safe to remove\n");
+            gpio_write(PIN_BLUE, GPIO_LOW);
+            gpio_write(PIN_GREEN, GPIO_LOW);
             while (gpio_read(PIN_PROG)) {
                 gpio_write(PIN_GREEN, GPIO_HIGH);
                 vTaskDelay(pdMS_TO_TICKS(500));
@@ -192,7 +196,7 @@ void store_data() {
         while (fifo.ridx != fifo.widx) {
             Status code = sd_write_sensor_data(&fifo.queue[fifo.ridx]);
             if (code != STATUS_OK) {
-                printf("SD write error %d\n", code);
+                printf("SD sensor write error %d\n", code);
                 gpio_write(PIN_GREEN, GPIO_LOW);
                 break;
             }
@@ -211,7 +215,10 @@ void store_data() {
         }
 
         if (s_fix_avail) {
-            sd_write_gps_data(xTaskGetTickCount(), &s_last_fix);
+            Status code = sd_write_gps_data(xTaskGetTickCount(), &s_last_fix);
+            if (code != STATUS_OK) {
+                printf("SD GPS write error %d\n", code);
+            }
             s_fix_avail = 0;
         }
 
@@ -318,7 +325,7 @@ int main(void) {
                 "read_gps",            // Task name
                 2048,                  // Stack size
                 NULL,                  // Parameters
-                tskIDLE_PRIORITY + 1,  // Priority
+                tskIDLE_PRIORITY + 2,  // Priority
                 &s_read_gps_handle     // Task handle
     );
 

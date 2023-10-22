@@ -3,7 +3,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "FreeRTOS.h"
 #include "string.h"
+#include "task.h"
 #include "timer.h"
 
 static Status ubx_cfg_valget(I2cDevice*, Max_M10S_Layer_TypeDef, uint32_t*,
@@ -47,6 +49,11 @@ static Status ubx_read_msg(I2cDevice* device, uint8_t header[4],
             if (MILLIS() - start_time > timeout) {
                 return STATUS_TIMEOUT;
             }
+
+            if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+                taskYIELD();
+            }
+
             if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
                 return STATUS_ERROR;
             }
