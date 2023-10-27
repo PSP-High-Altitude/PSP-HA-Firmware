@@ -37,6 +37,8 @@
         "stm32g4xx_hal_gpio_ex.h": "c",
         "ff_gen_drv.h": "c",
         "ff.h": "c",
-        "ffconf.h": "c"
+        "ffconf.h": "c",
+        "pspcom.h": "c",
+        "freertos.h": "c"
     }
 }

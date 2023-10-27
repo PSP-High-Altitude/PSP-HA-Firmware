@@ -15,6 +15,7 @@
 #include "max_m10s.h"
 #include "ms5637/ms5637.h"
 #include "mt29f2g.h"
+#include "pspcom.h"
 #include "qspi/qspi.h"
 #include "status.h"
 #include "stm32g474xx.h"
@@ -36,7 +37,7 @@
 #define PIN_PROG PIN_PB8
 #define PIN_BUZZER PIN_PB9
 
-#define TARGET_INTERVAL 25  // ms
+#define TARGET_INTERVAL 40  // ms
 
 #define LOG_FIFO_LEN 256
 
@@ -46,11 +47,37 @@ extern PCD_HandleTypeDef hpcd_USB_FS;
 
 volatile static struct {
     SensorData queue[LOG_FIFO_LEN];
-    size_t ridx;  // Next index that will be read from
-    size_t widx;  // Next index that will be written to
+    size_t head;  // Next index that will be read from
+    size_t tail;  // Next index that will be written to
+    size_t count;
     // ridx == widx -> FIFO is empty
     // (ridx == widx - 1) mod LOG_FIFO_LEN -> FIFO is full
 } fifo;
+
+void init_fifo() {
+    fifo.head = 0;
+    fifo.tail = 0;
+    fifo.count = 0;
+}
+
+SensorData read_fifo() {
+    SensorData ret = fifo.queue[fifo.head];
+    fifo.head = (fifo.head + 1) % LOG_FIFO_LEN;
+    fifo.count--;
+    return ret;
+}
+
+void write_fifo(SensorData data) {
+    if (fifo.count == LOG_FIFO_LEN) {
+        fifo.head = (fifo.head + 1) % LOG_FIFO_LEN;
+        fifo.count--;
+    }
+    fifo.queue[fifo.tail] = data;
+    fifo.tail = (fifo.tail + 1) % LOG_FIFO_LEN;
+    fifo.count++;
+}
+
+SensorData last_sensor_data;
 
 static I2cDevice s_mag_conf = {
     .address = 0x1E,
@@ -112,31 +139,25 @@ int _write(int file, char *data, int len) {
 static TaskHandle_t s_read_sensors_handle;
 static TaskHandle_t s_read_gps_handle;
 static TaskHandle_t s_store_data_handle;
+static TaskHandle_t s_usb_telem_handle;
 
 static TickType_t s_last_sensor_read_ticks;
 
 void read_sensors() {
     s_last_sensor_read_ticks = xTaskGetTickCount();
     while (1) {
-        if (!((fifo.widx == fifo.ridx - 1) ||
-              (fifo.ridx == 0 && fifo.widx == LOG_FIFO_LEN - 1))) {
-            // FIFO is not full
-            SensorData log = {
-                .timestamp = xTaskGetTickCount(),
-                .acch = adxl372_read_accel(&s_acc_conf),
-                .accel = lsm6dsox_read_accel(&s_imu_conf),
-                .gyro = lsm6dsox_read_gyro(&s_imu_conf),
-                .mag = iis2mdc_read(&s_mag_conf),
-                .baro = ms5637_read(&s_baro_conf, OSR_256),
-            };
-            fifo.queue[fifo.widx] = log;
-            if (fifo.widx == LOG_FIFO_LEN - 1) {
-                fifo.widx = 0;
-            } else {
-                fifo.widx += 1;
-            }
-            xTaskNotifyGive(s_store_data_handle);
-        }
+        // FIFO is not full
+        SensorData log = {
+            .timestamp = xTaskGetTickCount(),
+            .acch = adxl372_read_accel(&s_acc_conf),
+            .accel = lsm6dsox_read_accel(&s_imu_conf),
+            .gyro = lsm6dsox_read_gyro(&s_imu_conf),
+            .mag = iis2mdc_read(&s_mag_conf),
+            .baro = ms5637_read(&s_baro_conf, OSR_256),
+        };
+        last_sensor_data = log;
+        write_fifo(log);
+        xTaskNotifyGive(s_store_data_handle);
         vTaskDelayUntil(&s_last_sensor_read_ticks,
                         pdMS_TO_TICKS(TARGET_INTERVAL));
     }
@@ -180,7 +201,6 @@ void store_data() {
             }
             printf("Remounting SD\n\n");
             sd_reinit();
-            fifo.ridx = fifo.widx;
             continue;
         }
 
@@ -193,19 +213,15 @@ void store_data() {
         TickType_t start_ticks = xTaskGetTickCount();
 
         uint32_t entries_read = 0;
-        while (fifo.ridx != fifo.widx) {
-            Status code = sd_write_sensor_data(&fifo.queue[fifo.ridx]);
+        while (fifo.count > 0) {
+            SensorData log = read_fifo();
+            Status code = sd_write_sensor_data(&log);
             if (code != STATUS_OK) {
                 printf("SD sensor write error %d\n", code);
                 gpio_write(PIN_GREEN, GPIO_LOW);
                 break;
             }
             gpio_write(PIN_GREEN, GPIO_HIGH);
-            if (fifo.ridx == LOG_FIFO_LEN - 1) {
-                fifo.ridx = 0;
-            } else {
-                fifo.ridx += 1;
-            }
             entries_read += 1;
             if (entries_read == LOG_FIFO_LEN) {
                 gpio_write(PIN_RED, GPIO_HIGH);
@@ -231,10 +247,18 @@ void store_data() {
     }
 }
 
+void send_usb_telem() {
+    while (1) {
+        pspcom_send_sensor(&last_sensor_data);
+        vTaskDelay(200 / portTICK_PERIOD_MS);
+    }
+}
+
 int main(void) {
     HAL_Init();
     SystemClock_Config();
     init_timers();
+    init_fifo();
     gpio_write(PIN_PA4, GPIO_HIGH);
     gpio_write(PIN_PB12, GPIO_HIGH);
     gpio_write(PIN_PE4, GPIO_HIGH);
@@ -328,6 +352,16 @@ int main(void) {
                 tskIDLE_PRIORITY + 2,  // Priority
                 &s_read_gps_handle     // Task handle
     );
+
+#ifdef DEBUG
+    xTaskCreate(send_usb_telem,        // Task function
+                "usb_telem",           // Task name
+                2048,                  // Stack size
+                NULL,                  // Parameters
+                tskIDLE_PRIORITY + 1,  // Priority
+                &s_usb_telem_handle    // Task handle
+    );
+#endif
 
     vTaskStartScheduler();
 
