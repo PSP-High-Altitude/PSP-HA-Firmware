@@ -1,0 +1,3 @@
+../Core/Src/telemetry_program.c:16:6:telemetry_program	1
+../Core/Src/telemetry_program.c:22:6:process_packet_from_air	10
+../Core/Src/telemetry_program.c:97:6:process_packet_from_uart	3

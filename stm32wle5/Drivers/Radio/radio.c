@@ -38,7 +38,7 @@
 #include "radio_fw.h"
 #include "radio_driver.h"
 #include "radio_conf.h"
-#include "hab_timer.h"
+#include "psp_timer.h"
 //#include "mw_log_conf.h"
 
 /* Private typedef -----------------------------------------------------------*/

@@ -1,0 +1,14 @@
+../Drivers/STM32WLxx_HAL_Driver/Inc/stm32wlxx_ll_bus.h:449:22:LL_AHB2_GRP1_EnableClock	1
+../Drivers/STM32WLxx_HAL_Driver/Inc/stm32wlxx_ll_bus.h:914:22:LL_APB1_GRP1_EnableClock	1
+../Drivers/STM32WLxx_HAL_Driver/Inc/stm32wlxx_ll_bus.h:1018:22:LL_APB1_GRP1_DisableClock	1
+../Drivers/STM32WLxx_HAL_Driver/Inc/stm32wlxx_ll_bus.h:1303:22:LL_APB2_GRP1_EnableClock	1
+../Drivers/STM32WLxx_HAL_Driver/Inc/stm32wlxx_ll_bus.h:1351:22:LL_APB2_GRP1_DisableClock	1
+../Drivers/STM32WLxx_HAL_Driver/Inc/stm32wlxx_ll_bus.h:1488:22:LL_APB3_GRP1_EnableClock	1
+../Drivers/STM32WLxx_HAL_Driver/Inc/stm32wlxx_ll_bus.h:1516:22:LL_APB3_GRP1_DisableClock	1
+../Core/Src/stm32wlxx_hal_msp.c:67:6:HAL_MspInit	1
+../Core/Src/stm32wlxx_hal_msp.c:86:6:HAL_SUBGHZ_MspInit	1
+../Core/Src/stm32wlxx_hal_msp.c:108:6:HAL_SUBGHZ_MspDeInit	1
+../Core/Src/stm32wlxx_hal_msp.c:130:6:HAL_TIM_Base_MspInit	3
+../Core/Src/stm32wlxx_hal_msp.c:163:6:HAL_TIM_Base_MspDeInit	3
+../Core/Src/stm32wlxx_hal_msp.c:196:6:HAL_UART_MspInit	7
+../Core/Src/stm32wlxx_hal_msp.c:312:6:HAL_UART_MspDeInit	3

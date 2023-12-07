@@ -24,15 +24,14 @@
 #include "radio.h"
 
 /* USER CODE BEGIN Includes */
-#include "sensors/data.h"
+#include "board.h"
 #include "common/status.h"
 #include "peripherals/gpio/gpio.h"
-#include "board.h"
+#include "telemetry_program.h"
 /* USER CODE END Includes */
 
 /* External variables ---------------------------------------------------------*/
 /* USER CODE BEGIN EV */
-extern volatile uint8_t radio_in_use;
 /* USER CODE END EV */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -42,9 +41,6 @@ extern volatile uint8_t radio_in_use;
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define RX_TIMEOUT_VALUE		     5000
-#define TX_TIMEOUT_VALUE		     10000
-
 #define MAX_APP_BUFFER_SIZE          255
 #if (PAYLOAD_LEN > MAX_APP_BUFFER_SIZE)
 #error PAYLOAD_LEN must be less or equal than MAX_APP_BUFFER_SIZE
@@ -157,73 +153,59 @@ void SubghzApp_Init(void)
   #endif /* USE_MODEM_LORA | USE_MODEM_FSK */
 
     /*set idle*/
-    //gpio_write(PIN_PB5, GPIO_LOW);
-    //Radio.Rx(RX_TIMEOUT_VALUE);
-    lora_state = IDLE;
-  /* USER CODE END SubghzApp_Init_2 */
+    Radio.Rx(RX_TIMEOUT_VALUE);
+    lora_state = RX;
+    /* USER CODE END SubghzApp_Init_2 */
 }
 
 /* USER CODE BEGIN EF */
 /* USER CODE END EF */
 
 /* Private functions ---------------------------------------------------------*/
-static void OnTxDone(void)
-{
-  /* USER CODE BEGIN OnTxDone */
-  //Radio.Rx(RX_TIMEOUT_VALUE);
-  lora_state = IDLE;
-  if(radio_in_use == 2)
-  	  radio_in_use = 0;
-  /* USER CODE END OnTxDone */
+static void OnTxDone(void) {
+    /* USER CODE BEGIN OnTxDone */
+    Radio.Rx(RX_TIMEOUT_VALUE);
+    lora_state = RX;
+    /* USER CODE END OnTxDone */
 }
 
-static void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi, int8_t LoraSnr_FskCfo)
-{
-  /* USER CODE BEGIN OnRxDone */
-	if(lora_state != TX)
-	  {
-	    //Radio.Rx(RX_TIMEOUT_VALUE);
-		lora_state = IDLE;
-	  }
-	if(radio_in_use == 2)
-		radio_in_use = 0;
-  /* USER CODE END OnRxDone */
+static void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi,
+                     int8_t LoraSnr_FskCfo) {
+    /* USER CODE BEGIN OnRxDone */
+    if (lora_state != TX) {
+        Radio.Rx(RX_TIMEOUT_VALUE);
+        lora_state = RX;
+    }
+    process_packet_from_air(payload, size);
+    /* USER CODE END OnRxDone */
 }
 
 static void OnTxTimeout(void)
 {
-  /* USER CODE BEGIN OnTxTimeout */
-  //Radio.Rx(RX_TIMEOUT_VALUE);
-  lora_state = IDLE;
-  if(radio_in_use == 2)
-	  radio_in_use = 0;
-  /* USER CODE END OnTxTimeout */
+    /* USER CODE BEGIN OnTxTimeout */
+    Radio.Rx(RX_TIMEOUT_VALUE);
+    lora_state = RX;
+    /* USER CODE END OnTxTimeout */
 }
 
 static void OnRxTimeout(void)
 {
-  /* USER CODE BEGIN OnRxTimeout */
-  if(lora_state != TX)
-  {
-    //Radio.Rx(RX_TIMEOUT_VALUE);
-	lora_state = IDLE;
-  }
-  if(radio_in_use == 2)
-  	  radio_in_use = 0;
-  /* USER CODE END OnRxTimeout */
+    /* USER CODE BEGIN OnRxTimeout */
+    if (lora_state != TX) {
+        Radio.Rx(RX_TIMEOUT_VALUE);
+        lora_state = IDLE;
+    }
+    /* USER CODE END OnRxTimeout */
 }
 
 static void OnRxError(void)
 {
-  /* USER CODE BEGIN OnRxError */
-  if(lora_state != TX)
-  {
-	//Radio.Rx(RX_TIMEOUT_VALUE);
-	lora_state = IDLE;
-  }
-  if(radio_in_use == 2)
-  	  radio_in_use = 0;
-  /* USER CODE END OnRxError */
+    /* USER CODE BEGIN OnRxError */
+    if (lora_state != TX) {
+        Radio.Rx(RX_TIMEOUT_VALUE);
+        lora_state = IDLE;
+    }
+    /* USER CODE END OnRxError */
 }
 
 /* USER CODE BEGIN PrFD */

@@ -1,0 +1,12 @@
+../Drivers/Radio/radio_fw.c:257:9:RFW_TransmitLongPacket	32	static
+../Drivers/Radio/radio_fw.c:422:9:RFW_ReceiveLongPacket	32	static
+../Drivers/Radio/radio_fw.c:474:9:RFW_Init	24	static
+../Drivers/Radio/radio_fw.c:552:6:RFW_DeInit	4	static
+../Drivers/Radio/radio_fw.c:559:9:RFW_Is_Init	4	static
+../Drivers/Radio/radio_fw.c:568:9:RFW_Is_LongPacketModeEnabled	4	static
+../Drivers/Radio/radio_fw.c:577:6:RFW_SetAntSwitch	16	static
+../Drivers/Radio/radio_fw.c:584:9:RFW_TransmitInit	32	static
+../Drivers/Radio/radio_fw.c:636:9:RFW_ReceiveInit	4	static
+../Drivers/Radio/radio_fw.c:659:6:RFW_DeInit_TxLongPacket	4	static
+../Drivers/Radio/radio_fw.c:669:6:RFW_ReceivePayload	4	static
+../Drivers/Radio/radio_fw.c:724:6:RFW_SetRadioModem	16	static

@@ -1,0 +1,9 @@
+../Core/Src/uart.c:18:8:uart_setup	2
+../Core/Src/uart.c:32:8:uart_send	4
+../Core/Src/uart.c:44:8:start_uart_reading	4
+../Core/Src/uart.c:58:8:stop_uart_reading	3
+../Core/Src/uart.c:68:6:circular_buffer_init	1
+../Core/Src/uart.c:72:9:circular_buffer_is_empty	2
+../Core/Src/uart.c:79:8:circular_buffer_size	1
+../Core/Src/uart.c:83:9:circular_buffer_pop	2
+../Core/Src/uart.c:93:13:get_circular_buffer	1

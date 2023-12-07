@@ -77,6 +77,8 @@ typedef enum {
 /* USER CODE BEGIN EC */
 #undef TX_OUTPUT_POWER
 #define TX_OUTPUT_POWER 22
+#define RX_TIMEOUT_VALUE 0
+#define TX_TIMEOUT_VALUE 1000
 /* USER CODE END EC */
 
 /* External variables --------------------------------------------------------*/
