@@ -1,6 +1,0 @@
-../Drivers/Radio/subghz_phy_app.c:98:6:SubghzApp_Init	1
-../Drivers/Radio/subghz_phy_app.c:165:13:OnTxDone	1
-../Drivers/Radio/subghz_phy_app.c:172:13:OnRxDone	2
-../Drivers/Radio/subghz_phy_app.c:183:13:OnTxTimeout	1
-../Drivers/Radio/subghz_phy_app.c:191:13:OnRxTimeout	2
-../Drivers/Radio/subghz_phy_app.c:201:13:OnRxError	2

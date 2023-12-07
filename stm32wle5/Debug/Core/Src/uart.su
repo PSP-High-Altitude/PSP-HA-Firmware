@@ -1,9 +1,0 @@
-../Core/Src/uart.c:18:8:uart_setup	24	static
-../Core/Src/uart.c:32:8:uart_send	24	static
-../Core/Src/uart.c:44:8:start_uart_reading	16	static
-../Core/Src/uart.c:58:8:stop_uart_reading	16	static
-../Core/Src/uart.c:68:6:circular_buffer_init	16	static
-../Core/Src/uart.c:72:9:circular_buffer_is_empty	16	static
-../Core/Src/uart.c:79:8:circular_buffer_size	16	static
-../Core/Src/uart.c:83:9:circular_buffer_pop	16	static
-../Core/Src/uart.c:93:13:get_circular_buffer	16	static

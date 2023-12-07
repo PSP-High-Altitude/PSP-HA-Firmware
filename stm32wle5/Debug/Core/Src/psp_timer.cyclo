@@ -1,7 +1,0 @@
-../Core/Src/psp_timer.c:8:6:init_timers	1
-../Core/Src/psp_timer.c:13:10:MICROS	1
-../Core/Src/psp_timer.c:19:10:MILLIS	1
-../Core/Src/psp_timer.c:21:6:DELAY	2
-../Core/Src/psp_timer.c:28:6:DELAY_MICROS	2
-../Core/Src/psp_timer.c:35:6:while_equals_timeout	3
-../Core/Src/psp_timer.c:46:6:while_not_equals_timeout	3

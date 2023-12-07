@@ -1,7 +1,0 @@
-../Core/Src/pspcom.c:15:6:timeout_callback	8	static
-../Core/Src/pspcom.c:20:10:crc	40	static
-../Core/Src/pspcom.c:45:11:pspcom_process_bytes_from_air	288	static
-../Core/Src/pspcom.c:64:6:pspcom_send_msg_over_air	288	static
-../Core/Src/pspcom.c:82:6:pspcom_send_msg_over_uart	536	static
-../Core/Src/pspcom.c:100:11:pspcom_read_msg_from_uart	544	static
-../Core/Src/pspcom.c:174:9:pspcom_uart_available	24	static
