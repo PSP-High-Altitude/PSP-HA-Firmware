@@ -53,3 +53,7 @@ Thumbs.db
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+
+# STM32CubeIDE
+stm32wle5/Debug
+stm32wle5/Release
