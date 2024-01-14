@@ -7,7 +7,6 @@
 #include "board.h"
 #include "clocks.h"
 #include "data.h"
-#include "fatfs/sd.h"
 #include "gpio/gpio.h"
 #include "iis2mdc/iis2mdc.h"
 #include "lfs.h"
@@ -15,8 +14,10 @@
 #include "max_m10s.h"
 #include "ms5637/ms5637.h"
 #include "mt29f2g.h"
+#include "pb.h"
 #include "pspcom.h"
 #include "qspi/qspi.h"
+#include "sd.h"
 #include "status.h"
 #include "stm32g474xx.h"
 #include "timer.h"
@@ -46,7 +47,7 @@
 extern PCD_HandleTypeDef hpcd_USB_FS;
 
 volatile static struct {
-    SensorData queue[LOG_FIFO_LEN];
+    SensorFrame queue[LOG_FIFO_LEN];
     size_t head;  // Next index that will be read from
     size_t tail;  // Next index that will be written to
     size_t count;
@@ -60,14 +61,14 @@ void init_fifo() {
     fifo.count = 0;
 }
 
-SensorData read_fifo() {
-    SensorData ret = fifo.queue[fifo.head];
+SensorFrame read_fifo() {
+    SensorFrame ret = fifo.queue[fifo.head];
     fifo.head = (fifo.head + 1) % LOG_FIFO_LEN;
     fifo.count--;
     return ret;
 }
 
-void write_fifo(SensorData data) {
+void write_fifo(SensorFrame data) {
     if (fifo.count == LOG_FIFO_LEN) {
         fifo.head = (fifo.head + 1) % LOG_FIFO_LEN;
         fifo.count--;
@@ -77,7 +78,7 @@ void write_fifo(SensorData data) {
     fifo.count++;
 }
 
-SensorData last_sensor_data;
+static SensorFrame s_last_sensor_data;
 
 static I2cDevice s_mag_conf = {
     .address = 0x1E,
@@ -101,12 +102,9 @@ static SpiDevice s_imu_conf = {
     .cs = 0,
     .periph = P_SPI1,
 };
-static SpiDevice s_sd_conf = {
-    .clk = SPI_SPEED_10MHz,
-    .cpol = 0,
-    .cpha = 0,
-    .cs = 0,
-    .periph = P_SPI4,
+static SdDevice s_sd_conf = {
+    .clk = SD_SPEED_10MHz,
+    .periph = P_SD4,
 };
 static SpiDevice s_acc_conf = {
     .clk = SPI_SPEED_1MHz,
@@ -146,17 +144,36 @@ static TickType_t s_last_sensor_read_ticks;
 void read_sensors() {
     s_last_sensor_read_ticks = xTaskGetTickCount();
     while (1) {
-        // FIFO is not full
-        SensorData log = {
-            .timestamp = xTaskGetTickCount(),
-            .acch = adxl372_read_accel(&s_acc_conf),
-            .accel = lsm6dsox_read_accel(&s_imu_conf),
-            .gyro = lsm6dsox_read_gyro(&s_imu_conf),
-            .mag = iis2mdc_read(&s_mag_conf),
-            .baro = ms5637_read(&s_baro_conf, OSR_256),
-        };
-        last_sensor_data = log;
-        write_fifo(log);
+        BaroData baro =
+            ms5637_read(&s_baro_conf, OSR_256);    // Baro read takes longest
+        uint64_t timestamp = xTaskGetTickCount();  // So measure timestamp after
+        Accel acch = adxl372_read_accel(&s_acc_conf);
+        Accel accel = lsm6dsox_read_accel(&s_imu_conf);
+        Gyro gyro = lsm6dsox_read_gyro(&s_imu_conf);
+        Mag mag = iis2mdc_read(&s_mag_conf);
+
+        s_last_sensor_data.timestamp = timestamp;
+
+        s_last_sensor_data.acc_h_x = acch.accelX;
+        s_last_sensor_data.acc_h_y = acch.accelY;
+        s_last_sensor_data.acc_h_z = acch.accelZ;
+
+        s_last_sensor_data.acc_i_x = accel.accelX;
+        s_last_sensor_data.acc_i_y = accel.accelY;
+        s_last_sensor_data.acc_i_z = accel.accelZ;
+
+        s_last_sensor_data.rot_i_x = gyro.gyroX;
+        s_last_sensor_data.rot_i_y = gyro.gyroY;
+        s_last_sensor_data.rot_i_z = gyro.gyroZ;
+
+        s_last_sensor_data.mag_i_x = mag.magX;
+        s_last_sensor_data.mag_i_y = mag.magY;
+        s_last_sensor_data.mag_i_z = mag.magZ;
+
+        s_last_sensor_data.temperature = baro.temperature;
+        s_last_sensor_data.pressure = baro.pressure;
+
+        write_fifo(s_last_sensor_data);
         xTaskNotifyGive(s_store_data_handle);
         vTaskDelayUntil(&s_last_sensor_read_ticks,
                         pdMS_TO_TICKS(TARGET_INTERVAL));
@@ -214,7 +231,7 @@ void store_data() {
 
         uint32_t entries_read = 0;
         while (fifo.count > 0) {
-            SensorData log = read_fifo();
+            SensorFrame log = read_fifo();
             Status code = sd_write_sensor_data(&log);
             if (code != STATUS_OK) {
                 printf("SD sensor write error %d\n", code);
@@ -230,13 +247,13 @@ void store_data() {
             gpio_write(PIN_RED, GPIO_LOW);
         }
 
-        if (s_fix_avail) {
-            Status code = sd_write_gps_data(xTaskGetTickCount(), &s_last_fix);
-            if (code != STATUS_OK) {
-                printf("SD GPS write error %d\n", code);
-            }
-            s_fix_avail = 0;
-        }
+        // if (s_fix_avail) {
+        //     Status code = sd_write_gps_data(xTaskGetTickCount(),
+        //     &s_last_fix); if (code != STATUS_OK) {
+        //         printf("SD GPS write error %d\n", code);
+        //     }
+        //     s_fix_avail = 0;
+        // }
 
         sd_flush();
 
@@ -249,7 +266,7 @@ void store_data() {
 
 void send_usb_telem() {
     while (1) {
-        pspcom_send_sensor(&last_sensor_data);
+        pspcom_send_sensor(&s_last_sensor_data);
         vTaskDelay(200 / portTICK_PERIOD_MS);
     }
 }

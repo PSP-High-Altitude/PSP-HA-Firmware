@@ -41,7 +41,7 @@ void pspcom_send_msg(pspcommsg msg) {
     fflush(stdout);
 }
 
-void pspcom_send_sensor(SensorData *sens) {
+void pspcom_send_sensor(SensorFrame *sens) {
     // Accelerometer
     pspcommsg tx_msg = {
         .payload_len = 13,
@@ -49,26 +49,26 @@ void pspcom_send_sensor(SensorData *sens) {
         .msg_id = ACCEL,
     };
     tx_msg.payload[0] = 0;
-    memcpy(tx_msg.payload + 1, &sens->accel.accelX, 4);
-    memcpy(tx_msg.payload + 5, &sens->accel.accelY, 4);
-    memcpy(tx_msg.payload + 9, &sens->accel.accelZ, 4);
+    memcpy(tx_msg.payload + 1, &sens->acc_i_x, 4);
+    memcpy(tx_msg.payload + 5, &sens->acc_i_y, 4);
+    memcpy(tx_msg.payload + 9, &sens->acc_i_z, 4);
     pspcom_send_msg(tx_msg);
 
     // Gyroscope
     tx_msg.msg_id = GYRO;
-    memcpy(tx_msg.payload + 1, &sens->gyro.gyroX, 4);
-    memcpy(tx_msg.payload + 5, &sens->gyro.gyroY, 4);
-    memcpy(tx_msg.payload + 9, &sens->gyro.gyroZ, 4);
+    memcpy(tx_msg.payload + 1, &sens->rot_i_x, 4);
+    memcpy(tx_msg.payload + 5, &sens->rot_i_y, 4);
+    memcpy(tx_msg.payload + 9, &sens->rot_i_z, 4);
     pspcom_send_msg(tx_msg);
 
     // Temperature
     tx_msg.msg_id = TEMP;
     tx_msg.payload_len = 5;
-    memcpy(tx_msg.payload + 1, &sens->baro.temperature, 4);
+    memcpy(tx_msg.payload + 1, &sens->temperature, 4);
     pspcom_send_msg(tx_msg);
 
     // Pressure
     tx_msg.msg_id = PRES;
-    memcpy(tx_msg.payload + 1, &sens->baro.pressure, 4);
+    memcpy(tx_msg.payload + 1, &sens->pressure, 4);
     pspcom_send_msg(tx_msg);
 }

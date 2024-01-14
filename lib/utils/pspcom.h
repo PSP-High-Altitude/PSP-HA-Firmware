@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "data.h"
+#include "sensor.pb.h"
 
 #define CRC16_POLY 0x1021
 #define CRC16_INIT 0xFFFF
@@ -31,6 +31,6 @@ void pspcom_process_bytes(char *buf, int len);
 
 void pspcom_send_msg(pspcommsg msg);
 
-void pspcom_send_sensor(SensorData *sens);
+void pspcom_send_sensor(SensorFrame *sens);
 
 #endif
