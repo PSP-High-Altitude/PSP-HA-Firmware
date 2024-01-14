@@ -16,8 +16,9 @@
 ---------------------------------------------------------------------------*/
 
 #include "FreeRTOS.h"
-#include "diskio.h"
+#include "fatfs/diskio.h"
 #include "gpio/gpio.h"
+#include "sd.h"
 #include "spi/spi.h"
 #include "task.h"
 
@@ -107,11 +108,15 @@ static uint8_t nop_buf[512] = {[0 ... 511] 0xFF};  // ugly but better than
 static uint8_t void_buf[512];                      // another SPI wrapper
 
 /* Initialize MMC interface */
-void sd_spi_init(SpiDevice *device) {
+Status diskio_init(SdDevice *device) {
     // Create a local copy (actual setup will be done later)
-    s_sd_spi_device = *device;
+    s_sd_spi_device.clk = device->clk;
+    s_sd_spi_device.periph = device->periph;
     generate_crc_table();
+    return STATUS_OK;
 }
+
+DWORD get_fattime() { return 0; }
 
 /* Exchange a byte */
 static BYTE xchg_spi(BYTE dat /* Data to send */
@@ -190,8 +195,8 @@ static void deselect(void) {
 static int select(void) /* 1:OK, 0:Timeout */
 {
     spi_set_cs(&s_sd_spi_device, GPIO_LOW); /* Set CS# low */
-    xchg_spi(0xFF);                /* Dummy clock (force DO enabled) */
-    if (wait_ready(500)) return 1; /* Wait for card ready */
+    xchg_spi(0xFF);                         /* Dummy clock (force DO enabled) */
+    if (wait_ready(500)) return 1;          /* Wait for card ready */
 
     deselect();
     return 0; /* Timeout */
