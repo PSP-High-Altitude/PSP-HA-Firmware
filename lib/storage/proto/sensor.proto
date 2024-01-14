@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+message SensorHeader {
+  string filename = 1;
+  
+}
+
+message SensorFrame {
+  // System timestamp (ms since power on)
+  uint64 timestamp = 2;
+
+  // Small fields reserved to keep data key sizes consistent
+  reserved 3 to 15;
+
+  // Barometer temperature (deg C)
+  float temperature = 16;
+  
+  // Barometer pressure (mbar)
+  float pressure = 17;
+
+  // Accelerometer acceleration vector (g)
+  float acc_h_x = 18;
+  float acc_h_y = 19;
+  float acc_h_z = 20;
+
+  // IMU acceleration vector (g)
+  float acc_i_x = 21;
+  float acc_i_y = 22;
+  float acc_i_z = 23;
+
+  // IMU rotation vector (dps)
+  float rot_i_x = 24;
+  float rot_i_y = 25;
+  float rot_i_z = 26;
+
+  // Magnetometer magnetic field vector (gauss)
+  float mag_i_x = 27;
+  float mag_i_y = 28;
+  float mag_i_z = 29;
+}
