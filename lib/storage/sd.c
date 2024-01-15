@@ -11,8 +11,8 @@
 
 static FATFS s_fs;
 
-static char s_filename[FNAME_LEN] = "dat_00.csv";
-static char s_gpsfname[FNAME_LEN] = "gps_00.csv";
+static char s_filename[FNAME_LEN] = "dat_00.pb3";
+static char s_gpsfname[FNAME_LEN] = "gps_00.pb3";
 
 static FIL s_datfile;
 static FIL s_gpsfile;
