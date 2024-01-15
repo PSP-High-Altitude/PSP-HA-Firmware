@@ -1,10 +1,5 @@
 syntax = "proto3";
 
-message SensorHeader {
-  string filename = 1;
-  
-}
-
 message SensorFrame {
   // System timestamp (ms since power on)
   uint64 timestamp = 2;

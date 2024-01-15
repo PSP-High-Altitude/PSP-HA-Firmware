@@ -1,7 +1,6 @@
 #ifndef DATA_H
 #define DATA_H
 
-#include <max_m10s.h>
 #include <stdint.h>
 
 // Barometer MS5637

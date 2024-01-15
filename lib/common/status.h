@@ -9,7 +9,7 @@ typedef enum {
     STATUS_HARDWARE_ERROR,
     STATUS_TESTING_ERROR,
     STATUS_PARAMETER_ERROR,  // Error with invalid parameter being passed
-    STATUS_TIMEOUT,
+    STATUS_TIMEOUT_ERROR,
 } Status;
 
 #endif  // STATUS_H
