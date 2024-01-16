@@ -124,6 +124,36 @@ TEST(TestSd, WriteSensorMulti) {
     }
 }
 
+TEST(TestSd, WriteGpsOne) {
+    GpsFrame gps_frame = {
+        .timestamp = 123456789,
+        .year = 2022,
+        .month = 1,
+        .day = 14,
+        .hour = 12,
+        .min = 30,
+        .sec = 45,
+        .valid_flags = 0x0F,
+        .num_sats = 10,
+        .lon = -73.935242,
+        .lat = 40.730610,
+        .height = 100.0,
+        .height_msl = 150.0,
+        .accuracy_horiz = 5.0,
+        .accuracy_vertical = 3.0,
+        .vel_north = 0.5,
+        .vel_east = -0.2,
+        .vel_down = -0.1,
+        .ground_speed = 0.6,
+        .hdg = 90.0,
+        .accuracy_speed = 0.1,
+        .accuracy_hdg = 1.0,
+    };
+
+    Status status = sd_write_gps_data(&gps_frame);
+    EXPECT_EQ(status, STATUS_OK);
+}
+
 TEST(TestSd, Deinit) {
     Status status = sd_deinit();
     EXPECT_EQ(status, STATUS_OK);

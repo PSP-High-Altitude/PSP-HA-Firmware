@@ -43,11 +43,11 @@ static Status ubx_read_msg(I2cDevice* device, uint8_t header[4],
         uint8_t tx_buf[1] = {0xFF};
         uint8_t rx_buf[1] = {0xFF};
         if (MILLIS() - start_time > timeout) {
-            return STATUS_TIMEOUT;
+            return STATUS_TIMEOUT_ERROR;
         }
         while (rx_buf[0] == 0xFF) {
             if (MILLIS() - start_time > timeout) {
-                return STATUS_TIMEOUT;
+                return STATUS_TIMEOUT_ERROR;
             }
 
             if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {

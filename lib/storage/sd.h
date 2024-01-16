@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "gps.pb.h"
 #include "sensor.pb.h"
 #include "spi/spi.h"
 #include "status.h"
@@ -42,5 +43,7 @@ Status sd_deinit();
 Status sd_flush();
 
 Status sd_write_sensor_data(SensorFrame* sensor_frame);
+
+Status sd_write_gps_data(GpsFrame* gps_frame);
 
 #endif  // SD_H

@@ -39,6 +39,7 @@
         "ff.h": "c",
         "ffconf.h": "c",
         "pspcom.h": "c",
-        "freertos.h": "c"
+        "freertos.h": "c",
+        "iosfwd": "c"
     }
 }
