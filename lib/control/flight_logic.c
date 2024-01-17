@@ -11,13 +11,16 @@ Status fp_update() {
         case FP_BOOST:
             s_flight_phase = fp_boost();
             break;
+        case FP_FAST:
+            s_flight_phase = fp_fast();
+            break;
         case FP_COAST:
             s_flight_phase = fp_coast();
             break;
-        case FP_DESCENT:
+        case FP_DROGUE:
             s_flight_phase = fp_descent();
             break;
-        case FP_FINAL:
+        case FP_MAIN:
             s_flight_phase = fp_final();
             break;
         case FP_LANDED:
@@ -28,3 +31,19 @@ Status fp_update() {
             break;
     }
 }
+
+// things that need to happen in each pahse go here
+// return the phase it should be in
+FlightPhase fp_init() {}
+
+FlightPhase fp_ready() {}
+
+FlightPhase fp_boost() {}
+
+FlightPhase fp_coast() {}
+
+FlightPhase fp_drogue() {}
+
+FlightPhase fp_main() {}
+
+FlightPhase fp_landed() {}

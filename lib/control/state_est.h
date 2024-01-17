@@ -3,12 +3,21 @@
 
 #include "data.h"
 
-typedef struct {
-    float altitude;      // altitude above launch level (m)
-    float vspeed;        // speed in the up direction   (m/s)
-    float acceleration;  // magnitude of acceleration   (m/s^2)
-} EstState;
+typedef struct Vector {  // this struct should probably go somehwere else
+    float x;
+    float y;
+    float z;
+} Vector;
 
-EstState update_state(SensorData* data);
+typedef struct {
+    Vector posNED;
+    Vector velNED;
+    Vector accNED;
+    Vector velBody;
+    Vector accBody;
+} StateEst;
+
+StateEst update_state(SensorData* data, FlightPhase* fp,
+                      StateEst* currentState);
 
 #endif  // STATE_EST_H
