@@ -3,7 +3,7 @@
 #include "board.h"
 #include "gpio/gpio.h"
 #include "stdio.h"
-#include "stm32g4xx_hal.h"
+#include "stm32h7xx_hal.h"
 #include "timer.h"
 
 static SPI_HandleTypeDef spi1_handle = {.State = 0};

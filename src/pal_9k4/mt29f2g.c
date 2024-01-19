@@ -2,7 +2,7 @@
 
 #include "qspi/qspi.h"
 #include "stdio.h"
-#include "stm32g4xx_hal.h"
+#include "stm32h7xx_hal.h"
 #include "timer.h"
 
 static QSpiDevice dev = {

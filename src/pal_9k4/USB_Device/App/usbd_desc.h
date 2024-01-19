@@ -2,7 +2,7 @@
 /**
   ******************************************************************************
   * @file           : usbd_desc.c
-  * @version        : v3.0_Cube
+  * @version        : v1.0_Cube
   * @brief          : Header for usbd_conf.c file.
   ******************************************************************************
   * @attention
@@ -17,7 +17,6 @@
   ******************************************************************************
   */
 /* USER CODE END Header */
-
 /* Define to prevent recursive inclusion -------------------------------------*/
 #ifndef __USBD_DESC__C__
 #define __USBD_DESC__C__
@@ -50,7 +49,7 @@
 #define         DEVICE_ID2          (UID_BASE + 0x4)
 #define         DEVICE_ID3          (UID_BASE + 0x8)
 
-#define         USB_SIZ_STRING_SERIAL       0x1A
+#define  USB_SIZ_STRING_SERIAL       0x1A
 
 /* USER CODE BEGIN EXPORTED_CONSTANTS */
 
@@ -104,7 +103,8 @@
   * @{
   */
 
-extern USBD_DescriptorsTypeDef     CDC_Desc;
+/** Descriptor for the Usb device. */
+extern USBD_DescriptorsTypeDef HS_Desc;
 
 /* USER CODE BEGIN EXPORTED_VARIABLES */
 

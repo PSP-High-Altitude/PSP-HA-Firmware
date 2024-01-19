@@ -5,7 +5,7 @@
 #include "qspi/qspi.h"
 #include "status.h"
 #include "stdint.h"
-#include "stm32g4xx_hal.h"
+#include "stm32h7xx_hal.h"
 
 typedef struct {
     const uint8_t op_code;

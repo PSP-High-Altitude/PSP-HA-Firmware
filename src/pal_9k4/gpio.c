@@ -1,7 +1,7 @@
 #include "gpio/gpio.h"
 
 #include "board.h"
-#include "stm32g4xx_hal.h"
+#include "stm32h7xx_hal.h"
 
 Status gpio_mode(uint8_t pin, GpioMode mode) {
     uint32_t gpio_pin = GPIO_PIN_TO_NUM[pin];

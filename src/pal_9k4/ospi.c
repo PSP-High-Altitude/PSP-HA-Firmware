@@ -1,53 +1,61 @@
-#include "qspi/qspi.h"
+#include "ospi.h"
 
 #include "board.h"
 #include "stdio.h"
-#include "stm32g4xx_hal.h"
+#include "stm32h7xx_hal.h"
 #include "timer.h"
 
-static QSPI_HandleTypeDef qspi1_handle = {.State = 0};
-static QSPI_HandleTypeDef* qspi_handles[] = {&qspi1_handle};
+static OSPI_HandleTypeDef qspi1_handle = {.State = 0};
+static OSPI_HandleTypeDef* qspi_handles[] = {&qspi1_handle};
 
 static Status qspi_setup(QSpiDevice* dev) {
     if (qspi_handles[0]->State != 0) {
         return STATUS_OK;
     }
-    QUADSPI_TypeDef* base = QUADSPI;
+    OCTOSPI_TypeDef* base = OCTOSPI1;
     GPIO_InitTypeDef pin_conf = {
         .Mode = GPIO_MODE_AF_PP,
         .Pull = GPIO_NOPULL,
-        .Speed = GPIO_SPEED_FREQ_MEDIUM,
+        .Speed = GPIO_SPEED_FREQ_VERY_HIGH,
     };
-    if (dev->bank == QSPI_BK1) {
-        pin_conf.Alternate = GPIO_AF10_QUADSPI;
+    if (dev->bank == QSPI_PORT1_7_4) {
+        pin_conf.Alternate = GPIO_AF9_OCTOSPIM_P1;
+        pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PF10];
+        HAL_GPIO_Init(GPIOF, &pin_conf);  // CLK: pin PF10
+        pin_conf.Alternate = GPIO_AF10_OCTOSPIM_P1;
+        pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PC1];
+        HAL_GPIO_Init(GPIOC, &pin_conf);  // IO0: pin PC1
+        pin_conf.Alternate = GPIO_AF4_OCTOSPIM_P1;
+        pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PC2] | GPIO_PIN_TO_NUM[PIN_PC3];
+        HAL_GPIO_Init(GPIOC, &pin_conf);  // IO1: pin PC2, IO2: pin PC3
+        pin_conf.Alternate = GPIO_AF10_OCTOSPIM_P1;
         pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PE10];
-        HAL_GPIO_Init(GPIOE, &pin_conf);  // CLK: pin PE10
+        HAL_GPIO_Init(GPIOE, &pin_conf);  // IO3: pin PE10
+        pin_conf.Alternate = GPIO_AF11_OCTOSPIM_P1;
         pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PE11];
         HAL_GPIO_Init(GPIOE, &pin_conf);  // NCS: pin PE11
-        pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PE12];
-        HAL_GPIO_Init(GPIOE, &pin_conf);  // IO0: pin PE12
-        pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PE13];
-        HAL_GPIO_Init(GPIOE, &pin_conf);  // IO1: pin PE13
-        pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PE14];
-        HAL_GPIO_Init(GPIOE, &pin_conf);  // IO2: pin PE14
-        pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PE15];
-        HAL_GPIO_Init(GPIOE, &pin_conf);  // IO3: pin PE15
     } else {
         return STATUS_PARAMETER_ERROR;
     }
     uint32_t prescale = 0;
     switch (dev->clk) {
         case QSPI_SPEED_1MHz:
-            prescale = 168;
+            prescale = 80;
             break;
-        case QSPI_SPEED_2MHz:
-            prescale = 84;
+        case QSPI_SPEED_5MHz:
+            prescale = 16;
             break;
         case QSPI_SPEED_10MHz:
-            prescale = 17;
+            prescale = 8;
             break;
         case QSPI_SPEED_20MHz:
-            prescale = 9;
+            prescale = 4;
+            break;
+        case QSPI_SPEED_40MHz:
+            prescale = 2;
+            break;
+        case QSPI_SPEED_80MHz:
+            prescale = 1;
             break;
         default:
             return STATUS_PARAMETER_ERROR;

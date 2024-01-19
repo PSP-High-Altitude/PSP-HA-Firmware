@@ -1,7 +1,7 @@
 #include "timer.h"
 
 #include "FreeRTOS.h"
-#include "stm32g4xx_hal.h"
+#include "stm32h7xx_hal.h"
 #include "task.h"
 
 TIM_HandleTypeDef tim2_handle;

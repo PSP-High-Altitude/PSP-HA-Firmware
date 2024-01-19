@@ -19,7 +19,7 @@
 #include "qspi/qspi.h"
 #include "sd.h"
 #include "status.h"
-#include "stm32g474xx.h"
+#include "stm32h7xx.h"
 #include "timer.h"
 
 // FreeRTOS

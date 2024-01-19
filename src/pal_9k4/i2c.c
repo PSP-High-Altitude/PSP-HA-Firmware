@@ -1,7 +1,7 @@
 #include "i2c/i2c.h"
 
-#include "pal_9k31/board.h"
-#include "stm32g4xx_hal.h"
+#include "pal_9k4/board.h"
+#include "stm32h7xx_hal.h"
 
 static I2C_HandleTypeDef i2c1_handle = {.State = 0};
 static I2C_HandleTypeDef i2c2_handle = {.State = 0};

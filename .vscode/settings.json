@@ -40,6 +40,8 @@
         "ffconf.h": "c",
         "pspcom.h": "c",
         "freertos.h": "c",
-        "iosfwd": "c"
+        "iosfwd": "c",
+        "stm32h7xx_hal.h": "c",
+        "stm32h7xx.h": "c"
     }
 }
