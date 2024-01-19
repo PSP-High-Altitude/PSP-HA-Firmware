@@ -21,7 +21,11 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "peripherals/gpio/gpio.h"
+#include "psp_timer.h"
+#include "board.h"
+#include "radio_driver.h"
+#include "subghz_phy_app.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -82,14 +86,19 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
+  SUBGRF_SetTcxoMode(TCXO_CTRL_3_3V, 100);
+  SubghzApp_Init();
+  DELAY(100);
   /* USER CODE END Init */
 
   /* Configure the system clock */
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+  gpio_write(PIN_PA0, GPIO_HIGH);
+  DELAY(500);
+  gpio_write(PIN_PA0, GPIO_LOW);
+  DELAY(500);
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
