@@ -7,17 +7,20 @@ static I2C_HandleTypeDef i2c1_handle = {.State = 0};
 static I2C_HandleTypeDef i2c2_handle = {.State = 0};
 static I2C_HandleTypeDef i2c3_handle = {.State = 0};
 static I2C_HandleTypeDef i2c4_handle = {.State = 0};
-static I2C_HandleTypeDef *i2c_handles[4] = {&i2c1_handle, &i2c2_handle,
-                                            &i2c3_handle, &i2c4_handle};
+static I2C_HandleTypeDef i2c5_handle = {.State = 0};
+static I2C_HandleTypeDef i2c6_handle = {.State = 0};
+static I2C_HandleTypeDef *i2c_handles[6] = {&i2c1_handle, &i2c2_handle,
+                                            &i2c3_handle, &i2c4_handle,
+                                            &i2c5_handle, &i2c6_handle};
 
 static uint32_t getTimings(I2cDevice *dev) {
     switch (dev->clk) {
         case I2C_SPEED_STANDARD:
-            return 0x00303D5B;
+            return 0x10707DBC;
         case I2C_SPEED_FAST:
-            return 0x0010061A;
+            return 0x00602173;
         case I2C_SPEED_FAST_PLUS:
-            return 0x00000107;
+            return 0x00300B29;
         default:
             return 0;
     }
@@ -39,31 +42,36 @@ static Status i2cSetup(I2cDevice *dev) {
     switch (dev->periph) {
         case P_I2C1:
             base = I2C1;
-            return STATUS_PARAMETER_ERROR;
+            pin_conf.Alternate = GPIO_AF4_I2C1;
+            pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PB9];
+            HAL_GPIO_Init(GPIOB, &pin_conf);  // SDA: pin PB9
+            pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PB8];
+            HAL_GPIO_Init(GPIOB, &pin_conf);  // SCL: pin PB8
             break;
         case P_I2C2:
             base = I2C2;
             pin_conf.Alternate = GPIO_AF4_I2C2;
-            pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PA8];
-            HAL_GPIO_Init(GPIOA, &pin_conf);  // SDA: pin PA8
-            pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PA9];
-            HAL_GPIO_Init(GPIOA, &pin_conf);  // SCL: pin PA9
+            pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PB11];
+            HAL_GPIO_Init(GPIOB, &pin_conf);  // SDA: pin PB11
+            pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PB10];
+            HAL_GPIO_Init(GPIOB, &pin_conf);  // SCL: pin PB10
             break;
         case P_I2C3:
-            base = I2C3;
-            pin_conf.Alternate = GPIO_AF8_I2C3;
-            pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PC8];
-            HAL_GPIO_Init(GPIOC, &pin_conf);  // SCL: pin PC8
-            pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PC9];
-            HAL_GPIO_Init(GPIOC, &pin_conf);  // SDA: pin PC9
+            return STATUS_PARAMETER_ERROR;
             break;
         case P_I2C4:
             base = I2C4;
-            pin_conf.Alternate = GPIO_AF8_I2C4;
-            pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PC6];
-            HAL_GPIO_Init(GPIOC, &pin_conf);  // SCL: pin PC6
-            pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PC7];
-            HAL_GPIO_Init(GPIOC, &pin_conf);  // SDA: pin PC7
+            pin_conf.Alternate = GPIO_AF6_I2C4;
+            pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PB7];
+            HAL_GPIO_Init(GPIOB, &pin_conf);  // SDA: pin PB7
+            pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PB6];
+            HAL_GPIO_Init(GPIOB, &pin_conf);  // SCL: pin PB6
+            break;
+        case P_I2C5:
+            return STATUS_PARAMETER_ERROR;
+            break;
+        case P_I2C6:
+            return STATUS_PARAMETER_ERROR;
             break;
     }
     I2C_InitTypeDef init_conf = {

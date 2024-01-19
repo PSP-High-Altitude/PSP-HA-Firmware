@@ -16,7 +16,6 @@
 #include "mt29f2g.h"
 #include "pb.h"
 #include "pspcom.h"
-#include "qspi/qspi.h"
 #include "sd.h"
 #include "status.h"
 #include "stm32h7xx.h"
@@ -31,12 +30,12 @@
 #endif
 #define USE_SPI_CRC 0
 
-#define PIN_RED PIN_PC0
-#define PIN_YELLOW PIN_PC1
-#define PIN_GREEN PIN_PC2
-#define PIN_BLUE PIN_PC3
-#define PIN_PROG PIN_PB8
-#define PIN_BUZZER PIN_PB9
+#define PIN_RED PIN_PA0
+#define PIN_YELLOW PIN_PA1
+#define PIN_GREEN PIN_PA2
+#define PIN_BLUE PIN_PA3
+#define PIN_PROG PIN_PA13
+#define PIN_BUZZER PIN_PE0
 
 #define TARGET_INTERVAL 40  // ms
 
@@ -83,12 +82,12 @@ static SensorFrame s_last_sensor_data;
 static I2cDevice s_mag_conf = {
     .address = 0x1E,
     .clk = I2C_SPEED_FAST,
-    .periph = P_I2C3,
+    .periph = P_I2C1,
 };
 static I2cDevice s_baro_conf = {
     .address = 0x76,
     .clk = I2C_SPEED_FAST,
-    .periph = P_I2C3,
+    .periph = P_I2C1,
 };
 static I2cDevice s_gps_conf = {
     .address = 0x42,
@@ -124,7 +123,7 @@ int _write(int file, char *data, int len) {
     uint64_t start_time = MILLIS();
     USBD_StatusTypeDef rc = USBD_OK;
     do {
-        rc = CDC_Transmit_FS((uint8_t *)data, len);
+        rc = CDC_Transmit_HS((uint8_t *)data, len);
     } while (USBD_BUSY == rc && MILLIS() - start_time < 10);
 
     if (USBD_FAIL == rc) {
@@ -328,7 +327,7 @@ int main(void) {
     gpio_write(PIN_PB12, GPIO_HIGH);
     gpio_write(PIN_PE4, GPIO_HIGH);
     gpio_write(PIN_RED, GPIO_HIGH);
-    MX_USB_Device_Init();
+    MX_USB_DEVICE_Init();
     DELAY(1000);
     printf("Starting initialization...\n");
 
@@ -443,18 +442,6 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask,
 }
 
 extern void xPortSysTickHandler(void);
-
-void SysTick_Handler(void) {
-    HAL_IncTick();
-
-    /* Clear overflow flag */
-    SysTick->CTRL;
-
-    if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
-        /* Call tick handler */
-        xPortSysTickHandler();
-    }
-}
 
 void Error_Handler(void) {
     __disable_irq();

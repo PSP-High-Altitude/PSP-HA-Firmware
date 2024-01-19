@@ -61,8 +61,8 @@ void SystemClock_Config() {
         RCC_PERIPHCLK_OSPI | RCC_PERIPHCLK_SPI123 | RCC_PERIPHCLK_SPI45;
     PeriphClkInitStruct.PLL2.PLL2M = 48;
     PeriphClkInitStruct.PLL2.PLL2N = 160;
-    PeriphClkInitStruct.PLL2.PLL2P = 8;
-    PeriphClkInitStruct.PLL2.PLL2Q = 8;
+    PeriphClkInitStruct.PLL2.PLL2P = 4;
+    PeriphClkInitStruct.PLL2.PLL2Q = 4;
     PeriphClkInitStruct.PLL2.PLL2R = 2;
     PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2VCIRANGE_0;
     PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOMEDIUM;

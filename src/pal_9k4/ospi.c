@@ -5,11 +5,11 @@
 #include "stm32h7xx_hal.h"
 #include "timer.h"
 
-static OSPI_HandleTypeDef qspi1_handle = {.State = 0};
-static OSPI_HandleTypeDef* qspi_handles[] = {&qspi1_handle};
+static OSPI_HandleTypeDef ospi1_handle = {.State = 0};
+static OSPI_HandleTypeDef* ospi_handles[] = {&ospi1_handle};
 
-static Status qspi_setup(QSpiDevice* dev) {
-    if (qspi_handles[0]->State != 0) {
+static Status ospi_setup(OSpiDevice* dev) {
+    if (ospi_handles[0]->State != 0) {
         return STATUS_OK;
     }
     OCTOSPI_TypeDef* base = OCTOSPI1;
@@ -18,7 +18,7 @@ static Status qspi_setup(QSpiDevice* dev) {
         .Pull = GPIO_NOPULL,
         .Speed = GPIO_SPEED_FREQ_VERY_HIGH,
     };
-    if (dev->bank == QSPI_PORT1_7_4) {
+    if (dev->bank == OSPI_PORT1_7_4) {
         pin_conf.Alternate = GPIO_AF9_OCTOSPIM_P1;
         pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PF10];
         HAL_GPIO_Init(GPIOF, &pin_conf);  // CLK: pin PF10
@@ -39,64 +39,81 @@ static Status qspi_setup(QSpiDevice* dev) {
     }
     uint32_t prescale = 0;
     switch (dev->clk) {
-        case QSPI_SPEED_1MHz:
+        case OSPI_SPEED_1MHz:
             prescale = 80;
             break;
-        case QSPI_SPEED_5MHz:
+        case OSPI_SPEED_5MHz:
             prescale = 16;
             break;
-        case QSPI_SPEED_10MHz:
+        case OSPI_SPEED_10MHz:
             prescale = 8;
             break;
-        case QSPI_SPEED_20MHz:
+        case OSPI_SPEED_20MHz:
             prescale = 4;
             break;
-        case QSPI_SPEED_40MHz:
+        case OSPI_SPEED_40MHz:
             prescale = 2;
             break;
-        case QSPI_SPEED_80MHz:
+        case OSPI_SPEED_80MHz:
             prescale = 1;
             break;
         default:
             return STATUS_PARAMETER_ERROR;
     }
-    QSPI_InitTypeDef init_conf = {
+    OSPI_InitTypeDef init_conf = {
         .ClockPrescaler = prescale,
         .FifoThreshold = 1,
-        .SampleShifting = QSPI_SAMPLE_SHIFTING_NONE,
-        .FlashSize = 30,
-        .ChipSelectHighTime = QSPI_CS_HIGH_TIME_8_CYCLE,
-        .ClockMode = QSPI_CLOCK_MODE_0,
-        .FlashID = dev->bank ? QSPI_FLASH_ID_2 : QSPI_FLASH_ID_1,
-        .DualFlash = QSPI_DUALFLASH_DISABLE,
+        .DualQuad = HAL_OSPI_DUALQUAD_DISABLE,
+        .SampleShifting = HAL_OSPI_SAMPLE_SHIFTING_NONE,
+        .DeviceSize = 30,
+        .MemoryType = HAL_OSPI_MEMTYPE_MICRON,
+        .ChipSelectHighTime = 1,
+        .ClockMode = HAL_OSPI_CLOCK_MODE_0,
+        .WrapSize = HAL_OSPI_WRAP_NOT_SUPPORTED,
+        .DelayHoldQuarterCycle = HAL_OSPI_DHQC_DISABLE,
+        .ChipSelectBoundary = 0,
+        .DelayBlockBypass = HAL_OSPI_DELAY_BLOCK_BYPASSED,
+        .FreeRunningClock = HAL_OSPI_FREERUNCLK_DISABLE,
+        .MaxTran = 0,
+        .Refresh = 0,
     };
-    QSPI_HandleTypeDef* handle = qspi_handles[0];
+    OSPI_HandleTypeDef* handle = ospi_handles[0];
     (*handle).Init = init_conf;
     (*handle).Instance = base;
-    if (HAL_QSPI_Init(handle) != HAL_OK) {
+    if (HAL_OSPI_Init(handle) != HAL_OK) {
+        return STATUS_ERROR;
+    }
+    OSPIM_CfgTypeDef sOspiManagerCfg = {0};
+    sOspiManagerCfg.ClkPort = 1;
+    sOspiManagerCfg.NCSPort = 1;
+    sOspiManagerCfg.IOLowPort = HAL_OSPIM_IOPORT_1_HIGH;
+    if (HAL_OSPIM_Config(ospi_handles[0], &sOspiManagerCfg,
+                         HAL_OSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK) {
         return STATUS_ERROR;
     }
     return STATUS_OK;
 }
 
-Status qspi_cmd(QSpiDevice* dev, QSPI_CommandTypeDef* cmd) {
-    if (qspi_setup(dev) != STATUS_OK) {
+Status ospi_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd) {
+    if (ospi_setup(dev) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
     }
-    if (HAL_QSPI_Command(qspi_handles[0], cmd, 100) != HAL_OK) {
+    if (HAL_OSPI_Command(ospi_handles[0], cmd, 100) != HAL_OK) {
         return STATUS_ERROR;
     }
     return STATUS_OK;
 }
 
-Status qspi_auto_poll_cmd(QSpiDevice* dev, QSPI_CommandTypeDef* cmd,
-                          QSPI_AutoPollingTypeDef* cfg) {
-    if (qspi_setup(dev) != STATUS_OK) {
+Status ospi_auto_poll_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
+                          OSPI_AutoPollingTypeDef* cfg) {
+    if (ospi_setup(dev) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
     }
     HAL_StatusTypeDef status;
-    if ((status = HAL_QSPI_AutoPolling(qspi_handles[0], cmd, cfg, 100)) !=
-        HAL_OK) {
+    if (HAL_OSPI_Command(ospi_handles[0], cmd, 100) != HAL_OK) {
+        return STATUS_ERROR;
+    }
+    if ((status = HAL_OSPI_AutoPolling(ospi_handles[0], cfg, 100)) != HAL_OK) {
         return STATUS_ERROR;
     }
     return STATUS_OK;
@@ -109,10 +126,10 @@ Status qspi_auto_poll_cmd(QSpiDevice* dev, QSPI_CommandTypeDef* cmd,
         if (MILLIS() - start_time > 100) {
             return STATUS_TIMEOUT;
         }
-        if (HAL_QSPI_Command(qspi_handles[0], cmd, 100) != HAL_OK) {
+        if (HAL_OSPI_Command(ospi_handles[0], cmd, 100) != HAL_OK) {
             return STATUS_ERROR;
         }
-        if (HAL_QSPI_Receive(qspi_handles[0], rx_buf, 100) != HAL_OK) {
+        if (HAL_OSPI_Receive(ospi_handles[0], rx_buf, 100) != HAL_OK) {
             return STATUS_ERROR;
         }
         rx_data = (((uint32_t)rx_buf[0] << 24) | ((uint32_t)rx_buf[1] << 16) |
@@ -123,27 +140,29 @@ Status qspi_auto_poll_cmd(QSpiDevice* dev, QSPI_CommandTypeDef* cmd,
     */
 }
 
-Status qspi_write(QSpiDevice* dev, QSPI_CommandTypeDef* cmd, uint8_t* tx_buf) {
-    if (qspi_setup(dev) != STATUS_OK) {
+Status ospi_write(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
+                  uint8_t* tx_buf) {
+    if (ospi_setup(dev) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
     }
-    if (HAL_QSPI_Command(qspi_handles[0], cmd, 100) != HAL_OK) {
+    if (HAL_OSPI_Command(ospi_handles[0], cmd, 100) != HAL_OK) {
         return STATUS_ERROR;
     }
-    if (HAL_QSPI_Transmit(qspi_handles[0], tx_buf, 100) != HAL_OK) {
+    if (HAL_OSPI_Transmit(ospi_handles[0], tx_buf, 100) != HAL_OK) {
         return STATUS_ERROR;
     }
     return STATUS_OK;
 }
 
-Status qspi_read(QSpiDevice* dev, QSPI_CommandTypeDef* cmd, uint8_t* rx_buf) {
-    if (qspi_setup(dev) != STATUS_OK) {
+Status ospi_read(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
+                 uint8_t* rx_buf) {
+    if (ospi_setup(dev) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
     }
-    if (HAL_QSPI_Command(qspi_handles[0], cmd, 100) != HAL_OK) {
+    if (HAL_OSPI_Command(ospi_handles[0], cmd, 100) != HAL_OK) {
         return STATUS_ERROR;
     }
-    if (HAL_QSPI_Receive(qspi_handles[0], rx_buf, 100) != HAL_OK) {
+    if (HAL_OSPI_Receive(ospi_handles[0], rx_buf, 100) != HAL_OK) {
         return STATUS_ERROR;
     }
     return STATUS_OK;

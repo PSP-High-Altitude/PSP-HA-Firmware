@@ -15,6 +15,7 @@ typedef enum {
     P_SPI2 = 1,
     P_SPI3 = 2,
     P_SPI4 = 3,
+    P_SPI5 = 4,
 } SpiPeriph;
 
 typedef enum {

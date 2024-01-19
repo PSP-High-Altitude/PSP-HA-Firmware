@@ -10,9 +10,10 @@ static SPI_HandleTypeDef spi1_handle = {.State = 0};
 static SPI_HandleTypeDef spi2_handle = {.State = 0};
 static SPI_HandleTypeDef spi3_handle = {.State = 0};
 static SPI_HandleTypeDef spi4_handle = {.State = 0};
-static SPI_HandleTypeDef* spi_handles[] = {&spi1_handle, &spi2_handle,
-                                           &spi3_handle, &spi4_handle};
-static uint8_t cs_pin[4] = {PIN_PA4, PIN_PB12, 0, PIN_PE4};
+static SPI_HandleTypeDef spi5_handle = {.State = 0};
+static SPI_HandleTypeDef* spi_handles[] = {
+    &spi1_handle, &spi2_handle, &spi3_handle, &spi4_handle, &spi5_handle};
+static uint8_t cs_pin[5] = {PIN_PA4, PIN_PD8, 0, PIN_PE4, 0};
 
 Status spi_setup(SpiDevice* dev) {
     if (dev->periph < 0 || dev->periph > 3) {
@@ -41,22 +42,29 @@ Status spi_setup(SpiDevice* dev) {
             break;
         case P_SPI2:
             base = SPI2;
+            gpio_write(cs_pin[1], GPIO_HIGH);  // NSS: pin PD8
             pin_conf.Alternate = GPIO_AF5_SPI2;
             pin_conf.Pin =
-                GPIO_PIN_TO_NUM[PIN_PB13] | GPIO_PIN_TO_NUM[PIN_PB14] |
-                GPIO_PIN_TO_NUM[PIN_PB15];     // SCK: pin PB13, MISO: pin
-                                               // PB14, MOSI: pin PB15
-            gpio_write(cs_pin[1], GPIO_HIGH);  // NSS: pin PB12
+                GPIO_PIN_TO_NUM[PIN_PB14] |
+                GPIO_PIN_TO_NUM[PIN_PB15];  // MISO: pin PB14, MOSI: pin PB15
             HAL_GPIO_DeInit(GPIOB, pin_conf.Pin);
             HAL_GPIO_Init(GPIOB, &pin_conf);
             HAL_GPIO_LockPin(GPIOB, pin_conf.Pin);
+            pin_conf.Alternate = GPIO_AF5_SPI2;
+            pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PA9];  // SCK: pin PA9
+            HAL_GPIO_DeInit(GPIOA, pin_conf.Pin);
+            HAL_GPIO_Init(GPIOA, &pin_conf);
+            HAL_GPIO_LockPin(GPIOA, pin_conf.Pin);
             break;
         case P_SPI3:
-            base = SPI1;
             return STATUS_PARAMETER_ERROR;
             break;
         case P_SPI4:
             base = SPI4;
+            // Disable SDMMC pins first
+            // TODO
+
+            pin_conf.Mode = GPIO_MODE_AF_PP;
             pin_conf.Alternate = GPIO_AF5_SPI4;
             pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PE2] | GPIO_PIN_TO_NUM[PIN_PE5] |
                            GPIO_PIN_TO_NUM[PIN_PE6];  // SCK: pin PE2, MISO: pin
@@ -65,6 +73,9 @@ Status spi_setup(SpiDevice* dev) {
             HAL_GPIO_DeInit(GPIOE, pin_conf.Pin);
             HAL_GPIO_Init(GPIOE, &pin_conf);
             HAL_GPIO_LockPin(GPIOE, pin_conf.Pin);
+            break;
+        case P_SPI5:
+            return STATUS_PARAMETER_ERROR;
             break;
     }
     uint32_t prescale = 0;

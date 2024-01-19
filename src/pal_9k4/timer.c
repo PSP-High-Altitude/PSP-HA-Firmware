@@ -11,7 +11,7 @@ void init_timers(uint32_t sensor_interval_ms) {
     __HAL_RCC_TIM2_CLK_ENABLE();
 
     TIM_Base_InitTypeDef tim2_conf = {
-        .Prescaler = __HAL_TIM_CALC_PSC(HAL_RCC_GetPCLK1Freq(), 1000000),
+        .Prescaler = 275,
         .CounterMode = TIM_COUNTERMODE_UP,
         .Period = 0xFFFFFFFF - 1,
         .ClockDivision = TIM_CLOCKDIVISION_DIV1,

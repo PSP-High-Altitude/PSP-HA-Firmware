@@ -11,6 +11,8 @@ typedef enum {
     P_I2C2 = 1,
     P_I2C3 = 2,
     P_I2C4 = 3,
+    P_I2C5 = 4,
+    P_I2C6 = 5,
 } I2cPeriph;
 
 typedef enum {
