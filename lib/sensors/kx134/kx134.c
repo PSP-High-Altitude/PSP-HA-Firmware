@@ -201,7 +201,7 @@ Status kx134_config(SpiDevice* device, Kx134OutputDataRate rate,
         return STATUS_ERROR;
     }
 
-    Status status = kx134_read(device, KX134_CNTL1, &rx_buf, 1);
+    status = kx134_read(device, KX134_CNTL1, &rx_buf, 1);
 
     if (status != STATUS_OK) {
         return status;
