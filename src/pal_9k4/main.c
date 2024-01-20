@@ -311,10 +311,10 @@ void store_data() {
     }
 }
 
-void send_usb_telem() {
+void send_telem() {
     while (1) {
         pspcom_send_sensor(&s_last_sensor_data);
-        vTaskDelay(200 / portTICK_PERIOD_MS);
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
 }
 
@@ -426,8 +426,8 @@ int main(void) {
     );
 
 #ifdef DEBUG
-    xTaskCreate(send_usb_telem,        // Task function
-                "usb_telem",           // Task name
+    xTaskCreate(send_telem,            // Task function
+                "telem",               // Task name
                 2048,                  // Stack size
                 NULL,                  // Parameters
                 tskIDLE_PRIORITY + 1,  // Priority
