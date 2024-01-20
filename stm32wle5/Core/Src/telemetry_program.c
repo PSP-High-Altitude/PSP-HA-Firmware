@@ -4,6 +4,7 @@
 #include "peripherals/uart/uart.h"
 #include "pspcom.h"
 #include "radio.h"
+#include "stdio.h"
 
 extern volatile LoraState lora_state;
 extern const struct Radio_s Radio;
@@ -14,6 +15,7 @@ UartDevice uart1 = {
 };
 
 void telemetry_program() {
+	start_uart_reading(&uart1);
     while (1) {
         process_packet_from_uart();
     }
@@ -98,10 +100,14 @@ void process_packet_from_uart() {
     if (!pspcom_uart_available(&uart1)) {
         return;
     }
-    pspcommsg rx_msg = pspcom_read_msg_from_uart(&uart1);
+    static pspcommsg rx_msg = {0};
+    if(pspcom_read_msg_from_uart(&uart1, &rx_msg) != STATUS_OK) {
+    	return;
+    }
     if (rx_msg.msg_id == 0) {
         return;
     }
+    printf("%d %d %d\n", rx_msg.msg_id, rx_msg.device_id, rx_msg.payload_len);
     switch (rx_msg.msg_id) {
         default:
             rx_msg.device_id = DEVICE_ID;

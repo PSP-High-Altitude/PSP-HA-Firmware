@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "lib/peripherals/uart/uart.h"
+#include "lib/common/status.h"
 
 #define CRC16_POLY 0x1021
 #define CRC16_INIT 0xFFFF
@@ -54,7 +55,7 @@ void pspcom_send_msg_over_air(pspcommsg msg);
 
 void pspcom_send_msg_over_uart(UartDevice* dev, pspcommsg msg);
 
-pspcommsg pspcom_read_msg_from_uart(UartDevice* dev);
+Status pspcom_read_msg_from_uart(UartDevice* dev, pspcommsg *msg);
 
 uint8_t pspcom_uart_available(UartDevice* dev);
 

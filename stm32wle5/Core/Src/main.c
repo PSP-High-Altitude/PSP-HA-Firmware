@@ -26,6 +26,9 @@
 #include "board.h"
 #include "radio_driver.h"
 #include "subghz_phy_app.h"
+#include "telemetry_program.h"
+#include <errno.h>
+#include <sys/unistd.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -62,12 +65,11 @@ DMA_HandleTypeDef hdma_usart1_tx;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 /* USER CODE BEGIN PFP */
-
+#define PUTCHAR_PROTOTYPE int __io_putchar(int ch)
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
 /* USER CODE END 0 */
 
 /**
@@ -86,19 +88,16 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-  SUBGRF_SetTcxoMode(TCXO_CTRL_3_3V, 100);
-  SubghzApp_Init();
-  DELAY(100);
+
   /* USER CODE END Init */
 
   /* Configure the system clock */
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-  gpio_write(PIN_PA0, GPIO_HIGH);
-  DELAY(500);
-  gpio_write(PIN_PA0, GPIO_LOW);
-  DELAY(500);
+  SUBGRF_SetTcxoMode(TCXO_CTRL_3_3V, 100);
+  SubghzApp_Init();
+  HAL_Delay(100);
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
@@ -109,7 +108,12 @@ int main(void)
   MX_USART2_UART_Init();
   MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
-
+  init_timers();
+  gpio_write(PIN_PA0, GPIO_HIGH);
+  DELAY(500);
+  gpio_write(PIN_PA0, GPIO_LOW);
+  DELAY(500);
+  telemetry_program();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -120,6 +124,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
   }
+  return 0;
   /* USER CODE END 3 */
 }
 
@@ -425,7 +430,19 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+/**
+  * @brief  Retargets the C library printf function to the USART.
+  * @param  None
+  * @retval None
+  */
+PUTCHAR_PROTOTYPE
+{
+  /* Place your implementation of fputc here */
+  /* e.g. write a character to the USART1 and Loop until the end of transmission */
+  HAL_UART_Transmit(&huart2, (uint8_t *)&ch, 1, 100);
 
+  return ch;
+}
 /* USER CODE END 4 */
 
 /**
@@ -436,10 +453,7 @@ void Error_Handler(void)
 {
   /* USER CODE BEGIN Error_Handler_Debug */
   /* User can add his own implementation to report the HAL error return state */
-  __disable_irq();
-  while (1)
-  {
-  }
+  NVIC_SystemReset();
   /* USER CODE END Error_Handler_Debug */
 }
 
