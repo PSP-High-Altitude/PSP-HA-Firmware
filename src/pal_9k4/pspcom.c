@@ -122,7 +122,7 @@ void pspcom_send_msg(pspcommsg msg) {
     memcpy(buf + 5, msg.payload, msg.payload_len);
     sprintf(buf + 5 + msg.payload_len, "%c%c", (uint8_t)checksum,
             (uint8_t)(checksum >> 8));
-    HAL_UART_Transmit_DMA(&huart7, (uint8_t *)buf, 7 + msg.payload_len);
+    HAL_UART_Transmit(&huart7, (uint8_t *)buf, 7 + msg.payload_len, 50);
     free(buf);
 }
 
