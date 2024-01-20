@@ -37,6 +37,9 @@ uint16_t crc(uint16_t checksum, pspcommsg msg) {
 }
 
 Status pspcom_init() {
+    HAL_NVIC_SetPriority(UART7_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(UART7_IRQn);
+
     GPIO_InitTypeDef GPIO_InitStruct = {0};
     GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_7;
     GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
@@ -120,6 +123,7 @@ void pspcom_send_msg(pspcommsg msg) {
     sprintf(buf + 5 + msg.payload_len, "%c%c", (uint8_t)checksum,
             (uint8_t)(checksum >> 8));
     HAL_UART_Transmit_DMA(&huart7, (uint8_t *)buf, 7 + msg.payload_len);
+    free(buf);
 }
 
 void pspcom_send_sensor(SensorFrame *sens) {
@@ -130,30 +134,32 @@ void pspcom_send_sensor(SensorFrame *sens) {
         .msg_id = ACCEL,
     };
     tx_msg.payload[0] = 0;
-    memcpy(tx_msg.payload + 1, &sens->acc_i_x, 4);
-    memcpy(tx_msg.payload + 5, &sens->acc_i_y, 4);
-    memcpy(tx_msg.payload + 9, &sens->acc_i_z, 4);
+    memcpy(tx_msg.payload + 1, &sens->acc_i_x, sizeof(float));
+    memcpy(tx_msg.payload + 5, &sens->acc_i_y, sizeof(float));
+    memcpy(tx_msg.payload + 9, &sens->acc_i_z, sizeof(float));
     pspcom_send_msg(tx_msg);
 
     // Gyroscope
     tx_msg.msg_id = GYRO;
-    memcpy(tx_msg.payload + 1, &sens->rot_i_x, 4);
-    memcpy(tx_msg.payload + 5, &sens->rot_i_y, 4);
-    memcpy(tx_msg.payload + 9, &sens->rot_i_z, 4);
+    memcpy(tx_msg.payload + 1, &sens->rot_i_x, sizeof(float));
+    memcpy(tx_msg.payload + 5, &sens->rot_i_y, sizeof(float));
+    memcpy(tx_msg.payload + 9, &sens->rot_i_z, sizeof(float));
     pspcom_send_msg(tx_msg);
 
     // Temperature
     tx_msg.msg_id = TEMP;
     tx_msg.payload_len = 5;
-    memcpy(tx_msg.payload + 1, &sens->temperature, 4);
+    memcpy(tx_msg.payload + 1, &sens->temperature, sizeof(float));
     pspcom_send_msg(tx_msg);
 
     // Pressure
     tx_msg.msg_id = PRES;
-    memcpy(tx_msg.payload + 1, &sens->pressure, 4);
+    memcpy(tx_msg.payload + 1, &sens->pressure, sizeof(float));
     pspcom_send_msg(tx_msg);
 }
 
 void DMA1_Stream0_IRQHandler(void) { HAL_DMA_IRQHandler(&hdma_uart7_rx); }
 
 void DMA1_Stream1_IRQHandler(void) { HAL_DMA_IRQHandler(&hdma_uart7_tx); }
+
+void UART7_IRQHandler(void) { HAL_UART_IRQHandler(&huart7); }

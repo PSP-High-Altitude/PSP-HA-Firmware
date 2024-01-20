@@ -389,6 +389,13 @@ int main(void) {
         printf("SD card initialization failed\n");
     }
 
+    // Initialize PSPCOM connection
+    if (pspcom_init() == STATUS_OK) {
+        printf("PSPCOM initialization successful\n");
+    } else {
+        printf("PSPCOM initialization failed\n");
+    }
+
     // https://www.freertos.org/RTOS-Cortex-M3-M4.html
     NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
 
