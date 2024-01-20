@@ -53,6 +53,3 @@ Thumbs.db
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
-
-# stm32wle5
-stm32wle5/*
