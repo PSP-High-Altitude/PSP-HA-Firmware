@@ -25,6 +25,8 @@ void process_packet_from_air(uint8_t *payload, uint16_t length) {
     pspcommsg rx_msg = pspcom_process_bytes_from_air(payload, length);
     pspcommsg tx_msg = {0};
 
+    printf("LORA: %d %d %d\n", rx_msg.msg_id, rx_msg.device_id, rx_msg.payload_len);
+
     // Message was not addressed to this device
     if (rx_msg.device_id != DEVICE_ID && rx_msg.device_id != 0) {
         return;
@@ -107,7 +109,7 @@ void process_packet_from_uart() {
     if (rx_msg.msg_id == 0) {
         return;
     }
-    printf("%d %d %d\n", rx_msg.msg_id, rx_msg.device_id, rx_msg.payload_len);
+    printf("UART: %d %d %d\n", rx_msg.msg_id, rx_msg.device_id, rx_msg.payload_len);
     switch (rx_msg.msg_id) {
         default:
             rx_msg.device_id = DEVICE_ID;

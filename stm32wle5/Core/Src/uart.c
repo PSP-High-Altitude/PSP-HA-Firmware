@@ -2,6 +2,7 @@
 
 #include <stdbool.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "stm32wlxx_hal.h"
 
@@ -83,7 +84,7 @@ size_t circular_buffer_size(const UartBuffer* cb) {
 uint8_t circular_buffer_pop(UartBuffer* cb, uint8_t* data) {
 	if(cb->rd_ptr != DMA_WRITE_PTR) {
 		*data = cb->buffer[cb->rd_ptr++];
-		cb->rd_ptr &= (UART_BUFFER_SIZE - 1);
+		cb->rd_ptr %= UART_BUFFER_SIZE;
 		return 1;
 	} else {
 		return 0;

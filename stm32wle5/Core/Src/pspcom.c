@@ -55,9 +55,7 @@ pspcommsg pspcom_process_bytes_from_air(uint8_t *buf, uint16_t len) {
         memset(&result, 0, sizeof(pspcommsg));
         return result;
     }
-    for (int i = 0; i < result.payload_len; i++) {
-        result.payload[i] = buf[3 + i];
-    }
+    memcpy(result.payload, buf + 3, result.payload_len);
     return result;
 }
 
@@ -74,9 +72,12 @@ void pspcom_send_msg_over_air(pspcommsg msg) {
 
     lora_state = TX;
     Radio.Send(payload, len);
-    LoraState comp1 = lora_state;
-    LoraState comp2 = TX;
-    while_equals_timeout(1000, &comp1, &comp2, timeout_callback);
+    //LoraState comp1 = lora_state;
+    //LoraState comp2 = TX;
+    //while_equals_timeout(1000, &comp1, &comp2, timeout_callback);
+    DELAY(Radio.TimeOnAir(MODEM_LORA, LORA_BANDWIDTH,
+                      LORA_SPREADING_FACTOR, LORA_CODINGRATE,
+                      LORA_PREAMBLE_LENGTH, 0, len, 1) + 10);
 }
 
 void pspcom_send_msg_over_uart(UartDevice *dev, pspcommsg msg) {
@@ -159,6 +160,7 @@ Status pspcom_read_msg_from_uart(UartDevice *dev, pspcommsg *msg) {
                 circular_buffer_pop(cb, &current_byte);
                 checksum += ((uint16_t)current_byte) << 8;
                 if (crc(CRC16_INIT, *msg) == checksum) {
+                	state = 0;
                     return STATUS_OK;
                 }
                 state = 0;

@@ -1,9 +1,12 @@
 #include "pspcom.h"
 
+#include "FreeRTOS.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "stm32h7xx_hal.h"
 #include "string.h"
+#include "task.h"
+#include "timer.h"
 
 #define PSPCOM_DEVICE_ID 1
 
@@ -127,6 +130,8 @@ void pspcom_send_msg(pspcommsg msg) {
 }
 
 void pspcom_send_sensor(SensorFrame *sens) {
+    vTaskSuspendAll();
+
     // Accelerometer
     pspcommsg tx_msg = {
         .payload_len = 13,
@@ -156,6 +161,8 @@ void pspcom_send_sensor(SensorFrame *sens) {
     tx_msg.msg_id = PRES;
     memcpy(tx_msg.payload + 1, &sens->pressure, sizeof(float));
     pspcom_send_msg(tx_msg);
+
+    xTaskResumeAll();
 }
 
 void DMA1_Stream0_IRQHandler(void) { HAL_DMA_IRQHandler(&hdma_uart7_rx); }
