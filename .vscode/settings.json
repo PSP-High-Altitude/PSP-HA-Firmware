@@ -42,6 +42,10 @@
         "freertos.h": "c",
         "iosfwd": "c",
         "stm32h7xx_hal.h": "c",
-        "stm32h7xx.h": "c"
+        "stm32h7xx.h": "c",
+        "usbd_cdc.h": "c",
+        "usbd_core.h": "c",
+        "usbd_ioreq.h": "c",
+        "usbd_conf.h": "c"
     }
 }

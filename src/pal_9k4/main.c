@@ -3,12 +3,12 @@
 
 #include "USB_Device/App/usb_device.h"
 #include "USB_Device/App/usbd_cdc_if.h"
-#include "adxl372/adxl372.h"
 #include "board.h"
 #include "clocks.h"
 #include "data.h"
 #include "gpio/gpio.h"
 #include "iis2mdc/iis2mdc.h"
+#include "kx134/kx134.h"
 #include "lfs.h"
 #include "lsm6dsox/lsm6dsox.h"
 #include "max_m10s.h"
@@ -43,7 +43,7 @@
 
 #define DEBUG
 
-extern PCD_HandleTypeDef hpcd_USB_FS;
+extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
 
 volatile static struct {
     SensorFrame queue[LOG_FIFO_LEN];
@@ -95,7 +95,7 @@ static I2cDevice s_gps_conf = {
     .periph = P_I2C2,
 };
 static SpiDevice s_imu_conf = {
-    .clk = SPI_SPEED_1MHz,
+    .clk = SPI_SPEED_10MHz,
     .cpol = 0,
     .cpha = 0,
     .cs = 0,
@@ -106,7 +106,7 @@ static SdDevice s_sd_conf = {
     .periph = P_SD4,
 };
 static SpiDevice s_acc_conf = {
-    .clk = SPI_SPEED_1MHz,
+    .clk = SPI_SPEED_10MHz,
     .cpol = 0,
     .cpha = 0,
     .cs = 0,
@@ -146,7 +146,7 @@ void read_sensors() {
         BaroData baro =
             ms5637_read(&s_baro_conf, OSR_256);    // Baro read takes longest
         uint64_t timestamp = xTaskGetTickCount();  // So measure timestamp after
-        Accel acch = adxl372_read_accel(&s_acc_conf);
+        Accel acch = kx134_read_accel(&s_acc_conf);
         Accel accel = lsm6dsox_read_accel(&s_imu_conf);
         Gyro gyro = lsm6dsox_read_gyro(&s_imu_conf);
         Mag mag = iis2mdc_read(&s_mag_conf);
@@ -248,12 +248,12 @@ void store_data() {
         xTaskNotifyWait(0, 0xffffffffUL, &notif_value, 100);
 
         // If PROG switch is set, unmount SD card and wait
-        if (gpio_read(PIN_PROG)) {
+        if (!gpio_read(PIN_PROG)) {
             sd_deinit();
             printf("SD safe to remove\n");
             gpio_write(PIN_BLUE, GPIO_LOW);
             gpio_write(PIN_GREEN, GPIO_LOW);
-            while (gpio_read(PIN_PROG)) {
+            while (!gpio_read(PIN_PROG)) {
                 gpio_write(PIN_GREEN, GPIO_HIGH);
                 vTaskDelay(pdMS_TO_TICKS(500));
                 gpio_write(PIN_GREEN, GPIO_LOW);
@@ -323,11 +323,12 @@ int main(void) {
     SystemClock_Config();
     init_timers();
     init_fifo();
+    gpio_mode(PIN_PROG, GPIO_INPUT_PULLUP);
     gpio_write(PIN_PA4, GPIO_HIGH);
-    gpio_write(PIN_PB12, GPIO_HIGH);
+    gpio_write(PIN_PD8, GPIO_HIGH);
     gpio_write(PIN_PE4, GPIO_HIGH);
-    gpio_write(PIN_RED, GPIO_HIGH);
     MX_USB_DEVICE_Init();
+    gpio_write(PIN_RED, GPIO_HIGH);
     DELAY(1000);
     printf("Starting initialization...\n");
 
@@ -367,8 +368,8 @@ int main(void) {
     }
 
     // Initialize accelerometer
-    if (adxl372_init(&s_acc_conf, ADXL372_200_HZ, ADXL372_OUT_RATE_400_HZ,
-                     ADXL372_MEASURE_MODE)) {
+    if (kx134_init(&s_acc_conf, KX134_OUT_RATE_200_HZ, KX134_RANGE_64_G) ==
+        STATUS_OK) {
         printf("Accelerometer initialization successful\n");
     } else {
         printf("Accelerometer initialization failed\n");
@@ -443,13 +444,25 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask,
 
 extern void xPortSysTickHandler(void);
 
+void SysTick_Handler(void) {
+    HAL_IncTick();
+
+    /* Clear overflow flag */
+    SysTick->CTRL;
+
+    if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
+        /* Call tick handler */
+        xPortSysTickHandler();
+    }
+}
+
 void Error_Handler(void) {
     __disable_irq();
     while (1) {
     }
 }
 
-void NMI_Handler(void) {}
+void NMI_Handler(void) { printf("nmi\n"); }
 
 void HardFault_Handler(void) {
     while (1) {
@@ -477,4 +490,4 @@ void UsageFault_Handler(void) {
 
 void DebugMon_Handler(void) {}
 
-void USB_LP_IRQHandler(void) { HAL_PCD_IRQHandler(&hpcd_USB_FS); }
+void OTG_HS_IRQHandler(void) { HAL_PCD_IRQHandler(&hpcd_USB_OTG_HS); }

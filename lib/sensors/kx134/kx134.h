@@ -8,20 +8,30 @@
 #include "status.h"
 
 /*
- * Registery Definitions (below):
+ * register Definitions (below):
  */
 
 /**
- * This registery holds the device ID. Used to check a connection
+ * This register holds the device ID. Used to check a connection
  * to the device as this address should always contain the same
  * value: 0x46
  *
  * Bits:
  * [7:0] - Device Id = 0x46
  *
- * All the bits in this registery have read only access.
+ * All the bits in this register have read only access.
  */
 #define KX134_WHO_AM_I 0x13
+
+/**
+ * Command test register. Holds 0x55 after reset.
+ *
+ * Bits:
+ * [7:0] - Command test response = 0x55
+ *
+ * All the bits in this register have read only access.
+ */
+#define KX134_COTR 0x12
 
 /**
  * Status register.
@@ -32,7 +42,7 @@
  * [4] - Interrupt status
  * [7:5] - Reserved.
  *
- * All bits for this registery have read only access.
+ * All bits for this register have read only access.
  */
 #define KX134_STATUS 0x19
 
@@ -40,7 +50,7 @@
  * KX134 XOUT_L register. An incrementing read of this register
  * will read all the data registers in order.
  *
- * All of these registeries are read only.
+ * All of these registers are read only.
  */
 #define KX134_DATA 0x08
 

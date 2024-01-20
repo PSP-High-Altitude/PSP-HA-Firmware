@@ -2,9 +2,14 @@
 
 #include "stdio.h"
 #include "stdlib.h"
+#include "stm32h7xx_hal.h"
 #include "string.h"
 
 #define PSPCOM_DEVICE_ID 1
+
+UART_HandleTypeDef huart7;
+DMA_HandleTypeDef hdma_uart7_rx;
+DMA_HandleTypeDef hdma_uart7_tx;
 
 uint16_t crc(uint16_t checksum, pspcommsg msg) {
     // Some code is taken from ChatGPT
@@ -31,14 +36,90 @@ uint16_t crc(uint16_t checksum, pspcommsg msg) {
     return checksum;
 }
 
+Status pspcom_init() {
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_6 | GPIO_PIN_7;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF7_UART7;
+    HAL_GPIO_Init(GPIOF, &GPIO_InitStruct);
+
+    huart7.Instance = UART7;
+    huart7.Init.BaudRate = 115200;
+    huart7.Init.WordLength = UART_WORDLENGTH_8B;
+    huart7.Init.StopBits = UART_STOPBITS_1;
+    huart7.Init.Parity = UART_PARITY_NONE;
+    huart7.Init.Mode = UART_MODE_TX_RX;
+    huart7.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart7.Init.OverSampling = UART_OVERSAMPLING_16;
+    huart7.Init.OneBitSampling = UART_ONE_BIT_SAMPLE_DISABLE;
+    huart7.Init.ClockPrescaler = UART_PRESCALER_DIV1;
+    huart7.AdvancedInit.AdvFeatureInit = UART_ADVFEATURE_NO_INIT;
+    if (HAL_UART_Init(&huart7) != HAL_OK) {
+        return STATUS_ERROR;
+    }
+    if (HAL_UARTEx_SetTxFifoThreshold(&huart7, UART_TXFIFO_THRESHOLD_1_8) !=
+        HAL_OK) {
+        return STATUS_ERROR;
+    }
+    if (HAL_UARTEx_SetRxFifoThreshold(&huart7, UART_RXFIFO_THRESHOLD_1_8) !=
+        HAL_OK) {
+        return STATUS_ERROR;
+    }
+    if (HAL_UARTEx_DisableFifoMode(&huart7) != HAL_OK) {
+        return STATUS_ERROR;
+    }
+
+    /* UART7 DMA Init */
+    /* UART7_RX Init */
+    hdma_uart7_rx.Instance = DMA1_Stream0;
+    hdma_uart7_rx.Init.Request = DMA_REQUEST_UART7_RX;
+    hdma_uart7_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    hdma_uart7_rx.Init.PeriphInc = DMA_PINC_DISABLE;
+    hdma_uart7_rx.Init.MemInc = DMA_MINC_ENABLE;
+    hdma_uart7_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+    hdma_uart7_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+    hdma_uart7_rx.Init.Mode = DMA_NORMAL;
+    hdma_uart7_rx.Init.Priority = DMA_PRIORITY_MEDIUM;
+    hdma_uart7_rx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+    if (HAL_DMA_Init(&hdma_uart7_rx) != HAL_OK) {
+        return STATUS_ERROR;
+    }
+
+    __HAL_LINKDMA(&huart7, hdmarx, hdma_uart7_rx);
+
+    /* UART7_TX Init */
+    hdma_uart7_tx.Instance = DMA1_Stream1;
+    hdma_uart7_tx.Init.Request = DMA_REQUEST_UART7_TX;
+    hdma_uart7_tx.Init.Direction = DMA_MEMORY_TO_PERIPH;
+    hdma_uart7_tx.Init.PeriphInc = DMA_PINC_DISABLE;
+    hdma_uart7_tx.Init.MemInc = DMA_MINC_ENABLE;
+    hdma_uart7_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
+    hdma_uart7_tx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
+    hdma_uart7_tx.Init.Mode = DMA_NORMAL;
+    hdma_uart7_tx.Init.Priority = DMA_PRIORITY_MEDIUM;
+    hdma_uart7_tx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+    if (HAL_DMA_Init(&hdma_uart7_tx) != HAL_OK) {
+        return STATUS_ERROR;
+    }
+
+    __HAL_LINKDMA(&huart7, hdmatx, hdma_uart7_tx);
+
+    return STATUS_OK;
+}
+
 void pspcom_process_bytes(char *buf, int len) {}
 
 void pspcom_send_msg(pspcommsg msg) {
     uint16_t checksum = crc(CRC16_INIT, msg);
-    printf("!$%c%c%c", msg.payload_len, msg.device_id, msg.msg_id);
-    fwrite(msg.payload, 1, msg.payload_len, stdout);
-    printf("%c%c", (uint8_t)checksum, (uint8_t)(checksum >> 8));
-    fflush(stdout);
+    char *buf = (char *)malloc(7 + msg.payload_len);
+
+    sprintf(buf, "!$%c%c%c", msg.payload_len, msg.device_id, msg.msg_id);
+    memcpy(buf + 5, msg.payload, msg.payload_len);
+    sprintf(buf + 5 + msg.payload_len, "%c%c", (uint8_t)checksum,
+            (uint8_t)(checksum >> 8));
+    HAL_UART_Transmit_DMA(&huart7, (uint8_t *)buf, 7 + msg.payload_len);
 }
 
 void pspcom_send_sensor(SensorFrame *sens) {
@@ -72,3 +153,7 @@ void pspcom_send_sensor(SensorFrame *sens) {
     memcpy(tx_msg.payload + 1, &sens->pressure, 4);
     pspcom_send_msg(tx_msg);
 }
+
+void DMA1_Stream0_IRQHandler(void) { HAL_DMA_IRQHandler(&hdma_uart7_rx); }
+
+void DMA1_Stream1_IRQHandler(void) { HAL_DMA_IRQHandler(&hdma_uart7_tx); }

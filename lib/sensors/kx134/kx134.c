@@ -1,5 +1,6 @@
 #include "kx134.h"
 
+#include <stdio.h>
 #include <string.h>
 
 #include "math.h"
@@ -27,7 +28,7 @@ static Status kx134_read(SpiDevice* device, uint8_t address, uint8_t* rx_buf,
     // Create rx buffer with space for the initial blank byte
     uint8_t rx_buf_new[len + 1];
 
-    tx_buf[0] = (address << 1) | 1;  // Add address and read bit to tx buffer
+    tx_buf[0] = address | 0x80;  // Add address and read bit to tx buffer
 
     // Exchange the address and read len bits then copy all but the first byte
     // received to the original rx_buf.
@@ -59,7 +60,7 @@ static Status kx134_write(SpiDevice* device, uint8_t address, uint8_t* tx_buf,
 
     // Create new tx buffer
     uint8_t tx_buf_new[len + 1];
-    tx_buf_new[0] = address << 1;  // Add address and write bit to tx buffer
+    tx_buf_new[0] = address;  // Add address and write bit to tx buffer
     memcpy(tx_buf_new + 1, tx_buf,
            len);  // Copy bytes to end of the new tx buffer
 
@@ -82,10 +83,43 @@ static Status kx134_write(SpiDevice* device, uint8_t address, uint8_t* tx_buf,
 Status kx134_init(SpiDevice* device, Kx134OutputDataRate rate,
                   Kx134Range range) {
     uint8_t tx_buf;
+    uint8_t rx_buf;
+
+    // power up procedure
+    tx_buf = 0;
+    if (kx134_write(device, 0x7F, &tx_buf, 1) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    // power up procedure
+    tx_buf = 0x1C;
+    if (kx134_write(device, KX134_CNTL2, &tx_buf, 1) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
 
     // reset sensor
-    tx_buf = 0xBF;
+    tx_buf = 0x80;
     if (kx134_write(device, KX134_CNTL2, &tx_buf, 1) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    DELAY(2);
+
+    // Read WHO_AM_I register
+    if (kx134_read(device, KX134_WHO_AM_I, &rx_buf, 1) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    if (rx_buf != 0x46) {
+        return STATUS_ERROR;
+    }
+
+    // Read COTR register
+    if (kx134_read(device, KX134_COTR, &rx_buf, 1) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    if (rx_buf != 0x55) {
         return STATUS_ERROR;
     }
 

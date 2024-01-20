@@ -25,7 +25,7 @@ void SystemClock_Config() {
                                        RCC_OSCILLATORTYPE_HSI48 |
                                        RCC_OSCILLATORTYPE_HSE;
     RCC_OscInitStruct.HSEState = RCC_HSE_BYPASS;
-    RCC_OscInitStruct.HSIState = RCC_HSI_ON;
+    RCC_OscInitStruct.HSIState = RCC_HSI_DIV1;
     RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
     RCC_OscInitStruct.HSI48State = RCC_HSI48_ON;
     RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
@@ -58,7 +58,8 @@ void SystemClock_Config() {
      */
     RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
     PeriphClkInitStruct.PeriphClockSelection =
-        RCC_PERIPHCLK_OSPI | RCC_PERIPHCLK_SPI123 | RCC_PERIPHCLK_SPI45;
+        RCC_PERIPHCLK_OSPI | RCC_PERIPHCLK_SPI123 | RCC_PERIPHCLK_SPI45 |
+        RCC_PERIPHCLK_I2C1235 | RCC_PERIPHCLK_I2C4 | RCC_PERIPHCLK_USART234578;
     PeriphClkInitStruct.PLL2.PLL2M = 48;
     PeriphClkInitStruct.PLL2.PLL2N = 160;
     PeriphClkInitStruct.PLL2.PLL2P = 4;
@@ -68,8 +69,12 @@ void SystemClock_Config() {
     PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOMEDIUM;
     PeriphClkInitStruct.PLL2.PLL2FRACN = 0;
     PeriphClkInitStruct.OspiClockSelection = RCC_OSPICLKSOURCE_PLL2;
-    PeriphClkInitStruct.Spi123ClockSelection =
-        RCC_SPI123CLKSOURCE_PLL2 | RCC_SPI45CLKSOURCE_PLL2;
+    PeriphClkInitStruct.Spi123ClockSelection = RCC_SPI123CLKSOURCE_PLL2;
+    PeriphClkInitStruct.Spi45ClockSelection = RCC_SPI45CLKSOURCE_PLL2;
+    PeriphClkInitStruct.I2c123ClockSelection = RCC_I2C123CLKSOURCE_HSI;
+    PeriphClkInitStruct.I2c4ClockSelection = RCC_I2C4CLKSOURCE_HSI;
+    PeriphClkInitStruct.Usart234578ClockSelection =
+        RCC_USART234578CLKSOURCE_HSI;
 
     HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
 
@@ -97,6 +102,16 @@ void SystemClock_Config() {
     __HAL_RCC_GPIOF_CLK_ENABLE();
     __HAL_RCC_GPIOG_CLK_ENABLE();
     __HAL_RCC_GPIOH_CLK_ENABLE();
+
+    // Initialize UART clocks
+    __HAL_RCC_UART7_CLK_ENABLE();
+
+    // Initialize DMA
+    __HAL_RCC_DMA1_CLK_ENABLE();
+    HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+    HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
 
     // Initialize QSPI
     __HAL_RCC_OCTOSPIM_CLK_ENABLE();

@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "sensor.pb.h"
+#include "status.h"
 
 #define CRC16_POLY 0x1021
 #define CRC16_INIT 0xFFFF
@@ -26,6 +27,8 @@ typedef struct {
 } pspcommsg;
 
 uint16_t crc(uint16_t checksum, pspcommsg msg);
+
+Status pspcom_init();
 
 void pspcom_process_bytes(char *buf, int len);
 
