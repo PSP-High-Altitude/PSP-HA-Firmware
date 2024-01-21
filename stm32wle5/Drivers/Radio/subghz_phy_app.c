@@ -28,6 +28,7 @@
 #include "common/status.h"
 #include "peripherals/gpio/gpio.h"
 #include "telemetry_program.h"
+#include "stdio.h"
 /* USER CODE END Includes */
 
 /* External variables ---------------------------------------------------------*/
@@ -58,6 +59,8 @@ static RadioEvents_t RadioEvents;
 
 /* USER CODE BEGIN PV */
 volatile LoraState lora_state = IDLE;
+static uint8_t rx_buf[MAX_APP_BUFFER_SIZE];
+static uint16_t rx_buf_size;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -172,11 +175,15 @@ static void OnTxDone(void) {
 static void OnRxDone(uint8_t *payload, uint16_t size, int16_t rssi,
                      int8_t LoraSnr_FskCfo) {
     /* USER CODE BEGIN OnRxDone */
+	rx_buf_size = size;
+	memcpy(rx_buf, payload, rx_buf_size);
+
+	process_packet_from_air(rx_buf, rx_buf_size);
     if (lora_state != TX) {
         Radio.Rx(RX_TIMEOUT_VALUE);
         lora_state = RX;
     }
-    process_packet_from_air(payload, size);
+    //printf("%x%x%x\n", payload[0], payload[1], payload[2]);
     /* USER CODE END OnRxDone */
 }
 
