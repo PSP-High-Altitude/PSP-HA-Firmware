@@ -7,6 +7,7 @@
 #include "USB_Device/App/usbd_cdc_if.h"
 #include "clocks.h"
 #include "data.h"
+#include "flight_logic.h"
 #include "gpio/gpio.h"
 #include "iis2mdc/iis2mdc.h"
 #include "kx134/kx134.h"
@@ -18,6 +19,7 @@
 #include "pspcom.h"
 #include "sd.h"
 #include "sdmmc/sdmmc.h"
+#include "state_est.h"
 #include "status.h"
 #include "stm32h7xx.h"
 #include "timer.h"
@@ -143,8 +145,8 @@ void read_sensors() {
     s_last_sensor_read_ticks = xTaskGetTickCount();
     while (1) {
         BaroData baro =
-            ms5637_read(&s_baro_conf, OSR_256);    // Baro read takes longest
-        uint64_t timestamp = MICROS();             // So measure timestamp after
+            ms5637_read(&s_baro_conf, OSR_256);  // Baro read takes longest
+        uint64_t timestamp = MICROS();           // So measure timestamp after
         Accel acch = kx134_read_accel(&s_acc_conf);
         Accel accel = lsm6dsox_read_accel(&s_imu_conf);
         Gyro gyro = lsm6dsox_read_gyro(&s_imu_conf);
@@ -239,6 +241,15 @@ GpsFrame gps_fix_to_pb_frame(uint64_t timestamp,
     gps_frame.accuracy_hdg = gps_fix->accuracy_hdg;
 
     return gps_frame;
+}
+void do_state_est() {
+    s_flight_phase = FP_INIT;
+    s_current_state.accBody = {.x = 0, .y = 0, .z = 0};
+
+    while (1) {
+        fp_update(&s_last_sensor_read_ticks, &s_flight_phase, &s_current_state);
+        printf("phase: %d", phase);
+    }
 }
 
 void store_data() {
