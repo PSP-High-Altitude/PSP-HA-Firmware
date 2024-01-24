@@ -165,6 +165,31 @@ void pspcom_send_sensor(SensorFrame *sens) {
     xTaskResumeAll();
 }
 
+void pspcom_send_gps(GPS_Fix_TypeDef *gps) {
+    vTaskSuspendAll();
+
+    // Position
+    pspcommsg tx_msg = {
+        .payload_len = 13,
+        .device_id = PSPCOM_DEVICE_ID,
+        .msg_id = GPS_POS,
+    };
+    tx_msg.payload[0] = gps->num_sats;
+    memcpy(tx_msg.payload + 1, &gps->lat, sizeof(float));
+    memcpy(tx_msg.payload + 5, &gps->lon, sizeof(float));
+    memcpy(tx_msg.payload + 9, &gps->height_msl, sizeof(float));
+    pspcom_send_msg(tx_msg);
+
+    // Velocity
+    tx_msg.msg_id = GPS_VEL;
+    memcpy(tx_msg.payload + 1, &gps->vel_north, sizeof(float));
+    memcpy(tx_msg.payload + 5, &gps->vel_east, sizeof(float));
+    memcpy(tx_msg.payload + 9, &gps->vel_down, sizeof(float));
+    pspcom_send_msg(tx_msg);
+
+    xTaskResumeAll();
+}
+
 void DMA1_Stream0_IRQHandler(void) { HAL_DMA_IRQHandler(&hdma_uart7_rx); }
 
 void DMA1_Stream1_IRQHandler(void) { HAL_DMA_IRQHandler(&hdma_uart7_tx); }

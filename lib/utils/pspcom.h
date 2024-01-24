@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "max_m10s.h"
 #include "sensor.pb.h"
 #include "status.h"
 
@@ -17,6 +18,8 @@ enum {
     GYRO = 0x85,
     TEMP = 0x86,
     PRES = 0x87,
+    GPS_POS = 0x8A,
+    GPS_VEL = 0x8B
 };
 
 typedef struct {
@@ -35,5 +38,7 @@ void pspcom_process_bytes(char *buf, int len);
 void pspcom_send_msg(pspcommsg msg);
 
 void pspcom_send_sensor(SensorFrame *sens);
+
+void pspcom_send_gps(GPS_Fix_TypeDef *gps);
 
 #endif

@@ -136,7 +136,8 @@ int _write(int file, char *data, int len) {
 static TaskHandle_t s_read_sensors_handle;
 static TaskHandle_t s_read_gps_handle;
 static TaskHandle_t s_store_data_handle;
-static TaskHandle_t s_usb_telem_handle;
+static TaskHandle_t s_sensor_telem_handle;
+static TaskHandle_t s_gps_telem_handle;
 
 static TickType_t s_last_sensor_read_ticks;
 
@@ -311,9 +312,16 @@ void store_data() {
     }
 }
 
-void send_telem() {
+void send_sensor_telem() {
     while (1) {
         pspcom_send_sensor(&s_last_sensor_data);
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+    }
+}
+
+void send_gps_telem() {
+    while (1) {
+        pspcom_send_gps(&s_last_fix);
         vTaskDelay(5000 / portTICK_PERIOD_MS);
     }
 }
@@ -425,13 +433,21 @@ int main(void) {
                 &s_read_gps_handle     // Task handle
     );
 
-#ifdef DEBUG
-    xTaskCreate(send_telem,            // Task function
-                "telem",               // Task name
+    xTaskCreate(send_gps_telem,        // Task function
+                "gps_telem",           // Task name
                 2048,                  // Stack size
                 NULL,                  // Parameters
                 tskIDLE_PRIORITY + 1,  // Priority
-                &s_usb_telem_handle    // Task handle
+                &s_gps_telem_handle    // Task handle
+    );
+
+#ifdef DEBUG
+    xTaskCreate(send_sensor_telem,      // Task function
+                "sensor_telem",         // Task name
+                2048,                   // Stack size
+                NULL,                   // Parameters
+                tskIDLE_PRIORITY + 1,   // Priority
+                &s_sensor_telem_handle  // Task handle
     );
 #endif
 
