@@ -1,9 +1,10 @@
+#include "main.h"
+
 #include <errno.h>
 #include <sys/unistd.h>
 
 #include "USB_Device/App/usb_device.h"
 #include "USB_Device/App/usbd_cdc_if.h"
-#include "board.h"
 #include "clocks.h"
 #include "data.h"
 #include "gpio/gpio.h"
@@ -41,9 +42,21 @@
 
 #define LOG_FIFO_LEN 256
 
-#define DEBUG
-
 extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
+SensorFrame s_last_sensor_data;
+GPS_Fix_TypeDef s_last_fix;
+static TickType_t s_last_sensor_read_ticks;
+volatile static int s_fix_avail = 0;
+
+static TaskHandle_t s_read_sensors_handle;
+static TaskHandle_t s_read_gps_handle;
+static TaskHandle_t s_store_data_handle;
+static TaskHandle_t s_gps_telem_handle;
+static TaskHandle_t s_status_telem_handle;
+static TaskHandle_t s_process_commands_handle;
+#ifdef PSPCOM_SENSORS
+static TaskHandle_t s_sensor_telem_handle;
+#endif
 
 volatile static struct {
     SensorFrame queue[LOG_FIFO_LEN];
@@ -76,8 +89,6 @@ void write_fifo(SensorFrame data) {
     fifo.tail = (fifo.tail + 1) % LOG_FIFO_LEN;
     fifo.count++;
 }
-
-static SensorFrame s_last_sensor_data;
 
 static I2cDevice s_mag_conf = {
     .address = 0x1E,
@@ -133,14 +144,6 @@ int _write(int file, char *data, int len) {
     return len;
 }
 
-static TaskHandle_t s_read_sensors_handle;
-static TaskHandle_t s_read_gps_handle;
-static TaskHandle_t s_store_data_handle;
-static TaskHandle_t s_sensor_telem_handle;
-static TaskHandle_t s_gps_telem_handle;
-
-static TickType_t s_last_sensor_read_ticks;
-
 void read_sensors() {
     s_last_sensor_read_ticks = xTaskGetTickCount();
     while (1) {
@@ -179,9 +182,6 @@ void read_sensors() {
                         pdMS_TO_TICKS(TARGET_INTERVAL));
     }
 }
-
-static GPS_Fix_TypeDef s_last_fix;
-volatile static int s_fix_avail = 0;
 
 void read_gps() {
     while (1) {
@@ -271,14 +271,14 @@ void store_data() {
 
         gpio_write(PIN_YELLOW, GPIO_HIGH);
 
-        TickType_t start_ticks = xTaskGetTickCount();
+        // TickType_t start_ticks = xTaskGetTickCount();
 
         uint32_t entries_read = 0;
         while (fifo.count > 0) {
             SensorFrame log = read_fifo();
             Status code = sd_write_sensor_data(&log);
             if (code != STATUS_OK) {
-                printf("SD sensor write error %d\n", code);
+                // printf("SD sensor write error %d\n", code);
                 gpio_write(PIN_GREEN, GPIO_LOW);
                 break;
             }
@@ -298,31 +298,18 @@ void store_data() {
                 gps_fix_to_pb_frame(xTaskGetTickCount(), &s_last_fix);
             Status code = sd_write_gps_data(&gps_frame);
             if (code != STATUS_OK) {
-                printf("SD GPS write error %d\n", code);
+                // printf("SD GPS write error %d\n", code);
             }
             s_fix_avail = 0;
         }
 
         sd_flush();
 
-        TickType_t elapsed_time = xTaskGetTickCount() - start_ticks;
+        // TickType_t elapsed_time = xTaskGetTickCount() - start_ticks;
 
         gpio_write(PIN_YELLOW, GPIO_LOW);
-        printf("%lu entries read in %lu ticks\n", entries_read, elapsed_time);
-    }
-}
-
-void send_sensor_telem() {
-    while (1) {
-        pspcom_send_sensor(&s_last_sensor_data);
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
-    }
-}
-
-void send_gps_telem() {
-    while (1) {
-        pspcom_send_gps(&s_last_fix);
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        // printf("%lu entries read in %lu ticks\n", entries_read,
+        // elapsed_time);
     }
 }
 
@@ -337,7 +324,16 @@ int main(void) {
     gpio_write(PIN_PE4, GPIO_HIGH);
     MX_USB_DEVICE_Init();
     gpio_write(PIN_RED, GPIO_HIGH);
-    DELAY(1000);
+
+    gpio_write(PIN_BUZZER, GPIO_HIGH);
+    DELAY(100);
+    gpio_write(PIN_BUZZER, GPIO_LOW);
+    DELAY(100);
+    gpio_write(PIN_BUZZER, GPIO_HIGH);
+    DELAY(100);
+    gpio_write(PIN_BUZZER, GPIO_LOW);
+
+    DELAY(4700);
     printf("Starting initialization...\n");
 
     // Initialize magnetometer
@@ -433,21 +429,37 @@ int main(void) {
                 &s_read_gps_handle     // Task handle
     );
 
-    xTaskCreate(send_gps_telem,        // Task function
+    xTaskCreate(pspcom_send_gps,       // Task function
                 "gps_telem",           // Task name
                 2048,                  // Stack size
-                NULL,                  // Parameters
+                (void *)&s_last_fix,   // Parameters
                 tskIDLE_PRIORITY + 1,  // Priority
                 &s_gps_telem_handle    // Task handle
     );
 
-#ifdef DEBUG
-    xTaskCreate(send_sensor_telem,      // Task function
-                "sensor_telem",         // Task name
+    xTaskCreate(pspcom_send_status,     // Task function
+                "status_telem",         // Task name
                 2048,                   // Stack size
                 NULL,                   // Parameters
                 tskIDLE_PRIORITY + 1,   // Priority
-                &s_sensor_telem_handle  // Task handle
+                &s_status_telem_handle  // Task handle
+    );
+
+    xTaskCreate(pspcom_process_bytes,       // Task function
+                "process_commands",         // Task name
+                2048,                       // Stack size
+                NULL,                       // Parameters
+                tskIDLE_PRIORITY + 2,       // Priority
+                &s_process_commands_handle  // Task handle
+    );
+
+#ifdef PSPCOM_SENSORS
+    xTaskCreate(pspcom_send_sensor,           // Task function
+                "sensor_telem",               // Task name
+                2048,                         // Stack size
+                (void *)&s_last_sensor_data,  // Parameters
+                tskIDLE_PRIORITY + 1,         // Priority
+                &s_sensor_telem_handle        // Task handle
     );
 #endif
 

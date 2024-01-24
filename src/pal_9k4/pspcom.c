@@ -1,6 +1,9 @@
 #include "pspcom.h"
 
 #include "FreeRTOS.h"
+#include "gpio/gpio.h"
+#include "main.h"
+#include "pal_9k31/FreeRTOS/Source/include/timers.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "stm32h7xx_hal.h"
@@ -10,9 +13,37 @@
 
 #define PSPCOM_DEVICE_ID 1
 
+#define SENSOR_TELEM_PERIOD 5000
+#define GPS_TELEM_PERIOD 5000
+#define STATUS_TELEM_PERIOD 5000
+
 UART_HandleTypeDef huart7;
 DMA_HandleTypeDef hdma_uart7_rx;
 DMA_HandleTypeDef hdma_uart7_tx;
+TimerHandle_t arm_timer;
+
+uint8_t user_armed[3] = {0, 0, 0};
+
+#define UART_BUFFER_SIZE 512
+
+#define DMA_WRITE_PTR                                          \
+    ((UART_BUFFER_SIZE -                                       \
+      ((DMA_Stream_TypeDef *)huart7.hdmarx->Instance)->NDTR) & \
+     (UART_BUFFER_SIZE - 1))
+
+struct {
+    uint8_t buffer[UART_BUFFER_SIZE];
+    size_t rd_ptr;
+} cb;
+
+static Status start_uart_reading();
+// static Status stop_uart_reading();
+static void circular_buffer_init();
+static uint8_t circular_buffer_is_empty();
+static Status circular_buffer_pop(uint8_t *data);
+static Status pspcom_read_msg_from_uart(pspcommsg *msg);
+static Status start_arm_timeout(uint32_t pyro);
+static void arm_timeout_callback(TimerHandle_t xTimer);
 
 uint16_t crc(uint16_t checksum, pspcommsg msg) {
     // Some code is taken from ChatGPT
@@ -86,7 +117,7 @@ Status pspcom_init() {
     hdma_uart7_rx.Init.MemInc = DMA_MINC_ENABLE;
     hdma_uart7_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
     hdma_uart7_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
-    hdma_uart7_rx.Init.Mode = DMA_NORMAL;
+    hdma_uart7_rx.Init.Mode = DMA_CIRCULAR;
     hdma_uart7_rx.Init.Priority = DMA_PRIORITY_MEDIUM;
     hdma_uart7_rx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
     if (HAL_DMA_Init(&hdma_uart7_rx) != HAL_OK) {
@@ -112,10 +143,132 @@ Status pspcom_init() {
 
     __HAL_LINKDMA(&huart7, hdmatx, hdma_uart7_tx);
 
+    circular_buffer_init();
+    if (start_uart_reading() != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    // Initialize arm timeout timer
+    arm_timer = xTimerCreate("ArmTimer", 1000 / portTICK_PERIOD_MS, pdFALSE,
+                             (void *)0, arm_timeout_callback);
+
     return STATUS_OK;
 }
 
-void pspcom_process_bytes(char *buf, int len) {}
+Status pspcom_read_msg_from_uart(pspcommsg *msg) {
+    static uint8_t state = 0;
+    uint8_t current_byte = 0;
+    static uint16_t checksum;
+    static uint8_t payload_ctr = 0;
+
+    while (!circular_buffer_is_empty()) {
+        switch (state) {
+            case 0:
+                memset(msg, 0, sizeof(pspcommsg));
+                payload_ctr = 0;
+                checksum = 0;
+                circular_buffer_pop(&current_byte);
+                if (current_byte == '!') {
+                    state = 1;
+                }
+                break;
+            case 1:
+                circular_buffer_pop(&current_byte);
+                if (current_byte == '$') {
+                    state = 2;
+                } else {
+                    state = 0;
+                }
+                break;
+            case 2:
+                circular_buffer_pop(&current_byte);
+                msg->payload_len = current_byte;
+                state = 3;
+                break;
+            case 3:
+                circular_buffer_pop(&current_byte);
+                msg->device_id = current_byte;
+                state = 4;
+                break;
+            case 4:
+                circular_buffer_pop(&current_byte);
+                msg->msg_id = current_byte;
+                state = 5;
+                break;
+            case 5:
+                if (payload_ctr < msg->payload_len) {
+                    circular_buffer_pop(&current_byte);
+                    msg->payload[payload_ctr] = current_byte;
+                    payload_ctr++;
+                    break;
+                } else {
+                    state = 6;
+                }
+            case 6:
+                circular_buffer_pop(&current_byte);
+                checksum = current_byte;
+                state = 7;
+                break;
+            case 7:
+                circular_buffer_pop(&current_byte);
+                checksum += ((uint16_t)current_byte) << 8;
+                if (crc(CRC16_INIT, *msg) == checksum) {
+                    state = 0;
+                    return STATUS_OK;
+                }
+                state = 0;
+                break;
+        }
+    }
+    return STATUS_ERROR;
+}
+
+void pspcom_process_bytes(char *buf, int len) {
+    pspcommsg msg;
+    while (1) {
+        if (pspcom_read_msg_from_uart(&msg) == STATUS_OK) {
+#ifdef DEBUG
+            printf("Received message: %d %d %d\n", msg.payload_len,
+                   msg.device_id, msg.msg_id);
+#endif
+            switch (msg.msg_id) {
+                case ARMMAIN:
+                case ARMDRG:
+                case ARMAUX:
+                    user_armed[msg.msg_id - ARMMAIN] = 1;
+                    if (start_arm_timeout(msg.msg_id - ARMMAIN) != STATUS_OK) {
+#ifdef DEBUG
+                        printf("Error starting arm timeout\n");
+#endif
+                        user_armed[msg.msg_id - ARMMAIN] = 0;
+                    }
+                    break;
+                case FIREMAIN:
+                    if (user_armed[0]) {
+                        gpio_write(PIN_FIREMAIN, 1);
+                        vTaskDelay(1000 / portTICK_PERIOD_MS);
+                        gpio_write(PIN_FIREMAIN, 0);
+                    }
+                case FIREDRG:
+                    if (user_armed[1]) {
+                        gpio_write(PIN_FIREDRG, 1);
+                        vTaskDelay(1000 / portTICK_PERIOD_MS);
+                        gpio_write(PIN_FIREDRG, 0);
+                    }
+                case FIREAUX:
+                    if (user_armed[2]) {
+                        gpio_write(PIN_FIREAUX, 1);
+                        vTaskDelay(1000 / portTICK_PERIOD_MS);
+                        gpio_write(PIN_FIREAUX, 0);
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+    }
+}
 
 void pspcom_send_msg(pspcommsg msg) {
     uint16_t checksum = crc(CRC16_INIT, msg);
@@ -129,65 +282,161 @@ void pspcom_send_msg(pspcommsg msg) {
     free(buf);
 }
 
-void pspcom_send_sensor(SensorFrame *sens) {
-    vTaskSuspendAll();
+void pspcom_send_sensor(void *sensor_frame) {
+    SensorFrame *sens = (SensorFrame *)sensor_frame;
+    while (1) {
+        vTaskSuspendAll();
 
-    // Accelerometer
-    pspcommsg tx_msg = {
-        .payload_len = 13,
-        .device_id = PSPCOM_DEVICE_ID,
-        .msg_id = ACCEL,
-    };
-    tx_msg.payload[0] = 0;
-    memcpy(tx_msg.payload + 1, &sens->acc_i_x, sizeof(float));
-    memcpy(tx_msg.payload + 5, &sens->acc_i_y, sizeof(float));
-    memcpy(tx_msg.payload + 9, &sens->acc_i_z, sizeof(float));
-    pspcom_send_msg(tx_msg);
+        // Accelerometer
+        pspcommsg tx_msg = {
+            .payload_len = 13,
+            .device_id = PSPCOM_DEVICE_ID,
+            .msg_id = ACCEL,
+        };
+        tx_msg.payload[0] = 0;
+        memcpy(tx_msg.payload + 1, &sens->acc_i_x, sizeof(float));
+        memcpy(tx_msg.payload + 5, &sens->acc_i_y, sizeof(float));
+        memcpy(tx_msg.payload + 9, &sens->acc_i_z, sizeof(float));
+        pspcom_send_msg(tx_msg);
 
-    // Gyroscope
-    tx_msg.msg_id = GYRO;
-    memcpy(tx_msg.payload + 1, &sens->rot_i_x, sizeof(float));
-    memcpy(tx_msg.payload + 5, &sens->rot_i_y, sizeof(float));
-    memcpy(tx_msg.payload + 9, &sens->rot_i_z, sizeof(float));
-    pspcom_send_msg(tx_msg);
+        // Gyroscope
+        tx_msg.msg_id = GYRO;
+        memcpy(tx_msg.payload + 1, &sens->rot_i_x, sizeof(float));
+        memcpy(tx_msg.payload + 5, &sens->rot_i_y, sizeof(float));
+        memcpy(tx_msg.payload + 9, &sens->rot_i_z, sizeof(float));
+        pspcom_send_msg(tx_msg);
 
-    // Temperature
-    tx_msg.msg_id = TEMP;
-    tx_msg.payload_len = 5;
-    memcpy(tx_msg.payload + 1, &sens->temperature, sizeof(float));
-    pspcom_send_msg(tx_msg);
+        // Temperature
+        tx_msg.msg_id = TEMP;
+        tx_msg.payload_len = 5;
+        memcpy(tx_msg.payload + 1, &sens->temperature, sizeof(float));
+        pspcom_send_msg(tx_msg);
 
-    // Pressure
-    tx_msg.msg_id = PRES;
-    memcpy(tx_msg.payload + 1, &sens->pressure, sizeof(float));
-    pspcom_send_msg(tx_msg);
+        // Pressure
+        tx_msg.msg_id = PRES;
+        memcpy(tx_msg.payload + 1, &sens->pressure, sizeof(float));
+        pspcom_send_msg(tx_msg);
 
-    xTaskResumeAll();
+        xTaskResumeAll();
+
+        vTaskDelay(SENSOR_TELEM_PERIOD / portTICK_PERIOD_MS);
+    }
 }
 
-void pspcom_send_gps(GPS_Fix_TypeDef *gps) {
-    vTaskSuspendAll();
+void pspcom_send_gps(void *gps_fix) {
+    GPS_Fix_TypeDef *gps = (GPS_Fix_TypeDef *)gps_fix;
+    while (1) {
+        vTaskSuspendAll();
 
-    // Position
-    pspcommsg tx_msg = {
-        .payload_len = 13,
-        .device_id = PSPCOM_DEVICE_ID,
-        .msg_id = GPS_POS,
-    };
-    tx_msg.payload[0] = gps->num_sats;
-    memcpy(tx_msg.payload + 1, &gps->lat, sizeof(float));
-    memcpy(tx_msg.payload + 5, &gps->lon, sizeof(float));
-    memcpy(tx_msg.payload + 9, &gps->height_msl, sizeof(float));
-    pspcom_send_msg(tx_msg);
+        // Position
+        pspcommsg tx_msg = {
+            .payload_len = 13,
+            .device_id = PSPCOM_DEVICE_ID,
+            .msg_id = GPS_POS,
+        };
+        tx_msg.payload[0] = gps->num_sats;
+        memcpy(tx_msg.payload + 1, &gps->lat, sizeof(float));
+        memcpy(tx_msg.payload + 5, &gps->lon, sizeof(float));
+        memcpy(tx_msg.payload + 9, &gps->height_msl, sizeof(float));
+        pspcom_send_msg(tx_msg);
 
-    // Velocity
-    tx_msg.msg_id = GPS_VEL;
-    memcpy(tx_msg.payload + 1, &gps->vel_north, sizeof(float));
-    memcpy(tx_msg.payload + 5, &gps->vel_east, sizeof(float));
-    memcpy(tx_msg.payload + 9, &gps->vel_down, sizeof(float));
-    pspcom_send_msg(tx_msg);
+        // Velocity
+        tx_msg.msg_id = GPS_VEL;
+        memcpy(tx_msg.payload + 1, &gps->vel_north, sizeof(float));
+        memcpy(tx_msg.payload + 5, &gps->vel_east, sizeof(float));
+        memcpy(tx_msg.payload + 9, &gps->vel_down, sizeof(float));
+        pspcom_send_msg(tx_msg);
 
-    xTaskResumeAll();
+        xTaskResumeAll();
+
+        vTaskDelay(GPS_TELEM_PERIOD / portTICK_PERIOD_MS);
+    }
+}
+
+void pspcom_send_status() {
+    while (1) {
+        vTaskSuspendAll();
+
+        // Pyro Status
+        pspcommsg tx_msg = {
+            .payload_len = 1,
+            .device_id = PSPCOM_DEVICE_ID,
+            .msg_id = PYRO_STAT,
+        };
+        uint8_t main_cont = gpio_read(PIN_CONTMAIN);
+        uint8_t drg_cont = gpio_read(PIN_CONTDRG);
+        uint8_t aux_cont = gpio_read(PIN_CONTAUX);
+        tx_msg.payload[0] =
+            (main_cont << 1) | (drg_cont << 3) | (aux_cont << 5) | 0x15;
+        pspcom_send_msg(tx_msg);
+
+        xTaskResumeAll();
+
+        vTaskDelay(STATUS_TELEM_PERIOD / portTICK_PERIOD_MS);
+    }
+}
+
+static Status start_uart_reading() {
+    if (HAL_UART_Receive_DMA(&huart7, cb.buffer, UART_BUFFER_SIZE) != HAL_OK) {
+        return STATUS_ERROR;
+    }
+    return STATUS_OK;
+}
+
+/*
+static Status stop_uart_reading() {
+    if (HAL_UART_AbortReceive(&huart7) != HAL_OK) {
+        return STATUS_ERROR;
+    }
+    return STATUS_OK;
+}
+*/
+
+static void circular_buffer_init() { cb.rd_ptr = 0; }
+
+static uint8_t circular_buffer_is_empty() {
+    if (cb.rd_ptr == DMA_WRITE_PTR) {
+        return 1;
+    }
+    return 0;
+}
+
+static Status circular_buffer_pop(uint8_t *data) {
+    if (cb.rd_ptr != DMA_WRITE_PTR) {
+        *data = cb.buffer[cb.rd_ptr++];
+        cb.rd_ptr %= UART_BUFFER_SIZE;
+        return STATUS_OK;
+    } else {
+        return STATUS_ERROR;
+    }
+}
+
+static Status start_arm_timeout(uint32_t pyro) {
+    if (xTimerIsTimerActive(arm_timer) == pdTRUE) {
+        return STATUS_ERROR;
+    }
+    vTimerSetTimerID(arm_timer, (void *)pyro);
+    if (xTimerStart(arm_timer, 0) != pdPASS) {
+        return STATUS_ERROR;
+    }
+    return STATUS_OK;
+}
+static void arm_timeout_callback(TimerHandle_t xTimer) {
+    uint32_t pyro = (uint32_t)pvTimerGetTimerID(xTimer);
+#ifdef DEBUG
+    printf("Pyro %lu timeout\n", pyro);
+#endif
+    switch (pyro) {
+        case 0:
+            user_armed[0] = 0;
+            break;
+        case 1:
+            user_armed[1] = 0;
+            break;
+        case 2:
+            user_armed[2] = 0;
+            break;
+    }
 }
 
 void DMA1_Stream0_IRQHandler(void) { HAL_DMA_IRQHandler(&hdma_uart7_rx); }

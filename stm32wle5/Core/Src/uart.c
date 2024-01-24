@@ -36,7 +36,7 @@ Status uart_send(UartDevice* dev, uint8_t* buf, uint16_t len) {
             return STATUS_PARAMETER_ERROR;
         }
     }
-    if (HAL_UART_Transmit_DMA(uart_handles[dev->periph], buf, len) != HAL_OK) {
+    if (HAL_UART_Transmit(uart_handles[dev->periph], buf, len, 100) != HAL_OK) {
         return STATUS_ERROR;
     }
     return STATUS_OK;

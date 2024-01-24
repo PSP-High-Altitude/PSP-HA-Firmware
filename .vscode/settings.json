@@ -47,6 +47,10 @@
                 "usbd_core.h": "c",
                 "usbd_ioreq.h": "c",
                 "usbd_conf.h": "c",
-                "uart.h": "c"
+                "uart.h": "c",
+                "max_m10s.h": "c",
+                "sd.h": "c",
+                "sensor.pb.h": "c",
+                "pb.h": "c"
         }
 }
