@@ -51,6 +51,9 @@
                 "max_m10s.h": "c",
                 "sd.h": "c",
                 "sensor.pb.h": "c",
-                "pb.h": "c"
+                "pb.h": "c",
+                "gpio.h": "c",
+                "sdmmc.h": "c",
+                "diskio.h": "c"
         }
 }

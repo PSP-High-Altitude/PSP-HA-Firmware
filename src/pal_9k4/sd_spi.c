@@ -19,8 +19,12 @@
 #include "fatfs/diskio.h"
 #include "gpio/gpio.h"
 #include "sd.h"
+#include "sdmmc/sdmmc.h"
 #include "spi/spi.h"
 #include "task.h"
+
+// SD or SPI
+#define SD
 
 /* MMC/SD command */
 #define CMD0 (0)           /* GO_IDLE_STATE */
@@ -48,7 +52,9 @@ static volatile DSTATUS Stat = STA_NOINIT; /* Physical drive status */
 static volatile UINT Timer1,
     Timer2; /* 1kHz decrement timer stopped at zero (disk_timerproc()) */
 
-static BYTE CardType; /* Card type flags */
+#ifndef SD
+BYTE CardType; /* Card type flags */
+#endif
 
 /*-----------------------------------------------------------------------*/
 /* CRC functions (from https://github.com/hazelnusse/crc7)               */
@@ -101,23 +107,32 @@ uint8_t get_cmd_crc(BYTE cmd, DWORD arg) {
 /*-----------------------------------------------------------------------*/
 /* SPI controls (Platform dependent)                                     */
 /*-----------------------------------------------------------------------*/
-
+#ifndef SD
 static SpiDevice s_sd_spi_device;
 static uint8_t nop_buf[512] = {[0 ... 511] 0xFF};  // ugly but better than
                                                    // having to create yet
 static uint8_t void_buf[512];                      // another SPI wrapper
+#else
+static SdmmcDevice s_sd_sdmmc_device;
+#endif
 
 /* Initialize MMC interface */
 Status diskio_init(SdDevice *device) {
     // Create a local copy (actual setup will be done later)
+#ifndef SD
     s_sd_spi_device.clk = device->clk;
     s_sd_spi_device.periph = device->periph;
+#else
+    s_sd_sdmmc_device.clk = device->clk;
+    s_sd_sdmmc_device.periph = device->periph;
+#endif
     generate_crc_table();
     return STATUS_OK;
 }
 
 DWORD get_fattime() { return 0; }
 
+#ifndef SD
 /* Exchange a byte */
 static BYTE xchg_spi(BYTE dat /* Data to send */
 ) {
@@ -305,6 +320,26 @@ static BYTE send_cmd(/* Return value: R1 resp (bit7==1:Failed to send) */
 
     return res; /* Return received response */
 }
+#endif
+
+#ifdef SD
+/*-----------------------------------------------------------------------*/
+/* Check status with timeout                                             */
+/*-----------------------------------------------------------------------*/
+static Status check_status(uint64_t timeout) {
+    SdmmcState res;
+    uint64_t start_time = xTaskGetTickCount();
+    do {
+        res = sdmmc_status(&s_sd_sdmmc_device);
+        // Yield until timeout
+        if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+            taskYIELD();
+        }
+    } while ((res != SD_CARD_TRANSFER) &&
+             (xTaskGetTickCount() - start_time < timeout));
+    return res == SD_CARD_TRANSFER ? STATUS_OK : STATUS_ERROR;
+}
+#endif
 
 /*--------------------------------------------------------------------------
 
@@ -318,12 +353,12 @@ static BYTE send_cmd(/* Return value: R1 resp (bit7==1:Failed to send) */
 
 DSTATUS disk_initialize(BYTE drv /* Physical drive number (0) */
 ) {
-    BYTE n, cmd, ty, ocr[4];
-
     if (drv) return STA_NOINIT; /* Supports only drive 0 */
 
     if (Stat & STA_NODISK) return Stat; /* Is card existing in the soket? */
 
+#ifndef SD
+    BYTE n, cmd, ty, ocr[4];
     SpiSpeed original_speed = s_sd_spi_device.clk;
     s_sd_spi_device.clk = SPI_SPEED_100kHz;
     spi_setup(&s_sd_spi_device);         /* Initialize SPI with slow clock */
@@ -373,6 +408,13 @@ DSTATUS disk_initialize(BYTE drv /* Physical drive number (0) */
         Stat = STA_NOINIT;
     }
 
+#else
+    if (sdmmc_setup(&s_sd_sdmmc_device) != STATUS_OK) {
+        Stat = STA_NOINIT;
+        return Stat;
+    }
+    Stat &= ~STA_NOINIT; /* Clear STA_NOINIT flag */
+#endif
     return Stat;
 }
 
@@ -399,6 +441,7 @@ DRESULT disk_read(
 ) {
     DWORD sect = (DWORD)sector;
 
+#ifndef SD
     if (drv || !count) return RES_PARERR;     /* Check parameter */
     if (Stat & STA_NOINIT) return RES_NOTRDY; /* Check if drive is ready */
 
@@ -422,6 +465,13 @@ DRESULT disk_read(
     deselect();
 
     return count ? RES_ERROR : RES_OK; /* Return result */
+#else
+    if (sdmmc_read_blocks(&s_sd_sdmmc_device, (uint8_t *)buff, sect, count) !=
+        STATUS_OK) {
+        return RES_ERROR;
+    }
+    return RES_OK;
+#endif
 }
 
 /*-----------------------------------------------------------------------*/
@@ -436,6 +486,7 @@ DRESULT disk_write(BYTE drv,         /* Physical drive number (0) */
 ) {
     DWORD sect = (DWORD)sector;
 
+#ifndef SD
     if (drv || !count) return RES_PARERR;     /* Check parameter */
     if (Stat & STA_NOINIT) return RES_NOTRDY; /* Check drive status */
     if (Stat & STA_PROTECT) return RES_WRPRT; /* Check write protect */
@@ -462,6 +513,13 @@ DRESULT disk_write(BYTE drv,         /* Physical drive number (0) */
     deselect();
 
     return count ? RES_ERROR : RES_OK; /* Return result */
+#else
+    if (sdmmc_write_blocks(&s_sd_sdmmc_device, (uint8_t *)buff, sect, count) !=
+        STATUS_OK) {
+        return RES_ERROR;
+    }
+    return RES_OK;
+#endif
 }
 #endif
 
@@ -473,9 +531,14 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
                    BYTE cmd,  /* Control command code */
                    void *buff /* Pointer to the conrtol data */
 ) {
-    DRESULT res;
+#ifndef SD
     BYTE n, csd[16];
-    DWORD st, ed, csize;
+    DWORD csize;
+#else
+    SdmmcInfo info;
+#endif
+    DWORD st, ed;
+    DRESULT res;
     LBA_t *dp;
 
     if (drv) return RES_PARERR;               /* Check parameter */
@@ -486,11 +549,21 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
     switch (cmd) {
         case CTRL_SYNC: /* Wait for end of internal write process of the drive
                          */
+#ifndef SD
             if (select()) res = RES_OK;
             break;
+#else
+            if (check_status(200) != STATUS_OK) {
+                res = RES_ERROR;
+                break;
+            }
+            res = RES_OK;
+            break;
+#endif
 
         case GET_SECTOR_COUNT: /* Get drive capacity in unit of sector (DWORD)
                                 */
+#ifndef SD
             if ((send_cmd(CMD9, 0) == 0) && rcvr_datablock(csd, 16)) {
                 if ((csd[0] >> 6) == 1) { /* SDC CSD ver 2 */
                     csize = csd[9] + ((WORD)csd[8] << 8) +
@@ -506,9 +579,30 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
                 res = RES_OK;
             }
             break;
+#else
+            if (sdmmc_info(&s_sd_sdmmc_device, &info) != STATUS_OK) {
+                res = RES_ERROR;
+                break;
+            }
+            *(DWORD *)buff = info.LogBlockNbr;
+            res = RES_OK;
+            break;
+#endif
+
+#ifdef SD
+        case GET_SECTOR_SIZE: /* Get sector size (WORD) */
+            if (sdmmc_info(&s_sd_sdmmc_device, &info) != STATUS_OK) {
+                res = RES_ERROR;
+                break;
+            }
+            *(WORD *)buff = info.LogBlockSize;
+            res = RES_OK;
+            break;
+#endif
 
         case GET_BLOCK_SIZE: /* Get erase block size in unit of sector (DWORD)
                               */
+#ifndef SD
             if (CardType & CT_SDC2) {           /* SDC ver 2+ */
                 if (send_cmd(ACMD13, 0) == 0) { /* Read SD status */
                     xchg_spi(0xFF);
@@ -535,9 +629,19 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
                 }
             }
             break;
+#else
+            if (sdmmc_info(&s_sd_sdmmc_device, &info) != STATUS_OK) {
+                res = RES_ERROR;
+                break;
+            }
+            *(WORD *)buff = info.LogBlockSize / 512;
+            res = RES_OK;
+            break;
+#endif
 
         case CTRL_TRIM: /* Erase a block of sectors (used when _USE_ERASE == 1)
                          */
+#ifndef SD
             if (!(CardType & CT_SDC)) break; /* Check if the card is SDC */
             if (disk_ioctl(drv, MMC_GET_CSD, csd)) break; /* Get CSD */
             if (!(csd[10] & 0x40)) break; /* Check if ERASE_BLK_EN = 1 */
@@ -554,7 +658,23 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
                 res = RES_OK; /* FatFs does not check result of this command */
             }
             break;
+#else
+            dp = buff;
+            st = (DWORD)dp[0];
+            ed = (DWORD)dp[1];
+            if (sdmmc_erase(&s_sd_sdmmc_device, st, ed) != STATUS_OK) {
+                res = RES_ERROR;
+                break;
+            }
+            if (check_status(30000) != STATUS_OK) {
+                res = RES_ERROR;
+                break;
+            }
+            res = RES_OK;
+            break;
+#endif
 
+#ifndef SD
             /* Following commands are never used by FatFs module */
 
         case MMC_GET_TYPE: /* Get MMC/SDC type (BYTE) */
@@ -589,13 +709,14 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
                 if (rcvr_datablock((BYTE *)buff, 64)) res = RES_OK;
             }
             break;
-
+#endif
         default:
             res = RES_PARERR;
     }
 
+#ifndef SD
     deselect();
-
+#endif
     return res;
 }
 

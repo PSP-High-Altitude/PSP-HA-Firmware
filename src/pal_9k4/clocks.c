@@ -59,7 +59,8 @@ void SystemClock_Config() {
     RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
     PeriphClkInitStruct.PeriphClockSelection =
         RCC_PERIPHCLK_OSPI | RCC_PERIPHCLK_SPI123 | RCC_PERIPHCLK_SPI45 |
-        RCC_PERIPHCLK_I2C1235 | RCC_PERIPHCLK_I2C4 | RCC_PERIPHCLK_USART234578;
+        RCC_PERIPHCLK_I2C1235 | RCC_PERIPHCLK_I2C4 | RCC_PERIPHCLK_USART234578 |
+        RCC_PERIPHCLK_SDMMC;
     PeriphClkInitStruct.PLL2.PLL2M = 48;
     PeriphClkInitStruct.PLL2.PLL2N = 160;
     PeriphClkInitStruct.PLL2.PLL2P = 4;
@@ -75,6 +76,7 @@ void SystemClock_Config() {
     PeriphClkInitStruct.I2c4ClockSelection = RCC_I2C4CLKSOURCE_HSI;
     PeriphClkInitStruct.Usart234578ClockSelection =
         RCC_USART234578CLKSOURCE_HSI;
+    PeriphClkInitStruct.SdmmcClockSelection = RCC_SDMMCCLKSOURCE_PLL;
 
     HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
 
@@ -116,6 +118,9 @@ void SystemClock_Config() {
     // Initialize QSPI
     __HAL_RCC_OCTOSPIM_CLK_ENABLE();
     __HAL_RCC_OSPI1_CLK_ENABLE();
+
+    // Initialize SDMMC
+    __HAL_RCC_SDMMC1_CLK_ENABLE();
 }
 
 HAL_StatusTypeDef HAL_InitTick(uint32_t TickPriority) {

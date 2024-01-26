@@ -18,6 +18,7 @@
 #include "pb.h"
 #include "pspcom.h"
 #include "sd.h"
+#include "sdmmc/sdmmc.h"
 #include "status.h"
 #include "stm32h7xx.h"
 #include "timer.h"
@@ -35,8 +36,8 @@
 #define PIN_YELLOW PIN_PA1
 #define PIN_GREEN PIN_PA2
 #define PIN_BLUE PIN_PA3
-#define PIN_PROG PIN_PA13
 #define PIN_BUZZER PIN_PE0
+#define PIN_PAUSE PIN_PB7  // SDA4
 
 #define TARGET_INTERVAL 40  // ms
 
@@ -112,9 +113,17 @@ static SpiDevice s_imu_conf = {
     .cs = 0,
     .periph = P_SPI1,
 };
+// SPI mode conf
+/*
 static SdDevice s_sd_conf = {
     .clk = SD_SPEED_10MHz,
     .periph = P_SD4,
+};
+*/
+// SDMMC mode conf
+static SdDevice s_sd_conf = {
+    .clk = SD_SPEED_50MHz,
+    .periph = P_SD1,
 };
 static SpiDevice s_acc_conf = {
     .clk = SPI_SPEED_10MHz,
@@ -249,12 +258,12 @@ void store_data() {
         xTaskNotifyWait(0, 0xffffffffUL, &notif_value, 100);
 
         // If PROG switch is set, unmount SD card and wait
-        if (!gpio_read(PIN_PROG)) {
+        if (!gpio_read(PIN_PAUSE)) {
             sd_deinit();
             printf("SD safe to remove\n");
             gpio_write(PIN_BLUE, GPIO_LOW);
             gpio_write(PIN_GREEN, GPIO_LOW);
-            while (!gpio_read(PIN_PROG)) {
+            while (!gpio_read(PIN_PAUSE)) {
                 gpio_write(PIN_GREEN, GPIO_HIGH);
                 vTaskDelay(pdMS_TO_TICKS(500));
                 gpio_write(PIN_GREEN, GPIO_LOW);
@@ -271,14 +280,14 @@ void store_data() {
 
         gpio_write(PIN_YELLOW, GPIO_HIGH);
 
-        // TickType_t start_ticks = xTaskGetTickCount();
+        uint64_t start_time = MICROS();
 
         uint32_t entries_read = 0;
         while (fifo.count > 0) {
             SensorFrame log = read_fifo();
             Status code = sd_write_sensor_data(&log);
             if (code != STATUS_OK) {
-                // printf("SD sensor write error %d\n", code);
+                printf("SD sensor write error %d\n", code);
                 gpio_write(PIN_GREEN, GPIO_LOW);
                 break;
             }
@@ -298,18 +307,18 @@ void store_data() {
                 gps_fix_to_pb_frame(xTaskGetTickCount(), &s_last_fix);
             Status code = sd_write_gps_data(&gps_frame);
             if (code != STATUS_OK) {
-                // printf("SD GPS write error %d\n", code);
+                printf("SD GPS write error %d\n", code);
             }
             s_fix_avail = 0;
         }
 
         sd_flush();
 
-        // TickType_t elapsed_time = xTaskGetTickCount() - start_ticks;
+        uint64_t elapsed_time = MICROS() - start_time;
 
         gpio_write(PIN_YELLOW, GPIO_LOW);
-        // printf("%lu entries read in %lu ticks\n", entries_read,
-        // elapsed_time);
+        printf("%lu entries read in %lu microseconds\n", entries_read,
+               (uint32_t)elapsed_time);
     }
 }
 
@@ -318,13 +327,11 @@ int main(void) {
     SystemClock_Config();
     init_timers();
     init_fifo();
-    gpio_mode(PIN_PROG, GPIO_INPUT_PULLUP);
-    gpio_write(PIN_PA4, GPIO_HIGH);
-    gpio_write(PIN_PD8, GPIO_HIGH);
-    gpio_write(PIN_PE4, GPIO_HIGH);
     MX_USB_DEVICE_Init();
+    gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLUP);
     gpio_write(PIN_RED, GPIO_HIGH);
 
+    /*
     gpio_write(PIN_BUZZER, GPIO_HIGH);
     DELAY(100);
     gpio_write(PIN_BUZZER, GPIO_LOW);
@@ -332,6 +339,7 @@ int main(void) {
     gpio_write(PIN_BUZZER, GPIO_HIGH);
     DELAY(100);
     gpio_write(PIN_BUZZER, GPIO_LOW);
+    */
 
     DELAY(4700);
     printf("Starting initialization...\n");

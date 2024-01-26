@@ -38,7 +38,6 @@ Status spi_setup(SpiDevice* dev) {
             gpio_write(cs_pin[0], GPIO_HIGH);         // NSS: pin PA4
             HAL_GPIO_DeInit(GPIOA, pin_conf.Pin);
             HAL_GPIO_Init(GPIOA, &pin_conf);
-            HAL_GPIO_LockPin(GPIOA, pin_conf.Pin);
             break;
         case P_SPI2:
             base = SPI2;
@@ -49,12 +48,11 @@ Status spi_setup(SpiDevice* dev) {
                 GPIO_PIN_TO_NUM[PIN_PB15];  // MISO: pin PB14, MOSI: pin PB15
             HAL_GPIO_DeInit(GPIOB, pin_conf.Pin);
             HAL_GPIO_Init(GPIOB, &pin_conf);
-            HAL_GPIO_LockPin(GPIOB, pin_conf.Pin);
+
             pin_conf.Alternate = GPIO_AF5_SPI2;
             pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PA9];  // SCK: pin PA9
             HAL_GPIO_DeInit(GPIOA, pin_conf.Pin);
             HAL_GPIO_Init(GPIOA, &pin_conf);
-            HAL_GPIO_LockPin(GPIOA, pin_conf.Pin);
             break;
         case P_SPI3:
             return STATUS_PARAMETER_ERROR;
@@ -62,9 +60,13 @@ Status spi_setup(SpiDevice* dev) {
         case P_SPI4:
             base = SPI4;
             // Disable SDMMC pins first
-            // TODO
+            gpio_mode(PIN_PB13, GPIO_INPUT_PULLUP);
+            gpio_mode(PIN_PC9, GPIO_INPUT_PULLUP);
+            gpio_mode(PIN_PC10, GPIO_INPUT_PULLUP);
+            gpio_mode(PIN_PC11, GPIO_INPUT_PULLUP);
+            gpio_mode(PIN_PC12, GPIO_INPUT_PULLUP);
+            gpio_mode(PIN_PD2, GPIO_INPUT_PULLUP);
 
-            pin_conf.Mode = GPIO_MODE_AF_PP;
             pin_conf.Alternate = GPIO_AF5_SPI4;
             pin_conf.Pin = GPIO_PIN_TO_NUM[PIN_PE2] | GPIO_PIN_TO_NUM[PIN_PE5] |
                            GPIO_PIN_TO_NUM[PIN_PE6];  // SCK: pin PE2, MISO: pin
@@ -72,7 +74,7 @@ Status spi_setup(SpiDevice* dev) {
             gpio_write(cs_pin[3], GPIO_HIGH);         // NSS: pin PE4
             HAL_GPIO_DeInit(GPIOE, pin_conf.Pin);
             HAL_GPIO_Init(GPIOE, &pin_conf);
-            HAL_GPIO_LockPin(GPIOE, pin_conf.Pin);
+
             break;
         case P_SPI5:
             return STATUS_PARAMETER_ERROR;
