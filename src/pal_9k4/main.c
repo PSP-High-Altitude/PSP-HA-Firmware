@@ -39,7 +39,7 @@
 #define PIN_BUZZER PIN_PE0
 #define PIN_PAUSE PIN_PB7  // SDA4
 
-#define TARGET_INTERVAL 40  // ms
+#define TARGET_INTERVAL 10  // ms
 
 #define LOG_FIFO_LEN 256
 
@@ -122,7 +122,7 @@ static SdDevice s_sd_conf = {
 */
 // SDMMC mode conf
 static SdDevice s_sd_conf = {
-    .clk = SD_SPEED_50MHz,
+    .clk = SD_SPEED_HIGH,
     .periph = P_SD1,
 };
 static SpiDevice s_acc_conf = {
@@ -279,9 +279,9 @@ void store_data() {
         }
 
         gpio_write(PIN_YELLOW, GPIO_HIGH);
-
+#ifdef DEBUG_STORAGE
         uint64_t start_time = MICROS();
-
+#endif
         uint32_t entries_read = 0;
         while (fifo.count > 0) {
             SensorFrame log = read_fifo();
@@ -313,12 +313,13 @@ void store_data() {
         }
 
         sd_flush();
-
-        uint64_t elapsed_time = MICROS() - start_time;
-
         gpio_write(PIN_YELLOW, GPIO_LOW);
+
+#ifdef DEBUG_STORAGE
+        uint64_t elapsed_time = MICROS() - start_time;
         printf("%lu entries read in %lu microseconds\n", entries_read,
                (uint32_t)elapsed_time);
+#endif
     }
 }
 

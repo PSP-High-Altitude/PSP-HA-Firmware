@@ -160,15 +160,18 @@ Status sd_write_gps_data(GpsFrame* frame) {
 }
 
 Status sd_reinit() {
+    if (hal_reinit_card() != STATUS_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
     if (f_mount(&s_fs, "", 0) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
     if (f_open(&s_datfile, s_filename, FA_OPEN_APPEND | FA_WRITE) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
-    // if (f_open(&s_gpsfile, s_gpsfname, FA_OPEN_APPEND | FA_WRITE) != FR_OK) {
-    //     return STATUS_HARDWARE_ERROR;
-    // }
+    if (f_open(&s_gpsfile, s_gpsfname, FA_OPEN_APPEND | FA_WRITE) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
 
     return STATUS_OK;
 }
@@ -177,9 +180,9 @@ Status sd_deinit() {
     if (f_close(&s_datfile) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
-    // if (f_close(&s_gpsfile) != FR_OK) {
-    //     return STATUS_HARDWARE_ERROR;
-    // }
+    if (f_close(&s_gpsfile) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
     if (f_unmount("") != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
@@ -191,9 +194,9 @@ Status sd_flush() {
     if (f_sync(&s_datfile) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
-    // if (f_sync(&s_gpsfile) != FR_OK) {
-    //     return STATUS_HARDWARE_ERROR;
-    // }
+    if (f_sync(&s_gpsfile) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
 
     return STATUS_OK;
 }

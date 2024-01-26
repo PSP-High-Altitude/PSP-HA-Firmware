@@ -47,4 +47,6 @@ Status sd_write_sensor_data(SensorFrame* sensor_frame);
 
 Status sd_write_gps_data(GpsFrame* gps_frame);
 
+Status hal_reinit_card();
+
 #endif  // SD_H

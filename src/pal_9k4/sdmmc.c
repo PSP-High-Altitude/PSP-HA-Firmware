@@ -98,7 +98,15 @@ Status sdmmc_setup(SdmmcDevice* dev) {
 }
 
 Status sdmmc_init_card(SdmmcDevice* dev) {
+    if (HAL_SD_GetCardState(sdmmc_handles[dev->periph]) ==
+        HAL_SD_CARD_TRANSFER) {
+        return STATUS_OK;
+    }
     if (HAL_SD_InitCard(sdmmc_handles[dev->periph]) != HAL_OK) {
+        return STATUS_ERROR;
+    }
+    if (HAL_SD_GetCardState(sdmmc_handles[dev->periph]) !=
+        HAL_SD_CARD_TRANSFER) {
         return STATUS_ERROR;
     }
     return STATUS_OK;

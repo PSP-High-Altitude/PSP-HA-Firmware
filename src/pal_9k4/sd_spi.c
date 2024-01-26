@@ -720,6 +720,14 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
     return res;
 }
 
+Status hal_reinit_card() {
+#ifdef SD
+    return sdmmc_init_card(&s_sd_sdmmc_device);
+#else
+    return STATUS_OK;
+#endif
+}
+
 /*-----------------------------------------------------------------------*/
 /* Device timer function                                                 */
 /*-----------------------------------------------------------------------*/
