@@ -199,7 +199,10 @@ void read_gps() {
         }
         Status code = max_m10s_poll_fix(&s_gps_conf, &s_last_fix);
         if (code == STATUS_OK) {
-            gpio_write(PIN_BLUE, GPIO_HIGH);
+            if (s_last_fix.fix_valid)
+                gpio_write(PIN_BLUE, GPIO_HIGH);
+            else
+                gpio_write(PIN_BLUE, GPIO_LOW);
             s_fix_avail = 1;
         } else {
             gpio_write(PIN_BLUE, GPIO_LOW);
@@ -345,7 +348,7 @@ int main(void) {
     printf("Starting initialization...\n");
 
     // Initialize magnetometer
-    if (iis2mdc_init(&s_mag_conf, IIS2MDC_ODR_50_HZ) == STATUS_OK) {
+    if (iis2mdc_init(&s_mag_conf, IIS2MDC_ODR_100_HZ) == STATUS_OK) {
         printf("Magnetometer initialization successful\n");
     } else {
         printf("Magnetometer initialization failed\n");
