@@ -278,15 +278,20 @@ void pspcom_send_msg(pspcommsg msg) {
     memcpy(buf + 5, msg.payload, msg.payload_len);
     sprintf(buf + 5 + msg.payload_len, "%c%c", (uint8_t)checksum,
             (uint8_t)(checksum >> 8));
-    HAL_UART_Transmit(&huart7, (uint8_t *)buf, 7 + msg.payload_len, 50);
+    HAL_UART_Transmit_DMA(&huart7, (uint8_t *)buf, 7 + msg.payload_len);
+    uint64_t timeout = MILLIS();
+    while (HAL_UART_GetState(&huart7) == HAL_UART_STATE_BUSY_TX) {
+        if (MILLIS() - timeout > 100) {
+            break;
+        }
+        vTaskDelay(1);
+    }
     free(buf);
 }
 
 void pspcom_send_sensor(void *sensor_frame) {
     SensorFrame *sens = (SensorFrame *)sensor_frame;
     while (1) {
-        vTaskSuspendAll();
-
         // Accelerometer
         pspcommsg tx_msg = {
             .payload_len = 13,
@@ -317,8 +322,6 @@ void pspcom_send_sensor(void *sensor_frame) {
         memcpy(tx_msg.payload + 1, &sens->pressure, sizeof(float));
         pspcom_send_msg(tx_msg);
 
-        xTaskResumeAll();
-
         vTaskDelay(SENSOR_TELEM_PERIOD / portTICK_PERIOD_MS);
     }
 }
@@ -326,8 +329,6 @@ void pspcom_send_sensor(void *sensor_frame) {
 void pspcom_send_gps(void *gps_fix) {
     GPS_Fix_TypeDef *gps = (GPS_Fix_TypeDef *)gps_fix;
     while (1) {
-        vTaskSuspendAll();
-
         // Position
         pspcommsg tx_msg = {
             .payload_len = 13,
@@ -347,16 +348,12 @@ void pspcom_send_gps(void *gps_fix) {
         memcpy(tx_msg.payload + 9, &gps->vel_down, sizeof(float));
         pspcom_send_msg(tx_msg);
 
-        xTaskResumeAll();
-
         vTaskDelay(GPS_TELEM_PERIOD / portTICK_PERIOD_MS);
     }
 }
 
 void pspcom_send_status() {
     while (1) {
-        vTaskSuspendAll();
-
         // Pyro Status
         pspcommsg tx_msg = {
             .payload_len = 1,
@@ -369,8 +366,6 @@ void pspcom_send_status() {
         tx_msg.payload[0] =
             (main_cont << 1) | (drg_cont << 3) | (aux_cont << 5) | 0x15;
         pspcom_send_msg(tx_msg);
-
-        xTaskResumeAll();
 
         vTaskDelay(STATUS_TELEM_PERIOD / portTICK_PERIOD_MS);
     }

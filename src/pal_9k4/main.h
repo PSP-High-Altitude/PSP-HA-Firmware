@@ -4,7 +4,7 @@
 #include "board.h"
 
 #define DEBUG
-// #define DEBUG_STORAGE
+#define DEBUG_STORAGE
 // #define PSPCOM_SENSORS
 
 #define PIN_FIREMAIN PIN_PG12

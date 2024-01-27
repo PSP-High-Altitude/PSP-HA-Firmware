@@ -39,7 +39,7 @@
 #define PIN_BUZZER PIN_PE0
 #define PIN_PAUSE PIN_PB7  // SDA4
 
-#define TARGET_INTERVAL 10  // ms
+#define TARGET_INTERVAL 5  // ms
 
 #define LOG_FIFO_LEN 256
 
@@ -417,7 +417,7 @@ int main(void) {
                 "store_data",          // Task name
                 2048,                  // Stack size
                 NULL,                  // Parameters
-                tskIDLE_PRIORITY + 2,  // Priority
+                tskIDLE_PRIORITY + 1,  // Priority
                 &s_store_data_handle   // Task handle
     );
 
@@ -425,7 +425,7 @@ int main(void) {
                 "read_sensors",         // Task name
                 2048,                   // Stack size
                 NULL,                   // Parameters
-                tskIDLE_PRIORITY + 3,   // Priority
+                tskIDLE_PRIORITY + 4,   // Priority
                 &s_read_sensors_handle  // Task handle
     );
 
@@ -433,7 +433,7 @@ int main(void) {
                 "read_gps",            // Task name
                 2048,                  // Stack size
                 NULL,                  // Parameters
-                tskIDLE_PRIORITY + 2,  // Priority
+                tskIDLE_PRIORITY + 3,  // Priority
                 &s_read_gps_handle     // Task handle
     );
 
@@ -441,7 +441,7 @@ int main(void) {
                 "gps_telem",           // Task name
                 2048,                  // Stack size
                 (void *)&s_last_fix,   // Parameters
-                tskIDLE_PRIORITY + 1,  // Priority
+                tskIDLE_PRIORITY + 2,  // Priority
                 &s_gps_telem_handle    // Task handle
     );
 
@@ -449,7 +449,7 @@ int main(void) {
                 "status_telem",         // Task name
                 2048,                   // Stack size
                 NULL,                   // Parameters
-                tskIDLE_PRIORITY + 1,   // Priority
+                tskIDLE_PRIORITY + 2,   // Priority
                 &s_status_telem_handle  // Task handle
     );
 
@@ -457,7 +457,7 @@ int main(void) {
                 "process_commands",         // Task name
                 2048,                       // Stack size
                 NULL,                       // Parameters
-                tskIDLE_PRIORITY + 2,       // Priority
+                tskIDLE_PRIORITY + 3,       // Priority
                 &s_process_commands_handle  // Task handle
     );
 
