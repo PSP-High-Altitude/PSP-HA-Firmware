@@ -158,7 +158,7 @@ void read_sensors() {
     while (1) {
         BaroData baro =
             ms5637_read(&s_baro_conf, OSR_256);    // Baro read takes longest
-        uint64_t timestamp = xTaskGetTickCount();  // So measure timestamp after
+        uint64_t timestamp = MICROS();             // So measure timestamp after
         Accel acch = kx134_read_accel(&s_acc_conf);
         Accel accel = lsm6dsox_read_accel(&s_imu_conf);
         Gyro gyro = lsm6dsox_read_gyro(&s_imu_conf);
@@ -303,8 +303,7 @@ void store_data() {
         if (s_fix_avail) {
             // This is an expensive copy but ideally we don't want to expose the
             // raw GPS format to the SD HAL
-            GpsFrame gps_frame =
-                gps_fix_to_pb_frame(xTaskGetTickCount(), &s_last_fix);
+            GpsFrame gps_frame = gps_fix_to_pb_frame(MICROS(), &s_last_fix);
             Status code = sd_write_gps_data(&gps_frame);
             if (code != STATUS_OK) {
                 printf("SD GPS write error %d\n", code);

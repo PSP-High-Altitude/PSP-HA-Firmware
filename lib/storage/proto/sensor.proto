@@ -1,7 +1,7 @@
 syntax = "proto3";
 
 message SensorFrame {
-  // System timestamp (ms since power on)
+  // System timestamp (us since power on)
   uint64 timestamp = 1;
 
   // Barometer temperature (deg C)
