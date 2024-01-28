@@ -46,14 +46,19 @@
 extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
 SensorFrame s_last_sensor_data;
 GPS_Fix_TypeDef s_last_fix;
+PAL_Data_Typedef s_last_data = {
+    .sensor_frame = &s_last_sensor_data,
+    .gps_fix = &s_last_fix,
+};
 static TickType_t s_last_sensor_read_ticks;
 volatile static int s_fix_avail = 0;
 
 static TaskHandle_t s_read_sensors_handle;
 static TaskHandle_t s_read_gps_handle;
 static TaskHandle_t s_store_data_handle;
-static TaskHandle_t s_gps_telem_handle;
-static TaskHandle_t s_status_telem_handle;
+// static TaskHandle_t s_gps_telem_handle;
+// static TaskHandle_t s_status_telem_handle;
+static TaskHandle_t s_standard_telem_handle;
 static TaskHandle_t s_process_commands_handle;
 #ifdef PSPCOM_SENSORS
 static TaskHandle_t s_sensor_telem_handle;
@@ -440,26 +445,35 @@ int main(void) {
                 &s_read_gps_handle     // Task handle
     );
 
-    xTaskCreate(pspcom_send_gps,       // Task function
-                "gps_telem",           // Task name
-                2048,                  // Stack size
-                (void *)&s_last_fix,   // Parameters
-                tskIDLE_PRIORITY + 2,  // Priority
-                &s_gps_telem_handle    // Task handle
-    );
+    /*
+        xTaskCreate(pspcom_send_gps,       // Task function
+                    "gps_telem",           // Task name
+                    2048,                  // Stack size
+                    (void *)&s_last_fix,   // Parameters
+                    tskIDLE_PRIORITY + 2,  // Priority
+                    &s_gps_telem_handle    // Task handle
+        );
 
-    xTaskCreate(pspcom_send_status,     // Task function
-                "status_telem",         // Task name
-                2048,                   // Stack size
-                NULL,                   // Parameters
-                tskIDLE_PRIORITY + 2,   // Priority
-                &s_status_telem_handle  // Task handle
+        xTaskCreate(pspcom_send_status,     // Task function
+                    "status_telem",         // Task name
+                    2048,                   // Stack size
+                    NULL,                   // Parameters
+                    tskIDLE_PRIORITY + 2,   // Priority
+                    &s_status_telem_handle  // Task handle
+        );
+    */
+    xTaskCreate(pspcom_send_standard,     // Task function
+                "status_telem",           // Task name
+                2048,                     // Stack size
+                NULL,                     // Parameters
+                tskIDLE_PRIORITY + 2,     // Priority
+                &s_standard_telem_handle  // Task handle
     );
 
     xTaskCreate(pspcom_process_bytes,       // Task function
                 "process_commands",         // Task name
                 2048,                       // Stack size
-                NULL,                       // Parameters
+                (void *)&s_last_data,       // Parameters
                 tskIDLE_PRIORITY + 3,       // Priority
                 &s_process_commands_handle  // Task handle
     );

@@ -31,6 +31,7 @@ enum {
     GPS_VEL = 0x8B,
     SYS_STAT = 0x8C,
     PYRO_STAT = 0x8D,
+    STD_TELEM_1 = 0xE0,
 };
 
 typedef struct {
@@ -39,6 +40,24 @@ typedef struct {
     uint8_t msg_id;
     uint8_t payload[256];
 } pspcommsg;
+
+typedef struct __attribute__((packed)) {
+    uint8_t num_sats : 5;
+    int32_t lat : 24;
+    int32_t lon : 25;
+    uint32_t alt : 18;
+} gps_pos_packed;
+
+typedef struct __attribute__((packed)) {
+    int32_t veln : 13;
+    int32_t vele : 13;
+    int32_t veld : 14;
+} gps_vel_packed;
+
+typedef struct {
+    SensorFrame *sensor_frame;
+    GPS_Fix_TypeDef *gps_fix;
+} PAL_Data_Typedef;
 
 uint16_t crc(uint16_t checksum, pspcommsg msg);
 
@@ -53,5 +72,7 @@ void pspcom_send_sensor(void *sensor_frame);
 void pspcom_send_gps(void *gps_fix);
 
 void pspcom_send_status();
+
+void pspcom_send_standard(void *pal_data);
 
 #endif

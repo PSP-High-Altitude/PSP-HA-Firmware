@@ -16,6 +16,7 @@
 #define SENSOR_TELEM_PERIOD 5000
 #define GPS_TELEM_PERIOD 5000
 #define STATUS_TELEM_PERIOD 5000
+#define STD_TELEM_PERIOD 5000
 
 UART_HandleTypeDef huart7;
 DMA_HandleTypeDef hdma_uart7_rx;
@@ -368,6 +369,84 @@ void pspcom_send_status() {
         pspcom_send_msg(tx_msg);
 
         vTaskDelay(STATUS_TELEM_PERIOD / portTICK_PERIOD_MS);
+    }
+}
+
+void pspcom_send_standard(void *pal_data) {
+    PAL_Data_Typedef *data = (PAL_Data_Typedef *)pal_data;
+    while (1) {
+        // Standard telemetry
+        pspcommsg tx_msg = {
+            .payload_len = 18,
+            .device_id = PSPCOM_DEVICE_ID,
+            .msg_id = STD_TELEM_1,
+        };
+
+        /*
+        // GPS_POS
+        int32_t lat = (int32_t)(data->gps_fix->lat / 0.0000108);
+        int32_t lon = (int32_t)(data->gps_fix->lon / 0.0000108);
+        uint32_t alt = (uint32_t)(data->gps_fix->height_msl + 1000);
+        tx_msg.payload[0] = data->gps_fix->num_sats & 0x1F;
+        tx_msg.payload[0] |= (lat & 0xE0) << 5;
+        tx_msg.payload[1] = (lat >> 3) & 0xFF;
+        tx_msg.payload[2] = (lat >> 11) & 0xFF;
+        tx_msg.payload[3] = (lat >> 19) & 0x1F;
+        tx_msg.payload[3] |= (lon & 0xE0) << 5;
+        tx_msg.payload[4] = (lat >> 3) & 0xFF;
+        tx_msg.payload[5] = (lat >> 11) & 0xFF;
+        tx_msg.payload[6] = (lat >> 19) & 0x3F;
+        tx_msg.payload[6] |= (alt & 0xC0) << 6;
+        tx_msg.payload[7] = (alt >> 2) & 0xFF;
+        tx_msg.payload[8] = (alt >> 10) & 0xFF;
+
+        // GPS_VEL
+        int16_t vel_north = (int16_t)(data->gps_fix->vel_north);
+        int16_t vel_east = (int16_t)(data->gps_fix->vel_east);
+        int16_t vel_down = (int16_t)(data->gps_fix->vel_down);
+        tx_msg.payload[9] = vel_north & 0xFF;
+        tx_msg.payload[10] = (vel_north >> 8) & 0x1F;
+        tx_msg.payload[10] |= (vel_east & 0xE0) << 5;
+        tx_msg.payload[11] = (vel_east >> 3) & 0xFF;
+        tx_msg.payload[12] = (vel_east >> 11) & 0x03;
+        tx_msg.payload[12] |= (vel_down & 0xFC) << 2;
+        tx_msg.payload[13] = (vel_down >> 2) & 0xFF;
+        */
+
+        // GPS_POS
+        gps_pos_packed gps_pos;
+        gps_pos.num_sats = data->gps_fix->num_sats & 0x1F;
+        gps_pos.lat = ((int32_t)(data->gps_fix->lat / 0.0000108)) & 0x00FFFFFF;
+        gps_pos.lon = ((int32_t)(data->gps_fix->lon / 0.0000108)) & 0x01FFFFFF;
+        gps_pos.alt =
+            ((uint32_t)(data->gps_fix->height_msl + 1000)) & 0x0003FFFF;
+        memcpy(tx_msg.payload, &gps_pos, sizeof(gps_pos_packed));
+
+        // GPS_VEL
+        gps_vel_packed gps_vel;
+        gps_vel.veln = ((int16_t)(data->gps_fix->vel_north)) & 0x1FFF;
+        gps_vel.vele = ((int16_t)(data->gps_fix->vel_east)) & 0x1FFF;
+        gps_vel.veld = ((int16_t)(data->gps_fix->vel_down)) & 0x3FFF;
+        memcpy(tx_msg.payload + 9, &gps_vel, sizeof(gps_vel_packed));
+
+        // PRES
+        uint16_t pres = (uint16_t)(data->sensor_frame->pressure / 0.025);
+        tx_msg.payload[14] = pres & 0xFF;
+        tx_msg.payload[15] = (pres >> 8) & 0xFF;
+
+        // PYRO_STAT
+        uint8_t main_cont = gpio_read(PIN_CONTMAIN);
+        uint8_t drg_cont = gpio_read(PIN_CONTDRG);
+        uint8_t aux_cont = gpio_read(PIN_CONTAUX);
+        tx_msg.payload[16] =
+            (main_cont << 1) | (drg_cont << 3) | (aux_cont << 5) | 0x15;
+
+        // SYS_STAT
+        tx_msg.payload[17] = 0;
+
+        pspcom_send_msg(tx_msg);
+
+        vTaskDelay(STD_TELEM_PERIOD / portTICK_PERIOD_MS);
     }
 }
 

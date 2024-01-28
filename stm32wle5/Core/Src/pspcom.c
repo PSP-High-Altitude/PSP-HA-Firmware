@@ -61,20 +61,16 @@ pspcommsg pspcom_process_bytes_from_air(uint8_t *buf, uint16_t len) {
 
 void pspcom_send_msg_over_air(pspcommsg msg) {
     uint8_t payload[256];
-    uint8_t len = 3 + msg.payload_len;
+    uint8_t len = 2 + msg.payload_len;
 
-    payload[0] = msg.payload_len;
     payload[1] = msg.device_id;
     payload[2] = msg.msg_id;
     for (int i = 0; i < msg.payload_len; i++) {
-        payload[3 + i] = msg.payload[i];
+        payload[2 + i] = msg.payload[i];
     }
 
     lora_state = TX;
     Radio.Send(payload, len);
-    //LoraState comp1 = lora_state;
-    //LoraState comp2 = TX;
-    //while_equals_timeout(1000, &comp1, &comp2, timeout_callback);
     DELAY(Radio.TimeOnAir(MODEM_LORA, LORA_BANDWIDTH,
                       LORA_SPREADING_FACTOR, LORA_CODINGRATE,
                       LORA_PREAMBLE_LENGTH, 0, len, 1) + 10);
