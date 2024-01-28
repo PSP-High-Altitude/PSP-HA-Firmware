@@ -43,6 +43,7 @@ static TaskHandle_t s_read_sensors_handle;
 static TaskHandle_t s_read_gps_handle;
 static TaskHandle_t s_store_data_handle;
 static TaskHandle_t s_standard_telem_handle;
+static TaskHandle_t s_do_state_est_handle;
 static TaskHandle_t s_process_commands_handle;
 #ifdef PSPCOM_SENSORS
 static TaskHandle_t s_sensor_telem_handle;
@@ -176,6 +177,7 @@ void read_sensors() {
 
         write_fifo(s_last_sensor_data);
         xTaskNotifyGive(s_store_data_handle);
+        xTaskNotifyGive(s_do_state_est_handle);
         vTaskDelayUntil(&s_last_sensor_read_ticks,
                         pdMS_TO_TICKS(TARGET_INTERVAL));
     }
@@ -248,8 +250,11 @@ void do_state_est() {
     s_flight_phase = FP_INIT;
     s_current_state = zeroState();
     s_upAxis = 0;
-    SensorData sensorData = sensorFrame2SensorData(s_last_sensor_data);
+
     while (1) {
+        uint32_t notif_value;
+        xTaskNotifyWait(0, 0xffffffffUL, &notif_value, 100);
+        SensorData sensorData = sensorFrame2SensorData(s_last_sensor_data);
         fp_update(sensorData, &s_flight_phase, &s_current_state);
         printf("phase: %d, accel (m/s^2): {%7.2f, %7.2f, %7.2f}\n",
                s_flight_phase, s_current_state.accBody.x,
@@ -449,6 +454,14 @@ int main(void) {
                 NULL,                  // Parameters
                 tskIDLE_PRIORITY + 3,  // Priority
                 &s_read_gps_handle     // Task handle
+    );
+
+    xTaskCreate(do_state_est,           // Task function
+                "do_state_est",         // Task name
+                2048,                   // Stack size
+                NULL,                   // Parameters
+                tskIDLE_PRIORITY + 3,   // Priority
+                &s_do_state_est_handle  // Task handle
     );
 
     /*
