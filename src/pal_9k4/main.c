@@ -465,7 +465,7 @@ int main(void) {
     xTaskCreate(pspcom_send_standard,     // Task function
                 "status_telem",           // Task name
                 2048,                     // Stack size
-                NULL,                     // Parameters
+                (void *)&s_last_data,     // Parameters
                 tskIDLE_PRIORITY + 2,     // Priority
                 &s_standard_telem_handle  // Task handle
     );
@@ -473,7 +473,7 @@ int main(void) {
     xTaskCreate(pspcom_process_bytes,       // Task function
                 "process_commands",         // Task name
                 2048,                       // Stack size
-                (void *)&s_last_data,       // Parameters
+                NULL,                       // Parameters
                 tskIDLE_PRIORITY + 3,       // Priority
                 &s_process_commands_handle  // Task handle
     );

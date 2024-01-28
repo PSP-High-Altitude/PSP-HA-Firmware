@@ -63,8 +63,8 @@ void pspcom_send_msg_over_air(pspcommsg msg) {
     uint8_t payload[256];
     uint8_t len = 2 + msg.payload_len;
 
-    payload[1] = msg.device_id;
-    payload[2] = msg.msg_id;
+    payload[0] = msg.device_id;
+    payload[1] = msg.msg_id;
     for (int i = 0; i < msg.payload_len; i++) {
         payload[2 + i] = msg.payload[i];
     }

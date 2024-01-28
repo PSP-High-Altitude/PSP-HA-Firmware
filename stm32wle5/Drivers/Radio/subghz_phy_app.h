@@ -75,14 +75,17 @@ typedef enum {
 #define PAYLOAD_LEN                                 64
 
 /* USER CODE BEGIN EC */
+#undef RF_FREQUENCY
+#define RF_FREQUENCY 433000000
+
 #undef TX_OUTPUT_POWER
 #define TX_OUTPUT_POWER 22
 
 #undef LORA_BANDWIDTH
-#define LORA_BANDWIDTH 2
+#define LORA_BANDWIDTH 0
 
 #undef LORA_SPREADING_FACTOR
-#define LORA_SPREADING_FACTOR 12
+#define LORA_SPREADING_FACTOR 10
 
 #define RX_TIMEOUT_VALUE 0
 #define TX_TIMEOUT_VALUE 1000

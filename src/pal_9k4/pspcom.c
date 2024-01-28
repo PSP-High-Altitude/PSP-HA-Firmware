@@ -382,37 +382,6 @@ void pspcom_send_standard(void *pal_data) {
             .msg_id = STD_TELEM_1,
         };
 
-        /*
-        // GPS_POS
-        int32_t lat = (int32_t)(data->gps_fix->lat / 0.0000108);
-        int32_t lon = (int32_t)(data->gps_fix->lon / 0.0000108);
-        uint32_t alt = (uint32_t)(data->gps_fix->height_msl + 1000);
-        tx_msg.payload[0] = data->gps_fix->num_sats & 0x1F;
-        tx_msg.payload[0] |= (lat & 0xE0) << 5;
-        tx_msg.payload[1] = (lat >> 3) & 0xFF;
-        tx_msg.payload[2] = (lat >> 11) & 0xFF;
-        tx_msg.payload[3] = (lat >> 19) & 0x1F;
-        tx_msg.payload[3] |= (lon & 0xE0) << 5;
-        tx_msg.payload[4] = (lat >> 3) & 0xFF;
-        tx_msg.payload[5] = (lat >> 11) & 0xFF;
-        tx_msg.payload[6] = (lat >> 19) & 0x3F;
-        tx_msg.payload[6] |= (alt & 0xC0) << 6;
-        tx_msg.payload[7] = (alt >> 2) & 0xFF;
-        tx_msg.payload[8] = (alt >> 10) & 0xFF;
-
-        // GPS_VEL
-        int16_t vel_north = (int16_t)(data->gps_fix->vel_north);
-        int16_t vel_east = (int16_t)(data->gps_fix->vel_east);
-        int16_t vel_down = (int16_t)(data->gps_fix->vel_down);
-        tx_msg.payload[9] = vel_north & 0xFF;
-        tx_msg.payload[10] = (vel_north >> 8) & 0x1F;
-        tx_msg.payload[10] |= (vel_east & 0xE0) << 5;
-        tx_msg.payload[11] = (vel_east >> 3) & 0xFF;
-        tx_msg.payload[12] = (vel_east >> 11) & 0x03;
-        tx_msg.payload[12] |= (vel_down & 0xFC) << 2;
-        tx_msg.payload[13] = (vel_down >> 2) & 0xFF;
-        */
-
         // GPS_POS
         gps_pos_packed gps_pos;
         gps_pos.num_sats = data->gps_fix->num_sats & 0x1F;
