@@ -13,6 +13,9 @@ Status fp_update(SensorData* data, FlightPhase* s_flight_phase,
                  StateEst* currentState) {
     float ax = currentState->accBody.x;
     float az = currentState->accBody.z;
+    Accel* aPtr = &data->accel;
+    void* vecPtr = (void*)aPtr;
+    (*currentState).accBody = vscale(createVectorFromStruct(vecPtr), 9.81);
     switch (*s_flight_phase) {
         case FP_INIT:
             // s_flight_phase = fp_init();
@@ -23,7 +26,9 @@ Status fp_update(SensorData* data, FlightPhase* s_flight_phase,
             break;
         case FP_READY:
             break;
-
+            if (ax > 15) {
+                *s_flight_phase = FP_BOOST;
+            }
         case FP_BOOST:
             if ((ax <= 300) && (ax >= 200)) {
                 *s_flight_phase = FP_FAST;
