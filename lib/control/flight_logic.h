@@ -17,13 +17,13 @@ typedef enum {
 // TODO: put transition constants here
 
 // function declarations
-Status fp_update();
-FlightPhase fp_init();
-FlightPhase fp_ready();
-FlightPhase fp_boost();
-FlightPhase fp_coast();
-FlightPhase fp_drogue();
-FlightPhase fp_main();
-FlightPhase fp_landed();
+// Status fp_update();
+// FlightPhase fp_init();
+// FlightPhase fp_ready();
+// FlightPhase fp_boost();
+// FlightPhase fp_coast();
+// FlightPhase fp_drogue();
+// FlightPhase fp_main();
+// FlightPhase fp_landed();
 
 #endif  // FLIGHT_LOGIC_H

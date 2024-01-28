@@ -8,6 +8,7 @@
 #include "clocks.h"
 #include "data.h"
 #include "flight_estimation.h"
+#include "flight_logic.h"
 #include "gpio/gpio.h"
 #include "iis2mdc/iis2mdc.h"
 #include "kx134/kx134.h"
@@ -246,9 +247,10 @@ void do_state_est() {
     // initialize stuff
     s_flight_phase = FP_INIT;
     s_current_state = zeroState();
-
+    s_upAxis = 0;
+    SensorData sensorData = sensorFrame2SensorData(s_last_sensor_data);
     while (1) {
-        fp_update(&s_last_sensor_data, &s_flight_phase, &s_current_state);
+        fp_update(sensorData, &s_flight_phase, &s_current_state);
         printf("phase: %d, accel (m/s^2): {%7.2f, %7.2f, %7.2f}\n",
                s_flight_phase, s_current_state.accBody.x,
                s_current_state.accBody.y, s_current_state.accBody.z);

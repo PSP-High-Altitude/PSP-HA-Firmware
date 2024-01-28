@@ -20,17 +20,7 @@ typedef struct {
     Vector orientation;
 } StateEst;
 
-StateEst zeroState() {
-    StateEst state;
-    Vector zeroVec = {0, 0, 0};
-
-    state.posNED = zeroVec;
-    state.velNED = zeroVec;
-    state.accNED = zeroVec;
-    state.velBody = zeroVec;
-    state.accBody = zeroVec;
-    state.orientation = zeroVec;
-}
+StateEst zeroState();
 
 // StateEst update_state(SensorData* data, FlightPhase* fp,
 //                       StateEst* currentState);

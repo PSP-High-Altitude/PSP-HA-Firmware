@@ -1,4 +1,4 @@
-#include "flight_logic.h"
+// #include "flight_logic.h"
 
 // Status fp_update() {
 //     switch (s_flight_phase) {
@@ -34,16 +34,16 @@
 
 // things that need to happen in each pahse go here
 // return the phase it should be in
-FlightPhase fp_init() {}
+// FlightPhase fp_init() {}
 
-FlightPhase fp_ready() {}
+// FlightPhase fp_ready() {}
 
-FlightPhase fp_boost() {}
+// FlightPhase fp_boost() {}
 
-FlightPhase fp_coast() {}
+// FlightPhase fp_coast() {}
 
-FlightPhase fp_drogue() {}
+// FlightPhase fp_drogue() {}
 
-FlightPhase fp_main() {}
+// FlightPhase fp_main() {}
 
-FlightPhase fp_landed() {}
+// FlightPhase fp_landed() {}
