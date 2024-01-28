@@ -248,7 +248,7 @@ void do_state_est() {
     s_current_state = zeroState();
 
     while (1) {
-        fp_update(&s_last_sensor_read_ticks, &s_flight_phase, &s_current_state);
+        fp_update(&s_last_sensor_data, &s_flight_phase, &s_current_state);
         printf("phase: %d, accel (m/s^2): {%7.2f, %7.2f, %7.2f}\n",
                s_flight_phase, s_current_state.accBody.x,
                s_current_state.accBody.y, s_current_state.accBody.z);
