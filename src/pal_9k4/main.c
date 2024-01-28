@@ -7,7 +7,7 @@
 #include "USB_Device/App/usbd_cdc_if.h"
 #include "clocks.h"
 #include "data.h"
-#include "flight_logic.h"
+#include "flight_estimation.h"
 #include "gpio/gpio.h"
 #include "iis2mdc/iis2mdc.h"
 #include "kx134/kx134.h"
@@ -243,12 +243,13 @@ GpsFrame gps_fix_to_pb_frame(uint64_t timestamp,
     return gps_frame;
 }
 void do_state_est() {
+    // initialize stuff
     s_flight_phase = FP_INIT;
-    s_current_state.accBody = {.x = 0, .y = 0, .z = 0};
+    s_current_state = zeroState();
 
     while (1) {
         fp_update(&s_last_sensor_read_ticks, &s_flight_phase, &s_current_state);
-        printf("phase: %d", phase);
+        printf("phase: %d", s_flight_phase);
     }
 }
 

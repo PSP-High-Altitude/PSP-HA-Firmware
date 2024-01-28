@@ -108,4 +108,27 @@ void UpdatePose(Vector v_a, Vector *v_ac, Vector *v_v, Vector *v_d, Vector v_w,
     *v_d = TrapInt(*v_d, *v_v, vprev, dt);
 }
 
+Vector zeroVec() {
+    Vector vec = {0, 0, 0};
+    return vec;
+}
+
+Vector createVectorFromStruct(void *ptr) {
+    if (ptr == NULL) {
+        // Handle the case where the pointer is NULL (error condition)
+        return zeroVec();
+    }
+
+    Vector result;
+
+    // Assume the struct pointed to by ptr has three floats
+    float *floatPtr = (float *)ptr;
+
+    result.x = floatPtr[0];
+    result.y = floatPtr[1];
+    result.z = floatPtr[2];
+
+    return result;
+}
+
 #endif //STATEESTIMATION_LIBRARY_H

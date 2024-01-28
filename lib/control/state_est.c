@@ -3,12 +3,12 @@
 #include "flight_logic.h"
 
 void state_est_main() {
-    FlightPhase phase;
-    StateEst state;
-    SensorData data;
+    FlightPhase* phase = malloc(sizeof(FlightPhase));
+    StateEst* state = malloc(sizeof(StateEst));
+    SensorData* data;
 
     while (1) {
-        fp_update(&data, &phase, &state);
+        fp_update(data, phase, state);
         printf("phase: %d", phase);
     }
 }
