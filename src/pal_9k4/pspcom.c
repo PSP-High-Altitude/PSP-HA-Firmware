@@ -18,6 +18,10 @@
 #define STATUS_TELEM_PERIOD 5000
 #define STD_TELEM_PERIOD 5000
 
+#define PYRO_RETRIES_MAN 3
+#define PYRO_RETRY_PERIOD_MAN 1000
+#define PYRO_FIRE_PERIOD_MAN 1000
+
 UART_HandleTypeDef huart7;
 DMA_HandleTypeDef hdma_uart7_rx;
 DMA_HandleTypeDef hdma_uart7_tx;
@@ -246,21 +250,45 @@ void pspcom_process_bytes(char *buf, int len) {
                     break;
                 case FIREMAIN:
                     if (user_armed[0]) {
-                        gpio_write(PIN_FIREMAIN, 1);
-                        vTaskDelay(1000 / portTICK_PERIOD_MS);
-                        gpio_write(PIN_FIREMAIN, 0);
+                        for (int i = 0; i < PYRO_RETRIES_MAN; i++) {
+                            gpio_write(PIN_FIREMAIN, 1);
+                            vTaskDelay(PYRO_FIRE_PERIOD_MAN /
+                                       portTICK_PERIOD_MS);
+                            gpio_write(PIN_FIREMAIN, 0);
+                            vTaskDelay(PYRO_RETRY_PERIOD_MAN /
+                                       portTICK_PERIOD_MS);
+                            if (gpio_read(PIN_CONTMAIN) == 0) {
+                                break;
+                            }
+                        }
                     }
                 case FIREDRG:
                     if (user_armed[1]) {
-                        gpio_write(PIN_FIREDRG, 1);
-                        vTaskDelay(1000 / portTICK_PERIOD_MS);
-                        gpio_write(PIN_FIREDRG, 0);
+                        for (int i = 0; i < PYRO_RETRIES_MAN; i++) {
+                            gpio_write(PIN_FIREDRG, 1);
+                            vTaskDelay(PYRO_FIRE_PERIOD_MAN /
+                                       portTICK_PERIOD_MS);
+                            gpio_write(PIN_FIREDRG, 0);
+                            vTaskDelay(PYRO_RETRY_PERIOD_MAN /
+                                       portTICK_PERIOD_MS);
+                            if (gpio_read(PIN_CONTDRG) == 0) {
+                                break;
+                            }
+                        }
                     }
                 case FIREAUX:
                     if (user_armed[2]) {
-                        gpio_write(PIN_FIREAUX, 1);
-                        vTaskDelay(1000 / portTICK_PERIOD_MS);
-                        gpio_write(PIN_FIREAUX, 0);
+                        for (int i = 0; i < PYRO_RETRIES_MAN; i++) {
+                            gpio_write(PIN_FIREAUX, 1);
+                            vTaskDelay(PYRO_FIRE_PERIOD_MAN /
+                                       portTICK_PERIOD_MS);
+                            gpio_write(PIN_FIREAUX, 0);
+                            vTaskDelay(PYRO_RETRY_PERIOD_MAN /
+                                       portTICK_PERIOD_MS);
+                            if (gpio_read(PIN_CONTAUX) == 0) {
+                                break;
+                            }
+                        }
                     }
                     break;
                 default:
