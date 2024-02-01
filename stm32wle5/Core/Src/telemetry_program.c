@@ -5,9 +5,13 @@
 #include "pspcom.h"
 #include "radio.h"
 #include "stdio.h"
+#include "psp_timer.h"
 
 extern volatile LoraState lora_state;
 extern const struct Radio_s Radio;
+static uint64_t last_msg_from_uart = 0;
+
+#define NO_DATA_TIMEOUT 30000
 
 UartDevice uart1 = {
     .periph = P_UART1,
@@ -15,9 +19,18 @@ UartDevice uart1 = {
 };
 
 void telemetry_program() {
+	last_msg_from_uart = MILLIS();
 	start_uart_reading(&uart1);
     while (1) {
         process_packet_from_uart();
+
+        // If we haven't been asked to send telemetry for a while something is wrong and we need to reset
+        if(MILLIS() - last_msg_from_uart > NO_DATA_TIMEOUT)
+		{
+        	printf("No data received for a while. Resetting...\n");
+        	DELAY(100);
+			NVIC_SystemReset();
+		}
     }
 }
 
@@ -96,6 +109,7 @@ void process_packet_from_air(uint8_t *payload, uint16_t length) {
         default:
             break;
     }
+
 }
 
 void process_packet_from_uart() {
@@ -106,6 +120,9 @@ void process_packet_from_uart() {
     if(pspcom_read_msg_from_uart(&uart1, &rx_msg) != STATUS_OK) {
     	return;
     }
+    // Reset receive timeout
+    last_msg_from_uart = MILLIS();
+
     if (rx_msg.msg_id == 0) {
         return;
     }
