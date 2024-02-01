@@ -1,7 +1,6 @@
 #ifndef MT29F2G_H
 #define MT29F2G_H
 
-#include "littlefs/lfs.h"
 #include "ospi.h"
 #include "status.h"
 #include "stdint.h"
@@ -15,7 +14,7 @@ typedef struct {
 } MT29F2G_CmdTypeDef;
 
 Status mt29f2g_init();
-
+/*
 int mt29f2g_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
                  void *buffer, lfs_size_t size);
 
@@ -24,7 +23,7 @@ int mt29f2g_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
 
 int mt29f2g_erase(const struct lfs_config *c, lfs_block_t block);
 
-int mt29f2g_sync(const struct lfs_config *c);
+int mt29f2g_sync(const struct lfs_config *c);*/
 
 static const OSPI_RegularCmdTypeDef mt29f2g_default_cmd = {
     .AddressMode = HAL_OSPI_ADDRESS_1_LINE,

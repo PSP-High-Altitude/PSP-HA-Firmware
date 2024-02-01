@@ -10,7 +10,6 @@
 #include "gpio/gpio.h"
 #include "iis2mdc/iis2mdc.h"
 #include "kx134/kx134.h"
-#include "lfs.h"
 #include "lsm6dsox/lsm6dsox.h"
 #include "max_m10s.h"
 #include "ms5637/ms5637.h"

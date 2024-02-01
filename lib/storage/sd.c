@@ -2,6 +2,7 @@
 
 #include "fatfs/ff.h"
 #include "pb_encode.h"
+#include "stdio.h"
 #include "timer.h"
 
 #define FNAME_LEN 16
@@ -10,10 +11,12 @@
 #define SENSOR_BUF_LEN 256
 #define GPS_BUF_LEN 256
 
+#define SD_MOUNT_POINT "/SD"
+
 static FATFS s_fs;
 
-static char s_filename[FNAME_LEN] = "dat_00.pb3";
-static char s_gpsfname[FNAME_LEN] = "gps_00.pb3";
+static char s_filename[FNAME_LEN] = SD_MOUNT_POINT "/dat_00.pb3";
+static char s_gpsfname[FNAME_LEN] = SD_MOUNT_POINT "/gps_00.pb3";
 
 static FIL s_datfile;
 static FIL s_gpsfile;
@@ -85,26 +88,27 @@ static Status sd_create_gps_file() {
 
 Status sd_init(SdDevice* dev) {
     diskio_init(dev);
-
-    if (f_mount(&s_fs, "", 0) != FR_OK) {
+    if (f_mount(&s_fs, SD_MOUNT_POINT, 0) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
     // Increment the suffix of the filename until we find an unused name
     // I'll do this properly at some point I swear
     while (f_stat(s_filename, 0) == FR_OK) {
-        if (s_filename[5] == '9') {
-            if (s_filename[4] == '9') {
+        if (s_filename[6 + strlen(SD_MOUNT_POINT)] == '9') {
+            if (s_filename[5 + strlen(SD_MOUNT_POINT)] == '9') {
                 return STATUS_DATA_ERROR;
             }
-            s_filename[4] += 1;
-            s_filename[5] = '0';
+            s_filename[5 + strlen(SD_MOUNT_POINT)] += 1;
+            s_filename[6 + strlen(SD_MOUNT_POINT)] = '0';
         } else {
-            s_filename[5] += 1;
+            s_filename[6 + strlen(SD_MOUNT_POINT)] += 1;
         }
     }
-    s_gpsfname[4] = s_filename[4];
-    s_gpsfname[5] = s_filename[5];
+    s_gpsfname[5 + strlen(SD_MOUNT_POINT)] =
+        s_filename[5 + strlen(SD_MOUNT_POINT)];
+    s_gpsfname[6 + strlen(SD_MOUNT_POINT)] =
+        s_filename[6 + strlen(SD_MOUNT_POINT)];
 
     // Initialize the sensor file and stream
     Status sensor_status = sd_create_sensor_file();
@@ -163,7 +167,7 @@ Status sd_reinit() {
     if (hal_reinit_card() != STATUS_OK) {
         return STATUS_HARDWARE_ERROR;
     }
-    if (f_mount(&s_fs, "", 0) != FR_OK) {
+    if (f_mount(&s_fs, SD_MOUNT_POINT, 0) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
     if (f_open(&s_datfile, s_filename, FA_OPEN_APPEND | FA_WRITE) != FR_OK) {
@@ -183,7 +187,7 @@ Status sd_deinit() {
     if (f_close(&s_gpsfile) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
-    if (f_unmount("") != FR_OK) {
+    if (f_unmount(SD_MOUNT_POINT) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
