@@ -8,7 +8,6 @@
 #include "clocks.h"
 #include "data.h"
 #include "flight_estimation.h"
-#include "flight_logic.h"
 #include "gpio/gpio.h"
 #include "iis2mdc/iis2mdc.h"
 #include "kx134/kx134.h"
@@ -30,15 +29,7 @@
 #include "task.h"
 
 extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
-SensorFrame s_last_sensor_data;
-GPS_Fix_TypeDef s_last_fix;
-PAL_Data_Typedef s_last_data = {
-    .sensor_frame = &s_last_sensor_data,
-    .gps_fix = &s_last_fix,
-};
-static TickType_t s_last_sensor_read_ticks;
-volatile static int s_fix_avail = 0;
-
+static SensorData s_last_sensor_data;
 static TaskHandle_t s_read_sensors_handle;
 static TaskHandle_t s_read_gps_handle;
 static TaskHandle_t s_store_data_handle;
@@ -50,7 +41,7 @@ static TaskHandle_t s_sensor_telem_handle;
 #endif
 
 volatile static struct {
-    SensorFrame queue[LOG_FIFO_LEN];
+    SensorData queue[LOG_FIFO_LEN];
     size_t head;  // Next index that will be read from
     size_t tail;  // Next index that will be written to
     size_t count;
@@ -64,14 +55,14 @@ void init_fifo() {
     fifo.count = 0;
 }
 
-SensorFrame read_fifo() {
-    SensorFrame ret = fifo.queue[fifo.head];
+SensorData read_fifo() {
+    SensorData ret = fifo.queue[fifo.head];
     fifo.head = (fifo.head + 1) % LOG_FIFO_LEN;
     fifo.count--;
     return ret;
 }
 
-void write_fifo(SensorFrame data) {
+void write_fifo(SensorData data) {
     if (fifo.count == LOG_FIFO_LEN) {
         fifo.head = (fifo.head + 1) % LOG_FIFO_LEN;
         fifo.count--;
@@ -156,21 +147,21 @@ void read_sensors() {
 
         s_last_sensor_data.timestamp = timestamp;
 
-        s_last_sensor_data.acc_h_x = acch.accelX;
-        s_last_sensor_data.acc_h_y = acch.accelY;
-        s_last_sensor_data.acc_h_z = acch.accelZ;
+        s_last_sensor_data.acch.x = acch.accelX;
+        s_last_sensor_data.acch.y = acch.accelY;
+        s_last_sensor_data.acch.z = acch.accelZ;
 
-        s_last_sensor_data.acc_i_x = accel.accelX;
-        s_last_sensor_data.acc_i_y = accel.accelY;
-        s_last_sensor_data.acc_i_z = accel.accelZ;
+        s_last_sensor_data.accel.x = accel.accelX;
+        s_last_sensor_data.accel.y = accel.accelY;
+        s_last_sensor_data.accel.z = accel.accelZ;
 
-        s_last_sensor_data.rot_i_x = gyro.gyroX;
-        s_last_sensor_data.rot_i_y = gyro.gyroY;
-        s_last_sensor_data.rot_i_z = gyro.gyroZ;
+        s_last_sensor_data.gyro.x = gyro.gyroX;
+        s_last_sensor_data.gyro.y = gyro.gyroY;
+        s_last_sensor_data.gyro.z = gyro.gyroZ;
 
-        s_last_sensor_data.mag_i_x = mag.magX;
-        s_last_sensor_data.mag_i_y = mag.magY;
-        s_last_sensor_data.mag_i_z = mag.magZ;
+        s_last_sensor_data.mag.x = mag.magX;
+        s_last_sensor_data.mag.y = mag.magY;
+        s_last_sensor_data.mag.z = mag.magZ;
 
         s_last_sensor_data.temperature = baro.temperature;
         s_last_sensor_data.pressure = baro.pressure;
@@ -245,6 +236,35 @@ GpsFrame gps_fix_to_pb_frame(uint64_t timestamp,
 
     return gps_frame;
 }
+
+SensorFrame sensor_data_to_pb_frame(const SensorData *data) {
+    SensorFrame sensor_frame;
+
+    // Copy data
+    sensor_frame.timestamp = s_last_sensor_data.timestamp;
+
+    sensor_frame.acc_h_x = s_last_sensor_data.acch.x;
+    sensor_frame.acc_h_y = s_last_sensor_data.acch.y;
+    sensor_frame.acc_h_z = s_last_sensor_data.acch.z;
+
+    sensor_frame.acc_i_x = s_last_sensor_data.accel.x;
+    sensor_frame.acc_i_y = s_last_sensor_data.accel.y;
+    sensor_frame.acc_i_z = s_last_sensor_data.accel.z;
+
+    sensor_frame.rot_i_x = s_last_sensor_data.gyro.x;
+    sensor_frame.rot_i_y = s_last_sensor_data.gyro.y;
+    sensor_frame.rot_i_z = s_last_sensor_data.gyro.z;
+
+    sensor_frame.mag_i_x = s_last_sensor_data.mag.x;
+    sensor_frame.mag_i_y = s_last_sensor_data.mag.y;
+    sensor_frame.mag_i_z = s_last_sensor_data.mag.z;
+
+    sensor_frame.temperature = s_last_sensor_data.temperature;
+    sensor_frame.pressure = s_last_sensor_data.pressure;
+
+    return sensor_frame;
+}
+
 void do_state_est() {
     // initialize stuff
     s_flight_phase = FP_INIT;
@@ -254,8 +274,7 @@ void do_state_est() {
     while (1) {
         uint32_t notif_value;
         xTaskNotifyWait(0, 0xffffffffUL, &notif_value, 100);
-        SensorData sensorData = sensorFrame2SensorData(s_last_sensor_data);
-        fp_update(sensorData, &s_flight_phase, &s_current_state);
+        fp_update(s_last_sensor_data, &s_flight_phase, &s_current_state);
         printf("phase: %d, accel (m/s^2): {%7.2f, %7.2f, %7.2f}\n",
                s_flight_phase, s_current_state.accBody.x,
                s_current_state.accBody.y, s_current_state.accBody.z);
@@ -294,7 +313,8 @@ void store_data() {
 #endif
         uint32_t entries_read = 0;
         while (fifo.count > 0) {
-            SensorFrame log = read_fifo();
+            SensorData sens_data = read_fifo();
+            SensorFrame log = sensor_data_to_pb_frame(&sens_data);
             Status code = sd_write_sensor_data(&log);
             if (code != STATUS_OK) {
                 printf("SD sensor write error %d\n", code);
@@ -353,6 +373,9 @@ int main(void) {
 
     DELAY(4700);
     printf("Starting initialization...\n");
+
+    // Initialize sensor data
+    s_last_sensor_data.timestamp = 0;
 
     // Initialize magnetometer
     if (iis2mdc_init(&s_mag_conf, IIS2MDC_ODR_100_HZ) == STATUS_OK) {

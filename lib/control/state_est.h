@@ -12,12 +12,13 @@
 
 typedef struct {
     // x is up!
-    Vector posNED;
-    Vector velNED;
-    Vector accNED;
-    Vector velBody;
-    Vector accBody;
-    Vector orientation;
+    float time;          // seconds
+    Vector posNED;       // m
+    Vector velNED;       // m/s
+    Vector accNED;       // m/s^2
+    Vector velBody;      // m/s
+    Vector accBody;      // m/s^2
+    Vector orientation;  // deg ??
 } StateEst;
 
 StateEst zeroState();
