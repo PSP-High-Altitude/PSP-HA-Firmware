@@ -14,26 +14,30 @@ typedef struct {
 } MT29F2G_CmdTypeDef;
 
 Status mt29f2g_init();
-/*
-int mt29f2g_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
-                 void *buffer, lfs_size_t size);
 
-int mt29f2g_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
-                 const void *buffer, lfs_size_t size);
+Status mt29f2g_read_pages(uint8_t *buffer, uint32_t page, uint32_t num_pages);
 
-int mt29f2g_erase(const struct lfs_config *c, lfs_block_t block);
+Status mt29f2g_write_pages(uint8_t *buffer, uint32_t page, uint32_t num_pages);
 
-int mt29f2g_sync(const struct lfs_config *c);*/
+Status mt29f2g_erase_blocks(uint32_t block_start, uint32_t block_end);
+
+Status mt29f2g_sync();
 
 static const OSPI_RegularCmdTypeDef mt29f2g_default_cmd = {
+    .OperationType = HAL_OSPI_OPTYPE_COMMON_CFG,
+    .FlashId = HAL_OSPI_FLASH_ID_1,
+    .InstructionSize = HAL_OSPI_INSTRUCTION_8_BITS,
+    .DataDtrMode = HAL_OSPI_DATA_DTR_DISABLE,
     .AddressMode = HAL_OSPI_ADDRESS_1_LINE,
     .AlternateBytesMode = HAL_OSPI_ALTERNATE_BYTES_NONE,
     .AlternateBytesSize = HAL_OSPI_ALTERNATE_BYTES_8_BITS,
-    .DataMode = HAL_OSPI_DATA_NONE,
+    .AlternateBytesDtrMode = HAL_OSPI_ALTERNATE_BYTES_DTR_DISABLE,
+    .DataMode = HAL_OSPI_DATA_1_LINE,
     .InstructionMode = HAL_OSPI_INSTRUCTION_1_LINE,
     .SIOOMode = HAL_OSPI_SIOO_INST_EVERY_CMD,
     .InstructionDtrMode = HAL_OSPI_INSTRUCTION_DTR_DISABLE,
     .AddressDtrMode = HAL_OSPI_ADDRESS_DTR_DISABLE,
+    .DQSMode = HAL_OSPI_DQS_DISABLE,
 };
 
 static const OSPI_AutoPollingTypeDef mt29f2g_default_auto = {

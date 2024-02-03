@@ -13,7 +13,7 @@
 #include "lsm6dsox/lsm6dsox.h"
 #include "max_m10s.h"
 #include "ms5637/ms5637.h"
-#include "mt29f2g.h"
+#include "nand_flash.h"
 #include "pb.h"
 #include "pspcom.h"
 #include "sd.h"
@@ -408,6 +408,15 @@ int main(void) {
         printf("SD card initialization failed\n");
     }
 
+    /*
+    // Initialize flash memory
+    if (nand_flash_init() == STATUS_OK) {
+        printf("Flash initialization successful\n");
+    } else {
+        printf("Flash initialization failed\n");
+    }
+    */
+
     // Initialize PSPCOM connection
     if (pspcom_init() == STATUS_OK) {
         printf("PSPCOM initialization successful\n");
@@ -524,26 +533,26 @@ void Error_Handler(void) {
 void NMI_Handler(void) { printf("nmi\n"); }
 
 void HardFault_Handler(void) {
+    printf("hard fault\n");
     while (1) {
-        printf("hard fault\n");
     }
 }
 
 void MemManage_Handler(void) {
+    printf("memmanage\n");
     while (1) {
-        printf("memmanage\n");
     }
 }
 
 void BusFault_Handler(void) {
+    printf("bus fault\n");
     while (1) {
-        printf("bus fault\n");
     }
 }
 
 void UsageFault_Handler(void) {
+    printf("usage fault\n");
     while (1) {
-        printf("usage fault\n");
     }
 }
 

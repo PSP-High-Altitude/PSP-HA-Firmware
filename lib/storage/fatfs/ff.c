@@ -23,7 +23,6 @@
 #include <string.h>
 
 #include "diskio.h" /* Declarations of device I/O functions */
-#include "stdio.h"
 
 /*--------------------------------------------------------------------------
 
@@ -4025,7 +4024,7 @@ FRESULT f_mount (
 
 	/* Get volume ID (logical drive number) */
 	vol = get_ldnumber(&rp);
-	if (vol < 0) return FR_INVALID_DRIVE;
+        if (vol < 0) return FR_INVALID_DRIVE;
 	cfs = FatFs[vol];			/* Pointer to the filesystem object of the volume */
 
 	if (cfs) {					/* Unregister current filesystem object if regsitered */

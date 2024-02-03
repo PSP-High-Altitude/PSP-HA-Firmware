@@ -118,6 +118,11 @@ void SystemClock_Config() {
     // Initialize QSPI
     __HAL_RCC_OCTOSPIM_CLK_ENABLE();
     __HAL_RCC_OSPI1_CLK_ENABLE();
+    __HAL_RCC_OSPI1_FORCE_RESET();
+    __HAL_RCC_OSPI1_RELEASE_RESET();
+
+    // Initalize MDMA
+    __HAL_RCC_MDMA_CLK_ENABLE();
 
     // Initialize SDMMC
     __HAL_RCC_SDMMC1_CLK_ENABLE();

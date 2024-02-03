@@ -15,9 +15,11 @@
 
 ---------------------------------------------------------------------------*/
 
-#include "FreeRTOS.h"
 #include "fatfs/diskio.h"
+
+#include "FreeRTOS.h"
 #include "gpio/gpio.h"
+#include "mt29f2g.h"
 #include "sd.h"
 #include "sdmmc/sdmmc.h"
 #include "spi/spi.h"
@@ -48,7 +50,8 @@
 #define CMD55 (55)         /* APP_CMD */
 #define CMD58 (58)         /* READ_OCR */
 
-static volatile DSTATUS Stat = STA_NOINIT; /* Physical drive status */
+static volatile DSTATUS Stat[FF_VOLUMES] = {
+    STA_NOINIT, STA_NOINIT}; /* Physical drive status */
 static volatile UINT Timer1,
     Timer2; /* 1kHz decrement timer stopped at zero (disk_timerproc()) */
 
@@ -77,20 +80,20 @@ void generate_crc_table() {
 }
 
 // adds a message byte to the current CRC-7 to get a the new CRC-7
-uint8_t crc_add(uint8_t CRC, uint8_t message_byte) {
-    return s_crc_table[(CRC << 1) ^ message_byte];
+uint8_t crc_add(uint8_t crc, uint8_t message_byte) {
+    return s_crc_table[(crc << 1) ^ message_byte];
 }
 
 // returns the CRC-7 for a message of "length" bytes
 uint8_t get_crc(uint8_t message[], int length) {
     int i;
-    uint8_t CRC = 0;
+    uint8_t crc = 0;
 
     for (i = 0; i < length; ++i) {
-        CRC = crc_add(CRC, message[i]);
+        crc = crc_add(crc, message[i]);
     }
 
-    return CRC;
+    return crc;
 }
 
 // returns the CRC-7 for a message of "length" bytes
@@ -353,69 +356,79 @@ static Status check_status(uint64_t timeout) {
 
 DSTATUS disk_initialize(BYTE drv /* Physical drive number (0) */
 ) {
-    if (drv) return STA_NOINIT; /* Supports only drive 0 */
-
-    if (Stat & STA_NODISK) return Stat; /* Is card existing in the soket? */
+    if (drv == 0) {
+        if (Stat[0] & STA_NODISK)
+            return Stat[0]; /* Is card existing in the soket? */
 
 #ifndef SD
-    BYTE n, cmd, ty, ocr[4];
-    SpiSpeed original_speed = s_sd_spi_device.clk;
-    s_sd_spi_device.clk = SPI_SPEED_100kHz;
-    spi_setup(&s_sd_spi_device);         /* Initialize SPI with slow clock */
-    for (n = 10; n; n--) xchg_spi(0xFF); /* Send 80 dummy clocks */
+        BYTE n, cmd, ty, ocr[4];
+        SpiSpeed original_speed = s_sd_spi_device.clk;
+        s_sd_spi_device.clk = SPI_SPEED_100kHz;
+        spi_setup(&s_sd_spi_device); /* Initialize SPI with slow clock */
+        for (n = 10; n; n--) xchg_spi(0xFF); /* Send 80 dummy clocks */
 
-    ty = 0;
-    if (send_cmd(CMD0, 0) == 1) {         /* Put the card SPI/Idle state */
-        Timer1 = 1000;                    /* Initialization timeout = 1 sec */
-        if (send_cmd(CMD8, 0x1AA) == 1) { /* SDv2? */
-            for (n = 0; n < 4; n++)
-                ocr[n] =
-                    xchg_spi(0xFF); /* Get 32 bit return value of R7 resp */
-            if (ocr[2] == 0x01 &&
-                ocr[3] == 0xAA) { /* Is the card supports vcc of 2.7-3.6V? */
-                while (Timer1 && send_cmd(ACMD41, 1UL << 30))
-                    ; /* Wait for end of initialization with ACMD41(HCS) */
-                if (Timer1 &&
-                    send_cmd(CMD58, 0) == 0) { /* Check CCS bit in the OCR */
-                    for (n = 0; n < 4; n++) ocr[n] = xchg_spi(0xFF);
-                    ty = (ocr[0] & 0x40) ? CT_SDC2 | CT_BLOCK
-                                         : CT_SDC2; /* Card id SDv2 */
+        ty = 0;
+        if (send_cmd(CMD0, 0) == 1) { /* Put the card SPI/Idle state */
+            Timer1 = 1000;            /* Initialization timeout = 1 sec */
+            if (send_cmd(CMD8, 0x1AA) == 1) { /* SDv2? */
+                for (n = 0; n < 4; n++)
+                    ocr[n] =
+                        xchg_spi(0xFF); /* Get 32 bit return value of R7 resp */
+                if (ocr[2] == 0x01 &&
+                    ocr[3] ==
+                        0xAA) { /* Is the card supports vcc of 2.7-3.6V? */
+                    while (Timer1 && send_cmd(ACMD41, 1UL << 30))
+                        ; /* Wait for end of initialization with ACMD41(HCS) */
+                    if (Timer1 && send_cmd(CMD58, 0) ==
+                                      0) { /* Check CCS bit in the OCR */
+                        for (n = 0; n < 4; n++) ocr[n] = xchg_spi(0xFF);
+                        ty = (ocr[0] & 0x40) ? CT_SDC2 | CT_BLOCK
+                                             : CT_SDC2; /* Card id SDv2 */
+                    }
                 }
+            } else {                            /* Not SDv2 card */
+                if (send_cmd(ACMD41, 0) <= 1) { /* SDv1 or MMC? */
+                    ty = CT_SDC1;
+                    cmd = ACMD41; /* SDv1 (ACMD41(0)) */
+                } else {
+                    ty = CT_MMC3;
+                    cmd = CMD1; /* MMCv3 (CMD1(0)) */
+                }
+                while (Timer1 && send_cmd(cmd, 0))
+                    ; /* Wait for end of initialization */
+                if (!Timer1 ||
+                    send_cmd(CMD16, 512) != 0) /* Set block length: 512 */
+                    ty = 0;
             }
-        } else {                            /* Not SDv2 card */
-            if (send_cmd(ACMD41, 0) <= 1) { /* SDv1 or MMC? */
-                ty = CT_SDC1;
-                cmd = ACMD41; /* SDv1 (ACMD41(0)) */
-            } else {
-                ty = CT_MMC3;
-                cmd = CMD1; /* MMCv3 (CMD1(0)) */
-            }
-            while (Timer1 && send_cmd(cmd, 0))
-                ; /* Wait for end of initialization */
-            if (!Timer1 ||
-                send_cmd(CMD16, 512) != 0) /* Set block length: 512 */
-                ty = 0;
         }
-    }
-    CardType = ty; /* Card type */
-    deselect();
+        CardType = ty; /* Card type */
+        deselect();
 
-    if (ty) { /* OK */
-        s_sd_spi_device.clk = original_speed;
-        spi_setup(&s_sd_spi_device); /* Set clock back to original */
-        Stat &= ~STA_NOINIT;         /* Clear STA_NOINIT flag */
-    } else {                         /* Failed */
-        Stat = STA_NOINIT;
-    }
+        if (ty) { /* OK */
+            s_sd_spi_device.clk = original_speed;
+            spi_setup(&s_sd_spi_device); /* Set clock back to original */
+            Stat[0] &= ~STA_NOINIT;      /* Clear STA_NOINIT flag */
+        } else {                         /* Failed */
+            Stat[0] = STA_NOINIT;
+        }
 
 #else
-    if (sdmmc_setup(&s_sd_sdmmc_device) != STATUS_OK) {
-        Stat = STA_NOINIT;
-        return Stat;
-    }
-    Stat &= ~STA_NOINIT; /* Clear STA_NOINIT flag */
+        if (sdmmc_setup(&s_sd_sdmmc_device) != STATUS_OK) {
+            Stat[0] = STA_NOINIT;
+            return Stat[0];
+        }
+        Stat[0] &= ~STA_NOINIT; /* Clear STA_NOINIT flag */
 #endif
-    return Stat;
+        return Stat[0];
+    } else if (drv == 1) {
+        if (mt29f2g_init() != STATUS_OK) {
+            Stat[1] = STA_NOINIT;
+            return Stat[1];
+        }
+        Stat[1] &= ~STA_NOINIT; /* Clear STA_NOINIT flag */
+        return Stat[1];
+    }
+    return STA_NOINIT;
 }
 
 /*-----------------------------------------------------------------------*/
@@ -424,9 +437,9 @@ DSTATUS disk_initialize(BYTE drv /* Physical drive number (0) */
 
 DSTATUS disk_status(BYTE drv /* Physical drive number (0) */
 ) {
-    if (drv) return STA_NOINIT; /* Supports only drive 0 */
+    if (drv > 1) return STA_NOINIT;
 
-    return Stat; /* Return disk status */
+    return Stat[drv]; /* Return disk status */
 }
 
 /*-----------------------------------------------------------------------*/
@@ -440,38 +453,46 @@ DRESULT disk_read(
     UINT count    /* Number of sectors to read (1..128) */
 ) {
     DWORD sect = (DWORD)sector;
-
+    if (drv == 0) {
 #ifndef SD
-    if (drv || !count) return RES_PARERR;     /* Check parameter */
-    if (Stat & STA_NOINIT) return RES_NOTRDY; /* Check if drive is ready */
+        if (!count) return RES_PARERR; /* Check parameter */
+        if (Stat[0] & STA_NOINIT)
+            return RES_NOTRDY; /* Check if drive is ready */
 
-    if (!(CardType & CT_BLOCK))
-        sect *= 512; /* LBA ot BA conversion (byte addressing cards) */
+        if (!(CardType & CT_BLOCK))
+            sect *= 512; /* LBA ot BA conversion (byte addressing cards) */
 
-    if (count == 1) {                    /* Single sector read */
-        if ((send_cmd(CMD17, sect) == 0) /* READ_SINGLE_BLOCK */
-            && rcvr_datablock(buff, 512)) {
-            count = 0;
+        if (count == 1) {                    /* Single sector read */
+            if ((send_cmd(CMD17, sect) == 0) /* READ_SINGLE_BLOCK */
+                && rcvr_datablock(buff, 512)) {
+                count = 0;
+            }
+        } else {                              /* Multiple sector read */
+            if (send_cmd(CMD18, sect) == 0) { /* READ_MULTIPLE_BLOCK */
+                do {
+                    if (!rcvr_datablock(buff, 512)) break;
+                    buff += 512;
+                } while (--count);
+                send_cmd(CMD12, 0); /* STOP_TRANSMISSION */
+            }
         }
-    } else {                              /* Multiple sector read */
-        if (send_cmd(CMD18, sect) == 0) { /* READ_MULTIPLE_BLOCK */
-            do {
-                if (!rcvr_datablock(buff, 512)) break;
-                buff += 512;
-            } while (--count);
-            send_cmd(CMD12, 0); /* STOP_TRANSMISSION */
-        }
-    }
-    deselect();
+        deselect();
 
-    return count ? RES_ERROR : RES_OK; /* Return result */
+        return count ? RES_ERROR : RES_OK; /* Return result */
 #else
-    if (sdmmc_read_blocks(&s_sd_sdmmc_device, (uint8_t *)buff, sect, count) !=
-        STATUS_OK) {
-        return RES_ERROR;
-    }
-    return RES_OK;
+        if (sdmmc_read_blocks(&s_sd_sdmmc_device, (uint8_t *)buff, sect,
+                              count) != STATUS_OK) {
+            return RES_ERROR;
+        }
+        return RES_OK;
 #endif
+    } else if (drv == 1) {
+        if (mt29f2g_read_pages((uint8_t *)buff, sect, count) != STATUS_OK) {
+            return RES_ERROR;
+        }
+        return RES_OK;
+    }
+    return RES_PARERR;
 }
 
 /*-----------------------------------------------------------------------*/
@@ -486,40 +507,48 @@ DRESULT disk_write(BYTE drv,         /* Physical drive number (0) */
 ) {
     DWORD sect = (DWORD)sector;
 
+    if (drv == 0) {
 #ifndef SD
-    if (drv || !count) return RES_PARERR;     /* Check parameter */
-    if (Stat & STA_NOINIT) return RES_NOTRDY; /* Check drive status */
-    if (Stat & STA_PROTECT) return RES_WRPRT; /* Check write protect */
+        if (!count) return RES_PARERR;               /* Check parameter */
+        if (Stat[0] & STA_NOINIT) return RES_NOTRDY; /* Check drive status */
+        if (Stat[0] & STA_PROTECT) return RES_WRPRT; /* Check write protect */
 
-    if (!(CardType & CT_BLOCK))
-        sect *= 512; /* LBA ==> BA conversion (byte addressing cards) */
+        if (!(CardType & CT_BLOCK))
+            sect *= 512; /* LBA ==> BA conversion (byte addressing cards) */
 
-    if (count == 1) {                    /* Single sector write */
-        if ((send_cmd(CMD24, sect) == 0) /* WRITE_BLOCK */
-            && xmit_datablock(buff, 0xFE)) {
-            count = 0;
+        if (count == 1) {                    /* Single sector write */
+            if ((send_cmd(CMD24, sect) == 0) /* WRITE_BLOCK */
+                && xmit_datablock(buff, 0xFE)) {
+                count = 0;
+            }
+        } else { /* Multiple sector write */
+            if (CardType & CT_SDC)
+                send_cmd(ACMD23, count);      /* Predefine number of sectors */
+            if (send_cmd(CMD25, sect) == 0) { /* WRITE_MULTIPLE_BLOCK */
+                do {
+                    if (!xmit_datablock(buff, 0xFC)) break;
+                    buff += 512;
+                } while (--count);
+                if (!xmit_datablock(0, 0xFD)) count = 1; /* STOP_TRAN token */
+            }
         }
-    } else { /* Multiple sector write */
-        if (CardType & CT_SDC)
-            send_cmd(ACMD23, count);      /* Predefine number of sectors */
-        if (send_cmd(CMD25, sect) == 0) { /* WRITE_MULTIPLE_BLOCK */
-            do {
-                if (!xmit_datablock(buff, 0xFC)) break;
-                buff += 512;
-            } while (--count);
-            if (!xmit_datablock(0, 0xFD)) count = 1; /* STOP_TRAN token */
-        }
-    }
-    deselect();
+        deselect();
 
-    return count ? RES_ERROR : RES_OK; /* Return result */
+        return count ? RES_ERROR : RES_OK; /* Return result */
 #else
-    if (sdmmc_write_blocks(&s_sd_sdmmc_device, (uint8_t *)buff, sect, count) !=
-        STATUS_OK) {
-        return RES_ERROR;
-    }
-    return RES_OK;
+        if (sdmmc_write_blocks(&s_sd_sdmmc_device, (uint8_t *)buff, sect,
+                               count) != STATUS_OK) {
+            return RES_ERROR;
+        }
+        return RES_OK;
 #endif
+    } else if (drv == 1) {
+        if (mt29f2g_write_pages((uint8_t *)buff, sect, count) != STATUS_OK) {
+            return RES_ERROR;
+        }
+        return RES_OK;
+    }
+    return RES_PARERR;
 }
 #endif
 
@@ -541,183 +570,220 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
     DRESULT res;
     LBA_t *dp;
 
-    if (drv) return RES_PARERR;               /* Check parameter */
-    if (Stat & STA_NOINIT) return RES_NOTRDY; /* Check if drive is ready */
+    if (drv == 0) {
+        if (Stat[0] & STA_NOINIT)
+            return RES_NOTRDY; /* Check if drive is ready */
 
-    res = RES_ERROR;
+        res = RES_ERROR;
 
-    switch (cmd) {
-        case CTRL_SYNC: /* Wait for end of internal write process of the drive
-                         */
+        switch (cmd) {
+            case CTRL_SYNC: /* Wait for end of internal write process of the
+                             * drive
+                             */
 #ifndef SD
-            if (select()) res = RES_OK;
-            break;
-#else
-            if (check_status(200) != STATUS_OK) {
-                res = RES_ERROR;
+                if (select()) res = RES_OK;
                 break;
-            }
-            res = RES_OK;
-            break;
-#endif
-
-        case GET_SECTOR_COUNT: /* Get drive capacity in unit of sector (DWORD)
-                                */
-#ifndef SD
-            if ((send_cmd(CMD9, 0) == 0) && rcvr_datablock(csd, 16)) {
-                if ((csd[0] >> 6) == 1) { /* SDC CSD ver 2 */
-                    csize = csd[9] + ((WORD)csd[8] << 8) +
-                            ((DWORD)(csd[7] & 63) << 16) + 1;
-                    *(LBA_t *)buff = csize << 10;
-                } else { /* SDC CSD ver 1 or MMC */
-                    n = (csd[5] & 15) + ((csd[10] & 128) >> 7) +
-                        ((csd[9] & 3) << 1) + 2;
-                    csize = (csd[8] >> 6) + ((WORD)csd[7] << 2) +
-                            ((WORD)(csd[6] & 3) << 10) + 1;
-                    *(LBA_t *)buff = csize << (n - 9);
+#else
+                if (check_status(200) != STATUS_OK) {
+                    res = RES_ERROR;
+                    break;
                 }
                 res = RES_OK;
-            }
-            break;
-#else
-            if (sdmmc_info(&s_sd_sdmmc_device, &info) != STATUS_OK) {
-                res = RES_ERROR;
                 break;
-            }
-            *(DWORD *)buff = info.LogBlockNbr;
-            res = RES_OK;
-            break;
 #endif
 
-#ifdef SD
-        case GET_SECTOR_SIZE: /* Get sector size (WORD) */
-            if (sdmmc_info(&s_sd_sdmmc_device, &info) != STATUS_OK) {
-                res = RES_ERROR;
-                break;
-            }
-            *(WORD *)buff = info.LogBlockSize;
-            res = RES_OK;
-            break;
-#endif
-
-        case GET_BLOCK_SIZE: /* Get erase block size in unit of sector (DWORD)
-                              */
+            case GET_SECTOR_COUNT: /* Get drive capacity in unit of sector
+                                    * (DWORD)
+                                    */
 #ifndef SD
-            if (CardType & CT_SDC2) {           /* SDC ver 2+ */
-                if (send_cmd(ACMD13, 0) == 0) { /* Read SD status */
-                    xchg_spi(0xFF);
-                    if (rcvr_datablock(csd, 16)) { /* Read partial block */
-                        for (n = 64 - 16; n; n--)
-                            xchg_spi(0xFF); /* Purge trailing data */
-                        *(DWORD *)buff = 16UL << (csd[10] >> 4);
-                        res = RES_OK;
-                    }
-                }
-            } else { /* SDC ver 1 or MMC */
-                if ((send_cmd(CMD9, 0) == 0) &&
-                    rcvr_datablock(csd, 16)) { /* Read CSD */
-                    if (CardType & CT_SDC1) {  /* SDC ver 1.XX */
-                        *(DWORD *)buff = (((csd[10] & 63) << 1) +
-                                          ((WORD)(csd[11] & 128) >> 7) + 1)
-                                         << ((csd[13] >> 6) - 1);
-                    } else { /* MMC */
-                        *(DWORD *)buff =
-                            ((WORD)((csd[10] & 124) >> 2) + 1) *
-                            (((csd[11] & 3) << 3) + ((csd[11] & 224) >> 5) + 1);
+                if ((send_cmd(CMD9, 0) == 0) && rcvr_datablock(csd, 16)) {
+                    if ((csd[0] >> 6) == 1) { /* SDC CSD ver 2 */
+                        csize = csd[9] + ((WORD)csd[8] << 8) +
+                                ((DWORD)(csd[7] & 63) << 16) + 1;
+                        *(LBA_t *)buff = csize << 10;
+                    } else { /* SDC CSD ver 1 or MMC */
+                        n = (csd[5] & 15) + ((csd[10] & 128) >> 7) +
+                            ((csd[9] & 3) << 1) + 2;
+                        csize = (csd[8] >> 6) + ((WORD)csd[7] << 2) +
+                                ((WORD)(csd[6] & 3) << 10) + 1;
+                        *(LBA_t *)buff = csize << (n - 9);
                     }
                     res = RES_OK;
                 }
-            }
-            break;
+                break;
 #else
-            if (sdmmc_info(&s_sd_sdmmc_device, &info) != STATUS_OK) {
-                res = RES_ERROR;
+                if (sdmmc_info(&s_sd_sdmmc_device, &info) != STATUS_OK) {
+                    res = RES_ERROR;
+                    break;
+                }
+                *(DWORD *)buff = info.LogBlockNbr;
+                res = RES_OK;
                 break;
-            }
-            *(WORD *)buff = info.LogBlockSize / 512;
-            res = RES_OK;
-            break;
 #endif
 
-        case CTRL_TRIM: /* Erase a block of sectors (used when _USE_ERASE == 1)
-                         */
+#ifdef SD
+            case GET_SECTOR_SIZE: /* Get sector size (WORD) */
+                if (sdmmc_info(&s_sd_sdmmc_device, &info) != STATUS_OK) {
+                    res = RES_ERROR;
+                    break;
+                }
+                *(WORD *)buff = info.LogBlockSize;
+                res = RES_OK;
+                break;
+#endif
+
+            case GET_BLOCK_SIZE: /* Get erase block size in unit of sector
+                                  * (DWORD)
+                                  */
 #ifndef SD
-            if (!(CardType & CT_SDC)) break; /* Check if the card is SDC */
-            if (disk_ioctl(drv, MMC_GET_CSD, csd)) break; /* Get CSD */
-            if (!(csd[10] & 0x40)) break; /* Check if ERASE_BLK_EN = 1 */
-            dp = buff;
-            st = (DWORD)dp[0];
-            ed = (DWORD)dp[1]; /* Load sector block */
-            if (!(CardType & CT_BLOCK)) {
-                st *= 512;
-                ed *= 512;
-            }
-            if (send_cmd(CMD32, st) == 0 && send_cmd(CMD33, ed) == 0 &&
-                send_cmd(CMD38, 0) == 0 &&
-                wait_ready(30000)) { /* Erase sector block */
-                res = RES_OK; /* FatFs does not check result of this command */
-            }
-            break;
+                if (CardType & CT_SDC2) {           /* SDC ver 2+ */
+                    if (send_cmd(ACMD13, 0) == 0) { /* Read SD status */
+                        xchg_spi(0xFF);
+                        if (rcvr_datablock(csd, 16)) { /* Read partial block */
+                            for (n = 64 - 16; n; n--)
+                                xchg_spi(0xFF); /* Purge trailing data */
+                            *(DWORD *)buff = 16UL << (csd[10] >> 4);
+                            res = RES_OK;
+                        }
+                    }
+                } else { /* SDC ver 1 or MMC */
+                    if ((send_cmd(CMD9, 0) == 0) &&
+                        rcvr_datablock(csd, 16)) { /* Read CSD */
+                        if (CardType & CT_SDC1) {  /* SDC ver 1.XX */
+                            *(DWORD *)buff = (((csd[10] & 63) << 1) +
+                                              ((WORD)(csd[11] & 128) >> 7) + 1)
+                                             << ((csd[13] >> 6) - 1);
+                        } else { /* MMC */
+                            *(DWORD *)buff =
+                                ((WORD)((csd[10] & 124) >> 2) + 1) *
+                                (((csd[11] & 3) << 3) + ((csd[11] & 224) >> 5) +
+                                 1);
+                        }
+                        res = RES_OK;
+                    }
+                }
+                break;
 #else
-            dp = buff;
-            st = (DWORD)dp[0];
-            ed = (DWORD)dp[1];
-            if (sdmmc_erase(&s_sd_sdmmc_device, st, ed) != STATUS_OK) {
-                res = RES_ERROR;
+                if (sdmmc_info(&s_sd_sdmmc_device, &info) != STATUS_OK) {
+                    res = RES_ERROR;
+                    break;
+                }
+                *(WORD *)buff = info.LogBlockSize / 512;
+                res = RES_OK;
                 break;
-            }
-            if (check_status(30000) != STATUS_OK) {
-                res = RES_ERROR;
+#endif
+
+            case CTRL_TRIM: /* Erase a block of sectors (used when _USE_ERASE ==
+                             * 1)
+                             */
+#ifndef SD
+                if (!(CardType & CT_SDC)) break; /* Check if the card is SDC */
+                if (disk_ioctl(drv, MMC_GET_CSD, csd)) break; /* Get CSD */
+                if (!(csd[10] & 0x40)) break; /* Check if ERASE_BLK_EN = 1 */
+                dp = buff;
+                st = (DWORD)dp[0];
+                ed = (DWORD)dp[1]; /* Load sector block */
+                if (!(CardType & CT_BLOCK)) {
+                    st *= 512;
+                    ed *= 512;
+                }
+                if (send_cmd(CMD32, st) == 0 && send_cmd(CMD33, ed) == 0 &&
+                    send_cmd(CMD38, 0) == 0 &&
+                    wait_ready(30000)) { /* Erase sector block */
+                    res = RES_OK; /* FatFs does not check result of this command
+                                   */
+                }
                 break;
-            }
-            res = RES_OK;
-            break;
+#else
+                dp = buff;
+                st = (DWORD)dp[0];
+                ed = (DWORD)dp[1];
+                if (sdmmc_erase(&s_sd_sdmmc_device, st, ed) != STATUS_OK) {
+                    res = RES_ERROR;
+                    break;
+                }
+                if (check_status(30000) != STATUS_OK) {
+                    res = RES_ERROR;
+                    break;
+                }
+                res = RES_OK;
+                break;
 #endif
 
 #ifndef SD
-            /* Following commands are never used by FatFs module */
+                /* Following commands are never used by FatFs module */
 
-        case MMC_GET_TYPE: /* Get MMC/SDC type (BYTE) */
-            *(BYTE *)buff = CardType;
-            res = RES_OK;
-            break;
-
-        case MMC_GET_CSD: /* Read CSD (16 bytes) */
-            if (send_cmd(CMD9, 0) == 0 &&
-                rcvr_datablock((BYTE *)buff, 16)) { /* READ_CSD */
+            case MMC_GET_TYPE: /* Get MMC/SDC type (BYTE) */
+                *(BYTE *)buff = CardType;
                 res = RES_OK;
-            }
-            break;
+                break;
 
-        case MMC_GET_CID: /* Read CID (16 bytes) */
-            if (send_cmd(CMD10, 0) == 0 &&
-                rcvr_datablock((BYTE *)buff, 16)) { /* READ_CID */
-                res = RES_OK;
-            }
-            break;
+            case MMC_GET_CSD: /* Read CSD (16 bytes) */
+                if (send_cmd(CMD9, 0) == 0 &&
+                    rcvr_datablock((BYTE *)buff, 16)) { /* READ_CSD */
+                    res = RES_OK;
+                }
+                break;
 
-        case MMC_GET_OCR:                  /* Read OCR (4 bytes) */
-            if (send_cmd(CMD58, 0) == 0) { /* READ_OCR */
-                for (n = 0; n < 4; n++) *(((BYTE *)buff) + n) = xchg_spi(0xFF);
-                res = RES_OK;
-            }
-            break;
+            case MMC_GET_CID: /* Read CID (16 bytes) */
+                if (send_cmd(CMD10, 0) == 0 &&
+                    rcvr_datablock((BYTE *)buff, 16)) { /* READ_CID */
+                    res = RES_OK;
+                }
+                break;
 
-        case MMC_GET_SDSTAT:                /* Read SD status (64 bytes) */
-            if (send_cmd(ACMD13, 0) == 0) { /* SD_STATUS */
-                xchg_spi(0xFF);
-                if (rcvr_datablock((BYTE *)buff, 64)) res = RES_OK;
-            }
-            break;
+            case MMC_GET_OCR:                  /* Read OCR (4 bytes) */
+                if (send_cmd(CMD58, 0) == 0) { /* READ_OCR */
+                    for (n = 0; n < 4; n++)
+                        *(((BYTE *)buff) + n) = xchg_spi(0xFF);
+                    res = RES_OK;
+                }
+                break;
+
+            case MMC_GET_SDSTAT:                /* Read SD status (64 bytes) */
+                if (send_cmd(ACMD13, 0) == 0) { /* SD_STATUS */
+                    xchg_spi(0xFF);
+                    if (rcvr_datablock((BYTE *)buff, 64)) res = RES_OK;
+                }
+                break;
 #endif
-        default:
-            res = RES_PARERR;
+            default:
+                res = RES_PARERR;
+        }
+
+#ifndef SD
+        deselect();
+#endif
+        return res;
+    } else if (drv == 1) {
+        switch (cmd) {
+            case CTRL_SYNC:
+                if (mt29f2g_sync() != STATUS_OK) {
+                    return RES_ERROR;
+                }
+                return RES_OK;
+            case GET_SECTOR_COUNT:
+                *(DWORD *)buff = 131072;  // 2048 blocks * 64 pages
+                return RES_OK;
+            case GET_SECTOR_SIZE:
+                *(WORD *)buff = 2048;  // 2048 bytes per page
+                return RES_OK;
+            case GET_BLOCK_SIZE:
+                *(DWORD *)buff = 64;  // 64 pages per block
+                return RES_OK;
+            case CTRL_TRIM:
+                dp = buff;
+                st = (DWORD)dp[0];
+                ed = (DWORD)dp[1];
+                if (mt29f2g_erase_blocks(st, ed) != STATUS_OK) {
+                    return RES_ERROR;
+                }
+                return RES_OK;
+            default:
+                return RES_PARERR;
+        }
     }
-
-#ifndef SD
-    deselect();
-#endif
-    return res;
+    return RES_PARERR;
 }
 
 Status hal_reinit_card() {

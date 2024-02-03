@@ -1,6 +1,6 @@
 #include "gpio/gpio.h"
 
-#include "board.h"
+#include "pal_9k4/board.h"
 #include "stm32h7xx_hal.h"
 
 Status gpio_mode(uint8_t pin, GpioMode mode) {

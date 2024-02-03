@@ -1,8 +1,8 @@
 #include "sdmmc/sdmmc.h"
 
 #include "FreeRTOS.h"
-#include "board.h"
 #include "gpio/gpio.h"
+#include "pal_9k4/board.h"
 #include "stdio.h"
 #include "stm32h7xx_hal.h"
 #include "timer.h"

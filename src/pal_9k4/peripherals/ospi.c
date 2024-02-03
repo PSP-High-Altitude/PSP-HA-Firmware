@@ -1,15 +1,15 @@
 #include "ospi.h"
 
-#include "board.h"
+#include "pal_9k4/board.h"
 #include "stdio.h"
 #include "stm32h7xx_hal.h"
 #include "timer.h"
 
 static OSPI_HandleTypeDef ospi1_handle = {.State = 0};
-static OSPI_HandleTypeDef* ospi_handles[] = {&ospi1_handle};
+static MDMA_HandleTypeDef hmdma_octospi1_fifo_th;
 
 static Status ospi_setup(OSpiDevice* dev) {
-    if (ospi_handles[0]->State != 0) {
+    if (ospi1_handle.State != 0) {
         return STATUS_OK;
     }
     OCTOSPI_TypeDef* base = OCTOSPI1;
@@ -65,7 +65,7 @@ static Status ospi_setup(OSpiDevice* dev) {
         .FifoThreshold = 1,
         .DualQuad = HAL_OSPI_DUALQUAD_DISABLE,
         .SampleShifting = HAL_OSPI_SAMPLE_SHIFTING_NONE,
-        .DeviceSize = 30,
+        .DeviceSize = 27,
         .MemoryType = HAL_OSPI_MEMTYPE_MICRON,
         .ChipSelectHighTime = 1,
         .ClockMode = HAL_OSPI_CLOCK_MODE_0,
@@ -77,20 +77,52 @@ static Status ospi_setup(OSpiDevice* dev) {
         .MaxTran = 0,
         .Refresh = 0,
     };
-    OSPI_HandleTypeDef* handle = ospi_handles[0];
-    (*handle).Init = init_conf;
-    (*handle).Instance = base;
-    if (HAL_OSPI_Init(handle) != HAL_OK) {
+    ospi1_handle.Init = init_conf;
+    ospi1_handle.Instance = base;
+    if (HAL_OSPI_Init(&ospi1_handle) != HAL_OK) {
         return STATUS_ERROR;
     }
     OSPIM_CfgTypeDef sOspiManagerCfg = {0};
     sOspiManagerCfg.ClkPort = 1;
     sOspiManagerCfg.NCSPort = 1;
     sOspiManagerCfg.IOLowPort = HAL_OSPIM_IOPORT_1_HIGH;
-    if (HAL_OSPIM_Config(ospi_handles[0], &sOspiManagerCfg,
+    sOspiManagerCfg.DQSPort = 0;
+    if (HAL_OSPIM_Config(&ospi1_handle, &sOspiManagerCfg,
                          HAL_OSPI_TIMEOUT_DEFAULT_VALUE) != HAL_OK) {
         return STATUS_ERROR;
     }
+
+    hmdma_octospi1_fifo_th.Instance = MDMA_Channel0;
+    hmdma_octospi1_fifo_th.Init.Request = MDMA_REQUEST_OCTOSPI1_FIFO_TH;
+    hmdma_octospi1_fifo_th.Init.TransferTriggerMode = MDMA_BUFFER_TRANSFER;
+    hmdma_octospi1_fifo_th.Init.Priority = MDMA_PRIORITY_LOW;
+    hmdma_octospi1_fifo_th.Init.Endianness = MDMA_LITTLE_ENDIANNESS_PRESERVE;
+    hmdma_octospi1_fifo_th.Init.SourceInc = MDMA_SRC_INC_BYTE;
+    hmdma_octospi1_fifo_th.Init.DestinationInc = MDMA_DEST_INC_BYTE;
+    hmdma_octospi1_fifo_th.Init.SourceDataSize = MDMA_SRC_DATASIZE_BYTE;
+    hmdma_octospi1_fifo_th.Init.DestDataSize = MDMA_DEST_DATASIZE_BYTE;
+    hmdma_octospi1_fifo_th.Init.DataAlignment = MDMA_DATAALIGN_PACKENABLE;
+    hmdma_octospi1_fifo_th.Init.BufferTransferLength = 1;
+    hmdma_octospi1_fifo_th.Init.SourceBurst = MDMA_SOURCE_BURST_SINGLE;
+    hmdma_octospi1_fifo_th.Init.DestBurst = MDMA_DEST_BURST_SINGLE;
+    hmdma_octospi1_fifo_th.Init.SourceBlockAddressOffset = 0;
+    hmdma_octospi1_fifo_th.Init.DestBlockAddressOffset = 0;
+    if (HAL_MDMA_Init(&hmdma_octospi1_fifo_th) != HAL_OK) {
+        return STATUS_ERROR;
+    }
+
+    if (HAL_MDMA_ConfigPostRequestMask(&hmdma_octospi1_fifo_th, 0, 0) !=
+        HAL_OK) {
+        return STATUS_ERROR;
+    }
+
+    __HAL_LINKDMA(&ospi1_handle, hmdma, hmdma_octospi1_fifo_th);
+
+    HAL_NVIC_SetPriority(OCTOSPI1_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(OCTOSPI1_IRQn);
+    HAL_NVIC_SetPriority(MDMA_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ(MDMA_IRQn);
+
     return STATUS_OK;
 }
 
@@ -98,7 +130,7 @@ Status ospi_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd) {
     if (ospi_setup(dev) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
     }
-    if (HAL_OSPI_Command(ospi_handles[0], cmd, 100) != HAL_OK) {
+    if (HAL_OSPI_Command(&ospi1_handle, cmd, 100) != HAL_OK) {
         return STATUS_ERROR;
     }
     return STATUS_OK;
@@ -109,35 +141,13 @@ Status ospi_auto_poll_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
     if (ospi_setup(dev) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
     }
-    HAL_StatusTypeDef status;
-    if (HAL_OSPI_Command(ospi_handles[0], cmd, 100) != HAL_OK) {
+    if (HAL_OSPI_Command(&ospi1_handle, cmd, 100) != HAL_OK) {
         return STATUS_ERROR;
     }
-    if ((status = HAL_OSPI_AutoPolling(ospi_handles[0], cfg, 100)) != HAL_OK) {
+    if (HAL_OSPI_AutoPolling(&ospi1_handle, cfg, 100) != HAL_OK) {
         return STATUS_ERROR;
     }
     return STATUS_OK;
-
-    /*
-    uint64_t start_time = MILLIS();
-    uint8_t rx_buf[4] = {0, 0, 0, 0};
-    uint32_t rx_data;
-    do {
-        if (MILLIS() - start_time > 100) {
-            return STATUS_TIMEOUT;
-        }
-        if (HAL_OSPI_Command(ospi_handles[0], cmd, 100) != HAL_OK) {
-            return STATUS_ERROR;
-        }
-        if (HAL_OSPI_Receive(ospi_handles[0], rx_buf, 100) != HAL_OK) {
-            return STATUS_ERROR;
-        }
-        rx_data = (((uint32_t)rx_buf[0] << 24) | ((uint32_t)rx_buf[1] << 16) |
-                   ((uint32_t)rx_buf[2] << 8) | rx_buf[3]);
-        printf("status: %lx\n", rx_data);
-    } while ((rx_data & cfg->Mask) != cfg->Match);
-    return STATUS_OK;
-    */
 }
 
 Status ospi_write(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
@@ -145,11 +155,18 @@ Status ospi_write(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
     if (ospi_setup(dev) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
     }
-    if (HAL_OSPI_Command(ospi_handles[0], cmd, 100) != HAL_OK) {
+    if (HAL_OSPI_Command(&ospi1_handle, cmd, 100) != HAL_OK) {
         return STATUS_ERROR;
     }
-    if (HAL_OSPI_Transmit(ospi_handles[0], tx_buf, 100) != HAL_OK) {
+    if (HAL_OSPI_Transmit_DMA(&ospi1_handle, tx_buf) != HAL_OK) {
         return STATUS_ERROR;
+    }
+    uint64_t start_time = MILLIS();
+    while (HAL_OSPI_GetState(&ospi1_handle) != HAL_OSPI_STATE_READY) {
+        if (MILLIS() - start_time > 500) {
+            return STATUS_ERROR;
+        }
+        DELAY_MICROS(100);
     }
     return STATUS_OK;
 }
@@ -159,11 +176,22 @@ Status ospi_read(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
     if (ospi_setup(dev) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
     }
-    if (HAL_OSPI_Command(ospi_handles[0], cmd, 100) != HAL_OK) {
+    if (HAL_OSPI_Command(&ospi1_handle, cmd, 100) != HAL_OK) {
         return STATUS_ERROR;
     }
-    if (HAL_OSPI_Receive(ospi_handles[0], rx_buf, 100) != HAL_OK) {
+    if (HAL_OSPI_Receive_DMA(&ospi1_handle, rx_buf) != HAL_OK) {
         return STATUS_ERROR;
+    }
+    uint64_t start_time = MILLIS();
+    while (HAL_OSPI_GetState(&ospi1_handle) != HAL_OSPI_STATE_READY) {
+        if (MILLIS() - start_time > 500) {
+            return STATUS_ERROR;
+        }
+        DELAY_MICROS(100);
     }
     return STATUS_OK;
 }
+
+void OCTOSPI1_IRQHandler(void) { HAL_OSPI_IRQHandler(&ospi1_handle); }
+
+void MDMA_IRQHandler(void) { HAL_MDMA_IRQHandler(&hmdma_octospi1_fifo_th); }

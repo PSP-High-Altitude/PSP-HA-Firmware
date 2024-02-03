@@ -54,6 +54,8 @@
                 "pb.h": "c",
                 "gpio.h": "c",
                 "sdmmc.h": "c",
-                "diskio.h": "c"
+                "diskio.h": "c",
+                "nand_flash.h": "c",
+                "spi.h": "c"
         }
 }
