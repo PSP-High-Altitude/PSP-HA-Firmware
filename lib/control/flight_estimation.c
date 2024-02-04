@@ -1,9 +1,13 @@
 #include "flight_estimation.h"
 
-void fp_update(SensorData data, FlightPhase* s_flight_phase,
+void fp_update(SensorFrame* data, FlightPhase* s_flight_phase,
                StateEst* currentState) {
-    currentState->accBody = vscale(data.accel, 9.81);
-    currentState->time = data.timestamp * 10E-6;
+    Vector new_accel;
+    new_accel.x = data->acc_i_x;
+    new_accel.y = data->acc_i_y;
+    new_accel.z = data->acc_i_z;
+    currentState->accBody = vscale(new_accel, 9.81);
+    currentState->time = data->timestamp * 10E-6;
     float ax = currentState->accBody.x;
     float az = currentState->accBody.z;
     switch (*s_flight_phase) {
@@ -16,10 +20,10 @@ void fp_update(SensorData data, FlightPhase* s_flight_phase,
             }
             break;
         case FP_READY:
-            break;
             if (ax > ACC_BOOST) {
                 *s_flight_phase = FP_BOOST;
             }
+            break;
         case FP_BOOST:
             if ((ax <= 300) && (ax >= 200)) {
                 *s_flight_phase = FP_FAST;
@@ -31,14 +35,14 @@ void fp_update(SensorData data, FlightPhase* s_flight_phase,
             }
             break;
         case FP_COAST:
-            if (az >= MAINHEIGHT) {
+            if (az >= MAIN_HEIGHT) {
                 if (az <= 40) {
                     *s_flight_phase = FP_DROGUE;
                 }
             }
             break;
         case FP_DROGUE:
-            if (az <= MAINHEIGHT) {
+            if (az <= MAIN_HEIGHT) {
                 *s_flight_phase = FP_MAIN;
             }
             break;

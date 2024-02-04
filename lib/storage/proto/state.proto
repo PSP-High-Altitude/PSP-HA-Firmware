@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+message StateFrame {
+  // System timestamp (us since power on)
+  uint64 timestamp = 1;
+
+  // Flight phase (enum value)
+  uint32 flight_phase = 2;
+
+  // Position (m)
+  float pos_n = 3;
+  float pos_e = 4;
+  float pos_d = 5;
+
+  // NED velocity (m/s)
+  float vel_n = 6;
+  float vel_e = 7;
+  float vel_d = 8;
+
+  // NED acceleration (m/s^2)
+  float acc_n = 9;
+  float acc_e = 10;
+  float acc_d = 11;
+
+  // Body velocity (m/s)
+  float vel_x = 12;
+  float vel_y = 13;
+  float vel_z = 14;
+
+  // Body acceleration (m/s^2)
+  float acc_x = 15;
+  float acc_y = 16;
+  float acc_z = 17;
+
+  // Orientation (deg)
+  float orient_x = 18;
+  float orient_y = 19;
+  float orient_z = 20;
+}

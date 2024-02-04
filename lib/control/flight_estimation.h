@@ -7,8 +7,8 @@
 
 #define MAIN_HEIGHT 100  // m
 #define INIT_TIME 10     // s
-#define ACC_BOOST        // m/s^2
-#define VEL_FAST         // m/s
+#define ACC_BOOST 20     // m/s^2
+#define VEL_FAST 300     // m/s
 
 typedef enum {
     FP_INIT,
@@ -22,6 +22,6 @@ typedef enum {
 } FlightPhase;
 
 SensorData sensorFrame2SensorData(SensorFrame frame);
-void fp_update(SensorData data, FlightPhase* s_flight_phase,
+void fp_update(SensorFrame* data, FlightPhase* s_flight_phase,
                StateEst* currentState);
 #endif  // FLIGHT_ESTIMATION_H
