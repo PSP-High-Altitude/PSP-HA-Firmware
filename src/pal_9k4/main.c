@@ -26,22 +26,6 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-#ifdef USE_SPI_CRC
-#undef USE_SPI_CRC
-#endif
-#define USE_SPI_CRC 0
-
-#define PIN_RED PIN_PA0
-#define PIN_YELLOW PIN_PA1
-#define PIN_GREEN PIN_PA2
-#define PIN_BLUE PIN_PA3
-#define PIN_BUZZER PIN_PE0
-#define PIN_PAUSE PIN_PB7  // SDA4
-
-#define TARGET_INTERVAL 5  // ms
-
-#define LOG_FIFO_LEN 256
-
 extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
 SensorFrame s_last_sensor_data;
 GPS_Fix_TypeDef s_last_fix;
@@ -55,8 +39,6 @@ volatile static int s_fix_avail = 0;
 static TaskHandle_t s_read_sensors_handle;
 static TaskHandle_t s_read_gps_handle;
 static TaskHandle_t s_store_data_handle;
-// static TaskHandle_t s_gps_telem_handle;
-// static TaskHandle_t s_status_telem_handle;
 static TaskHandle_t s_standard_telem_handle;
 static TaskHandle_t s_process_commands_handle;
 #ifdef PSPCOM_SENSORS

@@ -120,7 +120,7 @@ static Status ospi_setup(OSpiDevice* dev) {
 
     HAL_NVIC_SetPriority(OCTOSPI1_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(OCTOSPI1_IRQn);
-    HAL_NVIC_SetPriority(MDMA_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(MDMA_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(MDMA_IRQn);
 
     return STATUS_OK;
