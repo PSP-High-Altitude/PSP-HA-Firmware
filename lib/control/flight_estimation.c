@@ -4,8 +4,8 @@
 #include "pressure_altitude.h"
 
 void fp_init(FlightPhase* s_flight_phase, StateEst* current_state,
-             Vector* imu_up, Vector* high_g_up, float* acc_buffer,
-             float* baro_buffer, uint16_t buffer_size) {
+             Vector* imu_up, Vector* high_g_up, AverageBuffer* acc_buffer,
+             AverageBuffer* baro_buffer) {
     *s_flight_phase = FP_INIT;
     *current_state = zeroState();
     switch (IMU_UP) {
@@ -52,14 +52,20 @@ void fp_init(FlightPhase* s_flight_phase, StateEst* current_state,
         default:
             break;
     }
-    memset(acc_buffer, 0, buffer_size * sizeof(float));
-    memset(baro_buffer, 0, buffer_size * sizeof(float));
+    acc_buffer->count = 0;
+    baro_buffer->count = 0;
+    acc_buffer->sum = 0.0;
+    baro_buffer->sum = 0.0;
+    acc_buffer->index = 0;
+    baro_buffer->index = 0;
+    memset(acc_buffer, 0, acc_buffer->size * sizeof(float));
+    memset(baro_buffer, 0, baro_buffer->size * sizeof(float));
 }
 
 void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                FlightPhase* s_flight_phase, StateEst* current_state,
-               Vector* imu_up, Vector* high_g_up, float* acc_buffer,
-               float* baro_buffer, uint16_t buffer_size) {
+               Vector* imu_up, Vector* high_g_up, AverageBuffer* acc_buffer,
+               AverageBuffer* baro_buffer) {
     Vector new_accel;
     // Vector g_vec = vscale();  // TODO: double check this
     SensorData vecData = sensorFrame2SensorData(*data);
@@ -67,7 +73,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
     float h0 = 0;        // initial height m ASL
     float gps_h0 = 0;    // initial gps height m MSL
     float a_up_avg = 0;  // up acceleration from rolling average
-    float x_up_avg = 0;  // from pressure, hieght ASL
+    float x_up_avg = 0;  // from pressure, height ASL
 
     // z up in state
     // x and y are not in the right place but it's fine for now
@@ -79,37 +85,50 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                         gps->accuracy_horiz < GPS_ACCURACY_LIMIT_POS &&
                         gps->accuracy_vertical < GPS_ACCURACY_LIMIT_POS &&
                         gps->accuracy_speed < GPS_ACCURACY_LIMIT_VEL;
-    uint8_t valid_sensor = !isnan(vecData.accel.x) && !isnan(vecData.accel.y) &&
-                           !isnan(vecData.accel.z) && !isnan(vecData.acch.x) &&
-                           !isnan(vecData.acch.y) && !isnan(vecData.acch.z) &&
-                           !isnan(vecData.gyro.x) && !isnan(vecData.gyro.y) &&
-                           !isnan(vecData.gyro.z) && !isnan(vecData.mag.x) &&
-                           !isnan(vecData.mag.y) && !isnan(vecData.mag.z) &&
-                           !isnan(vecData.temperature) &&
-                           !isnan(vecData.pressure);
-    // Also check that not all fields are zero
-    valid_sensor =
-        valid_sensor &&
-        !((vnorm(vecData.accel) == 0) && (vnorm(vecData.acch) == 0) &&
-          (vnorm(vecData.gyro) == 0) && (vnorm(vecData.mag) == 0) &&
-          (vecData.temperature == 0) && (vecData.pressure == 0));
+    uint8_t valid_acc = !isnan(vecData.accel.x) && !isnan(vecData.accel.y) &&
+                        !isnan(vecData.accel.z) && !isnan(vecData.acch.x) &&
+                        !isnan(vecData.acch.y) && !isnan(vecData.acch.z) &&
+                        !isnan(vecData.gyro.x) && !isnan(vecData.gyro.y) &&
+                        !isnan(vecData.gyro.z) && !isnan(vecData.mag.x) &&
+                        !isnan(vecData.mag.y) && !isnan(vecData.mag.z);
+    uint8_t valid_baro =
+        !isnan(vecData.temperature) && !isnan(vecData.pressure);
+    // Also check valid_acc not all fields are zero
+    valid_acc = valid_acc &&
+                !((vnorm(vecData.accel) == 0) && (vnorm(vecData.acch) == 0) &&
+                  (vnorm(vecData.gyro) == 0) && (vnorm(vecData.mag) == 0));
+    valid_baro =
+        valid_baro && !((vecData.temperature == 0) && (vecData.pressure == 0));
 
-    // set up to z and adjust for g
-    Vector bodyUp = newVec(0, 0, 1);  // z up
-    if (vnorm(vecData.accel) < LOW_G_CUTOFF) {
-        new_accel.x = data->acc_i_x;
-        new_accel.y = data->acc_i_y;
-        new_accel.z = vdot(vecData.accel, *imu_up) - 1;
+    // Only update the state if the sensor data is valid
+    if (valid_acc) {
+        // set up to z and adjust for g
+        if (vnorm(vecData.accel) < LOW_G_CUTOFF) {
+            new_accel.x = data->acc_i_x;
+            new_accel.y = data->acc_i_y;
+            new_accel.z = vdot(vecData.accel, *imu_up) - 1;
+        } else {
+            new_accel.x = data->acc_i_x;
+            new_accel.y = data->acc_i_y;
+            new_accel.z = vdot(vecData.acch, *high_g_up) - 1;
+        }
+        current_state->accBody = vscale(new_accel, G);  // convert to m/s^2
+
+        // time
+        dt = (data->timestamp * 1E-6) - current_state->time;
+        current_state->time = data->timestamp * 1E-6;  // convert us to s
+
+        // push to average buffer
+        push_to_average(current_state->accBody.z, acc_buffer);
     } else {
-        new_accel.x = data->acc_i_x;
-        new_accel.y = data->acc_i_y;
-        new_accel.z = vdot(vecData.acch, *high_g_up) - 1;
+        dt = 0.0;  // data not valid so don't update state estimation
     }
-    current_state->accBody = vscale(new_accel, G);  // convert to m/s^2
 
-    // time
-    dt = (data->timestamp * 1E-6) - current_state->time;
-    current_state->time = data->timestamp * 1E-6;  // convert us to s
+    if (valid_baro) {
+        // push to average buffer
+        push_to_average(pressureToAltitude(data->pressure), baro_buffer);
+    }
+
     switch (*s_flight_phase) {
         case FP_INIT:
             // s_flight_phase = fp_init();
@@ -123,70 +142,77 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             if (valid_gps) {
                 gps_h0 = gps->height_msl;  // set gps initial height
             }
-            if (valid_sensor) {
-                h0 = rolling_average(pressureToAltitude(data->pressure),
-                                     baro_buffer,
-                                     buffer_size);  // set initial height
+            if (baro_buffer->count == baro_buffer->size) {
+                h0 = baro_buffer->sum /
+                     baro_buffer->count;  // set barometer initial height
             }
-
-            a_up_avg =
-                rolling_average(vnorm(current_state->accBody), acc_buffer,
-                                buffer_size);  // this one is norm in case I
-                                               // messed up the up direction
+            if (acc_buffer->count == acc_buffer->size) {
+                a_up_avg = acc_buffer->sum / acc_buffer->count;
+            }
             if (a_up_avg > ACC_BOOST) {
-                // using norm for now in case the up direction is messed up
-                // snomehow. Should us z/up in the future
                 *s_flight_phase = FP_BOOST;
             }
             break;
         case FP_BOOST:
-            update_accel_est(current_state, dt, bodyUp);
-            a_up_avg = rolling_average(current_state->accBody.z, acc_buffer,
-                                       buffer_size);  // now use up (z)
-            if ((a_up_avg < ACC_COAST) &&
-                (current_state->velNED.z * -1 < VEL_FAST)) {
+            update_accel_est(current_state, dt);
+            a_up_avg = acc_buffer->sum / acc_buffer->count;
+            if (a_up_avg > ACC_BOOST) {
+                break;  // still in boost
+            }
+            if ((current_state->velNED.z * -1 > VEL_FAST) ||
+                (valid_gps && (gps->vel_down * -1 > VEL_FAST))) {
                 *s_flight_phase = FP_FAST;
             } else if (a_up_avg < ACC_COAST) {
                 *s_flight_phase = FP_COAST;
             }
             break;
         case FP_FAST:
-            update_accel_est(current_state, dt, bodyUp);
-            if (current_state->velNED.z * -1 <= VEL_FAST) {
-                *s_flight_phase = FP_COAST;
+            update_accel_est(current_state, dt);
+            if ((current_state->velNED.z * -1 < VEL_FAST) ||
+                (valid_gps && (gps->vel_down * -1 < VEL_FAST))) {
+                *s_flight_phase =
+                    FP_COAST;  // We are slow enough to be in coast
             }
             break;
         case FP_COAST:
-            update_accel_est(current_state, dt, bodyUp);
-            if (current_state->velNED.z * -1 >= DROGUE_V) {
+            update_accel_est(current_state, dt);
+            if ((current_state->velNED.z * -1 < VEL_DROGUE) ||
+                (valid_gps && (gps->vel_down * -1 < VEL_DROGUE))) {
                 *s_flight_phase = FP_DROGUE;
+
+                // reset baro buffer, this helps in an edge case where the
+                // barometer fails at a altitude below main deployment height,
+                // and then gets all the way here. In this case, we don't want
+                // to use the old data and deploy the main early.
+                baro_buffer->count = 0;
+                baro_buffer->sum = 0.0;
+                baro_buffer->index = 0;
+                memset(baro_buffer, 0, baro_buffer->size * sizeof(float));
             }
             break;
         case FP_DROGUE:
-            current_state->posNED.z =
-                -1 * (pressureToAltitude(data->pressure) - h0);
-            x_up_avg =
-                rolling_average(current_state->posNED.z * -1, baro_buffer,
-                                buffer_size);  // average pressure height
-            if (x_up_avg <= MAIN_HEIGHT) {
+            if (valid_baro) {
+                current_state->posNED.z =
+                    -1 * (pressureToAltitude(data->pressure) - h0);
+            }
+            x_up_avg = (baro_buffer->sum / baro_buffer->count) - h0;
+            if ((x_up_avg < HEIGHT_MAIN &&
+                 baro_buffer->count == baro_buffer->size) ||
+                (valid_gps && gps->height_msl - gps_h0 < HEIGHT_MAIN)) {
                 *s_flight_phase = FP_MAIN;
             }
             break;
         case FP_MAIN:
             current_state->posNED.z =
                 -1 * (pressureToAltitude(data->pressure) - h0);
-            a_up_avg = rolling_average(current_state->accBody.z, acc_buffer,
-                                       buffer_size);  // now use up (z)
-            x_up_avg =
-                rolling_average(current_state->posNED.z * -1, baro_buffer,
-                                buffer_size);  // average pressure height
-            if ((vnorm(current_state->accBody) <= (2 * G)) &&
-                ((current_state->velNED.z * -1) < VEL_LANDED)) {
+            x_up_avg = (baro_buffer->sum / baro_buffer->count) - h0;
+            if (fabs(x_up_avg) < HEIGHT_LANDED ||
+                (valid_gps && fabs(gps->height_msl - gps_h0) < HEIGHT_LANDED) ||
+                (valid_gps && fabs(gps->vel_down * -1) < VEL_LANDED)) {
                 *s_flight_phase = FP_LANDED;
             }
             break;
         case FP_LANDED:
-            *s_flight_phase = FP_LANDED;
             break;
         default:
             *s_flight_phase = FP_INIT;
@@ -219,31 +245,21 @@ StateEst zeroState() {
     return state;
 }
 
-float rolling_average(float new_value, float* buffer, int buffer_size) {
-    static float sum =
-        0.0;  // Static variable to store the sum of buffer elements
-    static int index =
-        0;  // Static variable to keep track of the current index in the buffer
-    static int count = 0;  // Static variable to keep track of the number of
-                           // elements in the buffer
-
+void push_to_average(float new_value, AverageBuffer* buffer) {
     // If the buffer is not full, increment the count
-    if (count < buffer_size) {
-        count++;
+    if (buffer->count < buffer->size) {
+        buffer->count++;
     } else {
         // If the buffer is full, subtract the oldest value from the sum
-        sum -= buffer[index];
+        buffer->sum -= buffer->buffer[buffer->index];
     }
 
     // Add the new value to the sum
-    sum += new_value;
+    buffer->sum += new_value;
 
     // Store the new value in the buffer
-    buffer[index] = new_value;
+    buffer->buffer[buffer->index] = new_value;
 
     // Move to the next index
-    index = (index + 1) % buffer_size;
-
-    // Return the rolling average
-    return sum / count;
+    buffer->index = (buffer->index + 1) % buffer->size;
 }

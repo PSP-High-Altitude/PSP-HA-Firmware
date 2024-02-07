@@ -45,8 +45,12 @@ volatile static int s_fix_avail = 0;
 
 PAL_Data_Typedef s_last_data = {&s_last_sensor_frame, &s_last_fix};
 
-float acc_buffer[AVG_BUFFER_SIZE];
-float baro_buffer[AVG_BUFFER_SIZE];
+float acc_internal_buffer[AVG_BUFFER_SIZE];
+float baro_internal_buffer[AVG_BUFFER_SIZE];
+AverageBuffer acc_buffer = {.buffer = acc_internal_buffer,
+                            .size = AVG_BUFFER_SIZE};
+AverageBuffer baro_buffer = {.buffer = baro_internal_buffer,
+                             .size = AVG_BUFFER_SIZE};
 
 volatile static struct {
     SensorFrame queue[LOG_FIFO_LEN];
@@ -310,20 +314,22 @@ StateFrame state_data_to_pb_frame(uint64_t timestamp, FlightPhase fp,
 
 void do_state_est() {
     // initialize stuff
-
     Vector imu_up;
     Vector high_g_up;
-    fp_init(&s_flight_phase, &s_current_state, &imu_up, &high_g_up, acc_buffer,
-            baro_buffer, AVG_BUFFER_SIZE);
+    fp_init(&s_flight_phase, &s_current_state, &imu_up, &high_g_up, &acc_buffer,
+            &baro_buffer);
+
     while (1) {
         uint32_t notif_value;
         xTaskNotifyWait(0, 0xffffffffUL, &notif_value, 100);
         fp_update(&s_last_sensor_frame, &s_last_fix, &s_flight_phase,
-                  &s_current_state, &imu_up, &high_g_up, acc_buffer,
-                  baro_buffer, AVG_BUFFER_SIZE);
+                  &s_current_state, &imu_up, &high_g_up, &acc_buffer,
+                  &baro_buffer);
+#ifdef DEBUG
         printf("phase: %d, accel (m/s^2): {%7.2f, %7.2f, %7.2f}\n",
                s_flight_phase, s_current_state.accBody.x,
                s_current_state.accBody.y, s_current_state.accBody.z);
+#endif
     }
 }
 

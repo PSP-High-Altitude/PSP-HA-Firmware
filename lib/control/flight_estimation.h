@@ -8,20 +8,29 @@
 #include "vector.h"
 
 // set these befire flight
-#define MAIN_HEIGHT 300            // m
+#define HEIGHT_MAIN 300            // m
 #define INIT_TIME 10               // s
 #define ACC_BOOST 50               // m/s^2
 #define ACC_COAST 0                // m/s^2
-#define VEL_FAST 200               // m/s
+#define VEL_FAST 250               // m/s
 #define IMU_UP -2                  // +/- 1, 2, 3 for x, y, z
 #define HIGH_G_UP 2                // +/- 1, 2, 3 for x, y, z
 #define LOW_G_CUTOFF 14            // g
 #define G 9.81                     // m/s^2
-#define DROGUE_V 0                 // m/s
+#define VEL_DROGUE 0               // m/s
 #define VEL_LANDED 2               // m/s
+#define HEIGHT_LANDED 50           // m
 #define GPS_ACCURACY_LIMIT_POS 20  // m
 #define GPS_ACCURACY_LIMIT_VEL 5   // m/s
 #define AVERAGING_PERIOD_MS 100    // period of rolling average buffer
+
+typedef struct {
+    float* buffer;
+    float sum;
+    uint16_t count;
+    uint16_t index;
+    uint16_t size;
+} AverageBuffer;
 
 typedef enum {
     FP_INIT,
@@ -58,11 +67,10 @@ SensorData sensorFrame2SensorData(SensorFrame frame);
  * body (z up) frame
  * @param acc_buffer buffer for rolling average of acceleration
  * @param baro_buffer buffer for rolling average of barometer
- * @param buffer_size size of the rolling average buffers
  */
 void fp_init(FlightPhase* s_flight_phase, StateEst* current_state,
-             Vector* imu_up, Vector* high_g_up, float* acc_buffer,
-             float* baro_buffer, uint16_t buffer_size);
+             Vector* imu_up, Vector* high_g_up, AverageBuffer* acc_buffer,
+             AverageBuffer* baro_buffer);
 
 /**
  * @brief
@@ -77,23 +85,20 @@ void fp_init(FlightPhase* s_flight_phase, StateEst* current_state,
  * body (z up) frame
  * @param acc_buffer buffer for rolling average of acceleration
  * @param baro_buffer buffer for rolling average of barometer
- * @param buffer_size size of the rolling average buffers
  */
 void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                FlightPhase* s_flight_phase, StateEst* current_state,
-               Vector* imu_up, Vector* high_g_up, float* acc_buffer,
-               float* baro_buffer, uint16_t buffer_size);
+               Vector* imu_up, Vector* high_g_up, AverageBuffer* acc_buffer,
+               AverageBuffer* baro_buffer);
 
 StateEst zeroState();
 
 /**
  * @brief
  *
- * @param new_value
- * @param buffer
- * @param buffer_size
- * @return float
+ * @param new_value value to push into the average buffer
+ * @param buffer buffer to push the value into
  */
-float rolling_average(float new_value, float* buffer, int buffer_size);
+void push_to_average(float new_value, AverageBuffer* buffer);
 
 #endif  // FLIGHT_ESTIMATION_H

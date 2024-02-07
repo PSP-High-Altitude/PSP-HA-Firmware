@@ -26,9 +26,7 @@
 //     obj->p = 0;
 // }
 
-void update_accel_est(StateEst* state, float dt, Vector up) {
-    float a_up = vdot(state->accBody, up) *
-                 -1;  // vertical accleration adjusted for g, m/s^2
+void update_accel_est(StateEst* state, float dt) {
     // float t;
     // y is up
     // state->times[state->i - 1] = t / 1000.0;  // convert to s
@@ -49,7 +47,7 @@ void update_accel_est(StateEst* state, float dt, Vector up) {
     // trap int
     Vector v_prev = state->velNED;
     Vector a_prev = state->accNED;
-    state->accNED.z = a_up * -1;
+    state->accNED.z = state->accBody.z * -1;
     state->velNED = TrapInt(state->velNED, state->accNED, a_prev, dt);
     state->posNED = TrapInt(state->posNED, state->velNED, v_prev, dt);
 
