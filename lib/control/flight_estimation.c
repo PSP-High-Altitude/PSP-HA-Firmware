@@ -4,12 +4,15 @@
 #include "pressure_altitude.h"
 
 void fp_update(SensorFrame* data, FlightPhase* s_flight_phase,
-               StateEst* currentState, Vector imu_up, Vector high_g_up) {
+               StateEst* currentState, Vector imu_up, Vector high_g_up,
+               float* acc_buffer, float* baro_buffer) {
     Vector new_accel;
     // Vector g_vec = vscale();  // TODO: double check this
     SensorData vecData = sensorFrame2SensorData(*data);
     float dt;
     float h0 = 0;  // initial height m ASL
+    float a_up_avg = 0;  // up acceleration from rolling average
+    float x_up_avg = 0;  // from pressure, hieght ASL
 
     // z up in state
     // x and y are not in the right place but it's fine for now
@@ -41,8 +44,14 @@ void fp_update(SensorFrame* data, FlightPhase* s_flight_phase,
             }
             break;
         case FP_READY:
-            h0 = pressureToAltitude(data->pressure);  // set initial height
-            if (vnorm(currentState->accBody) > ACC_BOOST) {
+            h0 =
+                rolling_average(pressureToAltitude(data->pressure), baro_buffer,
+                                AVG_BUFFER_SIZE);  // set initial height
+            a_up_avg =
+                rolling_average(vnorm(currentState->accBody), acc_buffer,
+                                AVG_BUFFER_SIZE);  // this one is norm in case I
+                                                   // messed up the up direction
+            if (a_up_avg > ACC_BOOST) {
                 // using norm for now in case the up direction is messed up
                 // snomehow. Should us z/up in the future
                 *s_flight_phase = FP_BOOST;
@@ -50,10 +59,12 @@ void fp_update(SensorFrame* data, FlightPhase* s_flight_phase,
             break;
         case FP_BOOST:
             update_accel_est(currentState, dt, bodyUp);
-            if ((currentState->accBody.z < ACC_COAST) &&
+            a_up_avg = rolling_average(currentState->accBody.z, acc_buffer,
+                                       AVG_BUFFER_SIZE);  // now use up (z)
+            if ((a_up_avg < ACC_COAST) &&
                 (currentState->velNED.z * -1 < VEL_FAST)) {
                 *s_flight_phase = FP_FAST;
-            } else if (currentState->accBody.z < ACC_COAST) {
+            } else if (a_up_avg < ACC_COAST) {
                 *s_flight_phase = FP_COAST;
             }
             break;
@@ -70,15 +81,23 @@ void fp_update(SensorFrame* data, FlightPhase* s_flight_phase,
             }
             break;
         case FP_DROGUE:
-            currentState->velNED.z =
+            currentState->posNED.z =
                 -1 * (pressureToAltitude(data->pressure) - h0);
-            if (currentState->posNED.z * -1 <= MAIN_HEIGHT) {
+            x_up_avg =
+                rolling_average(currentState->posNED.z * -1, baro_buffer,
+                                AVG_BUFFER_SIZE);  // average pressure height
+            if (x_up_avg <= MAIN_HEIGHT) {
                 *s_flight_phase = FP_MAIN;
             }
             break;
         case FP_MAIN:
-            currentState->velNED.z =
+            currentState->posNED.z =
                 -1 * (pressureToAltitude(data->pressure) - h0);
+            a_up_avg = rolling_average(currentState->accBody.z, acc_buffer,
+                                       AVG_BUFFER_SIZE);  // now use up (z)
+            x_up_avg =
+                rolling_average(currentState->posNED.z * -1, baro_buffer,
+                                AVG_BUFFER_SIZE);  // average pressure height
             if ((vnorm(currentState->accBody) <= (2 * G)) &&
                 ((currentState->velNED.z * -1) < VEL_LANDED)) {
                 *s_flight_phase = FP_LANDED;
@@ -116,4 +135,33 @@ StateEst zeroState() {
     state.accBody = zeroVec;
     state.orientation = zeroVec;
     return state;
+}
+
+float rolling_average(float new_value, float* buffer, int buffer_size) {
+    static float sum =
+        0.0;  // Static variable to store the sum of buffer elements
+    static int index =
+        0;  // Static variable to keep track of the current index in the buffer
+    static int count = 0;  // Static variable to keep track of the number of
+                           // elements in the buffer
+
+    // If the buffer is not full, increment the count
+    if (count < buffer_size) {
+        count++;
+    } else {
+        // If the buffer is full, subtract the oldest value from the sum
+        sum -= buffer[index];
+    }
+
+    // Add the new value to the sum
+    sum += new_value;
+
+    // Store the new value in the buffer
+    buffer[index] = new_value;
+
+    // Move to the next index
+    index = (index + 1) % buffer_size;
+
+    // Return the rolling average
+    return sum / count;
 }

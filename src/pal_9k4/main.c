@@ -312,6 +312,8 @@ void do_state_est() {
     s_upAxis = 0;
     Vector imu_up;
     Vector high_g_up;
+    float accel_avg_buffer[AVG_BUFFER_SIZE] = {0};
+    float baro_avg_buffer[AVG_BUFFER_SIZE] = {0};
     switch (IMU_UP) {
         case -1:
             imu_up = newVec(-1, 0, 0);
@@ -361,7 +363,7 @@ void do_state_est() {
         uint32_t notif_value;
         xTaskNotifyWait(0, 0xffffffffUL, &notif_value, 100);
         fp_update(&s_last_sensor_frame, &s_flight_phase, &s_current_state,
-                  imu_up, high_g_up);
+                  imu_up, high_g_up, accel_avg_buffer, baro_avg_buffer);
         printf("phase: %d, accel (m/s^2): {%7.2f, %7.2f, %7.2f}\n",
                s_flight_phase, s_current_state.accBody.x,
                s_current_state.accBody.y, s_current_state.accBody.z);
