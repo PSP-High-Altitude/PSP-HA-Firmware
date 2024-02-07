@@ -15,7 +15,7 @@ float vdot(Vector v1, Vector v2) {
     return v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
 }
 
-float vnorm(Vector v) { return (sqrt(v.x * v.x + v.y + v.y + v.z * v.z)); }
+float vnorm(Vector v) { return (sqrt(v.x * v.x + v.y * v.y + v.z * v.z)); }
 
 Vector vcross(Vector v1, Vector v2) {
     Vector vout;

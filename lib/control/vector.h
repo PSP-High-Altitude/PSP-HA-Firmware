@@ -35,4 +35,6 @@ Vector newVec(float x, float y, float z);
 
 Vector createVectorFromStruct(void *ptr);
 
+float vnorm(Vector v);
+
 #endif  // VECTOR_H

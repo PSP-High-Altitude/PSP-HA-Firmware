@@ -18,8 +18,6 @@
 #include "pb.h"
 #include "pspcom.h"
 #include "sd.h"
-#include "sdmmc/sdmmc.h"
-#include "state_est.h"
 #include "status.h"
 #include "stm32h7xx.h"
 #include "timer.h"
@@ -39,6 +37,12 @@ static TaskHandle_t s_process_commands_handle;
 #ifdef PSPCOM_SENSORS
 static TaskHandle_t s_sensor_telem_handle;
 #endif
+static TickType_t s_last_sensor_read_ticks;
+static GPS_Fix_TypeDef s_last_fix;
+static FlightPhase s_flight_phase;
+static StateEst s_current_state;
+static int s_upAxis;  // +/- 1 2 3 for x y z
+volatile static int s_fix_avail = 0;
 
 volatile static struct {
     SensorFrame queue[LOG_FIFO_LEN];
@@ -302,14 +306,62 @@ StateFrame state_data_to_pb_frame(uint64_t timestamp, FlightPhase fp,
 
 void do_state_est() {
     // initialize stuff
+
     s_flight_phase = FP_INIT;
     s_current_state = zeroState();
     s_upAxis = 0;
+    Vector imu_up;
+    Vector high_g_up;
+    switch (IMU_UP) {
+        case -1:
+            imu_up = newVec(-1, 0, 0);
+            break;
+        case 1:
+            imu_up = newVec(1, 0, 0);
+            break;
+        case -2:
+            imu_up = newVec(0, -1, 0);
+            break;
+        case 2:
+            imu_up = newVec(0, 1, 0);
+            break;
+        case -3:
+            imu_up = newVec(0, 0, -1);
+            break;
+        case 3:
+            imu_up = newVec(0, 0, 1);
+            break;
+        default:
+            break;
+    }
+    switch (HIGH_G_UP) {
+        case -1:
+            high_g_up = newVec(-1, 0, 0);
+            break;
+        case 1:
+            high_g_up = newVec(1, 0, 0);
+            break;
+        case -2:
+            high_g_up = newVec(0, -1, 0);
+            break;
+        case 2:
+            high_g_up = newVec(0, 1, 0);
+            break;
+        case -3:
+            high_g_up = newVec(0, 0, -1);
+            break;
+        case 3:
+            high_g_up = newVec(0, 0, 1);
+            break;
+        default:
+            break;
+    }
 
     while (1) {
         uint32_t notif_value;
         xTaskNotifyWait(0, 0xffffffffUL, &notif_value, 100);
-        fp_update(&s_last_sensor_frame, &s_flight_phase, &s_current_state);
+        fp_update(&s_last_sensor_frame, &s_flight_phase, &s_current_state,
+                  imu_up, high_g_up);
         printf("phase: %d, accel (m/s^2): {%7.2f, %7.2f, %7.2f}\n",
                s_flight_phase, s_current_state.accBody.x,
                s_current_state.accBody.y, s_current_state.accBody.z);

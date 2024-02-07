@@ -49,6 +49,7 @@
                 "usbd_conf.h": "c",
                 "uart.h": "c",
                 "state_est.h": "c",
+                "flight_estimation.h": "c",
                 "max_m10s.h": "c",
                 "sd.h": "c",
                 "sensor.pb.h": "c",
