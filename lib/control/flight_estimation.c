@@ -1,6 +1,7 @@
 #include "flight_estimation.h"
 
 #include "accel_est.h"
+#include "pressure_altitude.h"
 
 void fp_update(SensorFrame* data, FlightPhase* s_flight_phase,
                StateEst* currentState, Vector imu_up, Vector high_g_up) {
@@ -8,6 +9,7 @@ void fp_update(SensorFrame* data, FlightPhase* s_flight_phase,
     // Vector g_vec = vscale();  // TODO: double check this
     SensorData vecData = sensorFrame2SensorData(*data);
     float dt;
+    float h0 = 0;  // initial height m ASL
 
     // z up in state
     // x and y are not in the right place but it's fine for now
@@ -39,6 +41,7 @@ void fp_update(SensorFrame* data, FlightPhase* s_flight_phase,
             }
             break;
         case FP_READY:
+            h0 = pressureToAltitude(data->pressure);  // set initial height
             if (vnorm(currentState->accBody) > ACC_BOOST) {
                 // using norm for now in case the up direction is messed up
                 // snomehow. Should us z/up in the future
@@ -67,11 +70,15 @@ void fp_update(SensorFrame* data, FlightPhase* s_flight_phase,
             }
             break;
         case FP_DROGUE:
+            currentState->velNED.z =
+                -1 * (pressureToAltitude(data->pressure) - h0);
             if (currentState->posNED.z * -1 <= MAIN_HEIGHT) {
                 *s_flight_phase = FP_MAIN;
             }
             break;
         case FP_MAIN:
+            currentState->velNED.z =
+                -1 * (pressureToAltitude(data->pressure) - h0);
             if ((vnorm(currentState->accBody) <= (2 * G)) &&
                 ((currentState->velNED.z * -1) < VEL_LANDED)) {
                 *s_flight_phase = FP_LANDED;
