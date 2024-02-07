@@ -23,14 +23,9 @@
 
 // Input: pressure [double] - in millibars
 float pressureToAltitude(float pressure) {
-    // Constants
-    float seaLevelPressure =
-        1013.25;  // Standard sea level pressure in millibars
-    //   double lapseRate = 0.0065; // Standard temperature lapse rate in K/m
-
     // Calculate altitudes using barometric formula
     float altitude =
-        44330 * (1 - pow((pressure / seaLevelPressure), 1 / 5.25588));
+        44330 * (1 - pow((pressure / SEA_LEVEL_PRESSURE), 1 / 5.25588));
 
     return altitude;
 }

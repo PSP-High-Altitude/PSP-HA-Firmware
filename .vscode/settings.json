@@ -60,6 +60,7 @@
                 "nand_flash.h": "c",
                 "spi.h": "c",
                 "task.h": "c",
-                "lsm6dsox.h": "c"
+                "lsm6dsox.h": "c",
+                "pressure_altitude.h": "c"
         }
 }
