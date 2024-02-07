@@ -40,9 +40,19 @@ void update_accel_est(StateEst* state, float dt, Vector up) {
     //     state->PosDown[state->i - 1] = 0;
     // } else {
     // double timestep[2] = {state->times[state->i - 2], t / 1000.0};
+
+    // non-trap int
+    // state->accNED.z = a_up * -1;
+    // state->velNED.z += state->accNED.z * dt;
+    // state->posNED.z += state->velNED.z * dt;
+
+    // trap int
+    Vector v_prev = state->velNED;
+    Vector a_prev = state->accNED;
     state->accNED.z = a_up * -1;
-    state->velNED.z += state->accNED.z * dt;
-    state->posNED.z += state->velNED.z * dt;
+    state->velNED = TrapInt(state->velNED, state->accNED, a_prev, dt);
+    state->posNED = TrapInt(state->posNED, state->velNED, v_prev, dt);
+
     //     state->VelDown[state->i - 2] +
     //     (timestep[1] *
     //      (state->AccDown[state->i - 2] + state->AccDown[state->i - 1]) / 2);

@@ -24,6 +24,15 @@ Vector vadd(Vector v1, Vector v2);
 
 Vector QuatRot(Vector v, Quaternion q);
 
+/**
+ * @brief trapezoidal integration
+ *
+ * @param vint the vector that the integration gets added
+ * @param v v_n
+ * @param vprev v_n-1
+ * @param dt delta time
+ * @return Vector
+ */
 Vector TrapInt(Vector vint, Vector v, Vector vprev, float dt);
 
 void UpdatePose(Vector v_a, Vector *v_ac, Vector *v_v, Vector *v_d, Vector v_w,
