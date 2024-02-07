@@ -22,10 +22,6 @@
 #define GPS_ACCURACY_LIMIT_POS 20  // m
 #define GPS_ACCURACY_LIMIT_VEL 5   // m/s
 #define AVERAGING_PERIOD_MS 100    // period of rolling average buffer
-#define AVG_BUFFER_SIZE (AVERAGING_PERIOD_MS / TARGET_INTERVAL)
-
-float acc_buffer[AVG_BUFFER_SIZE];
-float baro_buffer[AVG_BUFFER_SIZE];
 
 typedef enum {
     FP_INIT,
@@ -60,9 +56,13 @@ SensorData sensorFrame2SensorData(SensorFrame frame);
  * body (z up) frame
  * @param high_g_up unit vector representing the up direction of high g accel in
  * body (z up) frame
+ * @param acc_buffer buffer for rolling average of acceleration
+ * @param baro_buffer buffer for rolling average of barometer
+ * @param buffer_size size of the rolling average buffers
  */
 void fp_init(FlightPhase* s_flight_phase, StateEst* current_state,
-             Vector* imu_up, Vector* high_g_up);
+             Vector* imu_up, Vector* high_g_up, float* acc_buffer,
+             float* baro_buffer, uint16_t buffer_size);
 
 /**
  * @brief
@@ -75,10 +75,14 @@ void fp_init(FlightPhase* s_flight_phase, StateEst* current_state,
  * body (z up) frame
  * @param high_g_up unit vector representing the up direction of high g accel in
  * body (z up) frame
+ * @param acc_buffer buffer for rolling average of acceleration
+ * @param baro_buffer buffer for rolling average of barometer
+ * @param buffer_size size of the rolling average buffers
  */
 void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                FlightPhase* s_flight_phase, StateEst* current_state,
-               Vector* imu_up, Vector* high_g_up);
+               Vector* imu_up, Vector* high_g_up, float* acc_buffer,
+               float* baro_buffer, uint16_t buffer_size);
 
 StateEst zeroState();
 

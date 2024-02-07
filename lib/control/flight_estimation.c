@@ -4,7 +4,8 @@
 #include "pressure_altitude.h"
 
 void fp_init(FlightPhase* s_flight_phase, StateEst* current_state,
-             Vector* imu_up, Vector* high_g_up) {
+             Vector* imu_up, Vector* high_g_up, float* acc_buffer,
+             float* baro_buffer, uint16_t buffer_size) {
     *s_flight_phase = FP_INIT;
     *current_state = zeroState();
     switch (IMU_UP) {
@@ -51,19 +52,20 @@ void fp_init(FlightPhase* s_flight_phase, StateEst* current_state,
         default:
             break;
     }
-    memset(acc_buffer, 0, AVG_BUFFER_SIZE * sizeof(float));
-    memset(baro_buffer, 0, AVG_BUFFER_SIZE * sizeof(float));
+    memset(acc_buffer, 0, buffer_size * sizeof(float));
+    memset(baro_buffer, 0, buffer_size * sizeof(float));
 }
 
 void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                FlightPhase* s_flight_phase, StateEst* current_state,
-               Vector* imu_up, Vector* high_g_up) {
+               Vector* imu_up, Vector* high_g_up, float* acc_buffer,
+               float* baro_buffer, uint16_t buffer_size) {
     Vector new_accel;
     // Vector g_vec = vscale();  // TODO: double check this
     SensorData vecData = sensorFrame2SensorData(*data);
     float dt;
     float h0 = 0;        // initial height m ASL
-    float gps_h0;        // initial gps height m MSL
+    float gps_h0 = 0;    // initial gps height m MSL
     float a_up_avg = 0;  // up acceleration from rolling average
     float x_up_avg = 0;  // from pressure, hieght ASL
 
@@ -86,7 +88,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                            !isnan(vecData.temperature) &&
                            !isnan(vecData.pressure);
     // Also check that not all fields are zero
-    uint8_t valid_sensor =
+    valid_sensor =
         valid_sensor &&
         !((vnorm(vecData.accel) == 0) && (vnorm(vecData.acch) == 0) &&
           (vnorm(vecData.gyro) == 0) && (vnorm(vecData.mag) == 0) &&
@@ -124,13 +126,13 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             if (valid_sensor) {
                 h0 = rolling_average(pressureToAltitude(data->pressure),
                                      baro_buffer,
-                                     AVG_BUFFER_SIZE);  // set initial height
+                                     buffer_size);  // set initial height
             }
 
             a_up_avg =
                 rolling_average(vnorm(current_state->accBody), acc_buffer,
-                                AVG_BUFFER_SIZE);  // this one is norm in case I
-                                                   // messed up the up direction
+                                buffer_size);  // this one is norm in case I
+                                               // messed up the up direction
             if (a_up_avg > ACC_BOOST) {
                 // using norm for now in case the up direction is messed up
                 // snomehow. Should us z/up in the future
@@ -140,7 +142,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
         case FP_BOOST:
             update_accel_est(current_state, dt, bodyUp);
             a_up_avg = rolling_average(current_state->accBody.z, acc_buffer,
-                                       AVG_BUFFER_SIZE);  // now use up (z)
+                                       buffer_size);  // now use up (z)
             if ((a_up_avg < ACC_COAST) &&
                 (current_state->velNED.z * -1 < VEL_FAST)) {
                 *s_flight_phase = FP_FAST;
@@ -165,7 +167,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                 -1 * (pressureToAltitude(data->pressure) - h0);
             x_up_avg =
                 rolling_average(current_state->posNED.z * -1, baro_buffer,
-                                AVG_BUFFER_SIZE);  // average pressure height
+                                buffer_size);  // average pressure height
             if (x_up_avg <= MAIN_HEIGHT) {
                 *s_flight_phase = FP_MAIN;
             }
@@ -174,10 +176,10 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             current_state->posNED.z =
                 -1 * (pressureToAltitude(data->pressure) - h0);
             a_up_avg = rolling_average(current_state->accBody.z, acc_buffer,
-                                       AVG_BUFFER_SIZE);  // now use up (z)
+                                       buffer_size);  // now use up (z)
             x_up_avg =
                 rolling_average(current_state->posNED.z * -1, baro_buffer,
-                                AVG_BUFFER_SIZE);  // average pressure height
+                                buffer_size);  // average pressure height
             if ((vnorm(current_state->accBody) <= (2 * G)) &&
                 ((current_state->velNED.z * -1) < VEL_LANDED)) {
                 *s_flight_phase = FP_LANDED;

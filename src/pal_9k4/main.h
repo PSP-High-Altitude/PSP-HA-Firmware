@@ -2,6 +2,7 @@
 #define MAIN_H
 
 #include "board.h"
+#include "flight_estimation.h"
 
 #define DEBUG
 #define DEBUG_STORAGE
@@ -23,6 +24,8 @@
 
 // Sensor read interval (ms)
 #define TARGET_INTERVAL 5  // 200 Hz
+#define AVG_BUFFER_SIZE \
+    (AVERAGING_PERIOD_MS / TARGET_INTERVAL)  // For state estimation
 
 // Sensor FIFO length
 #define LOG_FIFO_LEN 256

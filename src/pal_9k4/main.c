@@ -7,7 +7,6 @@
 #include "USB_Device/App/usbd_cdc_if.h"
 #include "clocks.h"
 #include "data.h"
-#include "flight_estimation.h"
 #include "gpio/gpio.h"
 #include "iis2mdc/iis2mdc.h"
 #include "kx134/kx134.h"
@@ -18,6 +17,7 @@
 #include "pb.h"
 #include "pspcom.h"
 #include "sd.h"
+#include "sdmmc/sdmmc.h"
 #include "status.h"
 #include "stm32h7xx.h"
 #include "timer.h"
@@ -42,6 +42,11 @@ static GPS_Fix_TypeDef s_last_fix;
 static FlightPhase s_flight_phase;
 static StateEst s_current_state;
 volatile static int s_fix_avail = 0;
+
+PAL_Data_Typedef s_last_data = {&s_last_sensor_frame, &s_last_fix};
+
+float acc_buffer[AVG_BUFFER_SIZE];
+float baro_buffer[AVG_BUFFER_SIZE];
 
 volatile static struct {
     SensorFrame queue[LOG_FIFO_LEN];
@@ -308,12 +313,14 @@ void do_state_est() {
 
     Vector imu_up;
     Vector high_g_up;
-    fp_init(&s_flight_phase, &s_current_state, &imu_up, &high_g_up);
+    fp_init(&s_flight_phase, &s_current_state, &imu_up, &high_g_up, acc_buffer,
+            baro_buffer, AVG_BUFFER_SIZE);
     while (1) {
         uint32_t notif_value;
         xTaskNotifyWait(0, 0xffffffffUL, &notif_value, 100);
-        fp_update(&s_last_sensor_frame, &s_flight_phase, &s_current_state,
-                  &imu_up, &high_g_up);
+        fp_update(&s_last_sensor_frame, &s_last_fix, &s_flight_phase,
+                  &s_current_state, &imu_up, &high_g_up, acc_buffer,
+                  baro_buffer, AVG_BUFFER_SIZE);
         printf("phase: %d, accel (m/s^2): {%7.2f, %7.2f, %7.2f}\n",
                s_flight_phase, s_current_state.accBody.x,
                s_current_state.accBody.y, s_current_state.accBody.z);
