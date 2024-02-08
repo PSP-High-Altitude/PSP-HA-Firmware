@@ -16,6 +16,7 @@
 #include "nand_flash.h"
 #include "pb.h"
 #include "pspcom.h"
+#include "pyros.h"
 #include "sd.h"
 #include "sdmmc/sdmmc.h"
 #include "status.h"
@@ -419,6 +420,7 @@ int main(void) {
     MX_USB_DEVICE_Init();
     gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLUP);
     gpio_write(PIN_RED, GPIO_HIGH);
+    init_pyros();
 
     /*
     gpio_write(PIN_BUZZER, GPIO_HIGH);

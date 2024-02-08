@@ -2,6 +2,7 @@
 
 #include "accel_est.h"
 #include "pressure_altitude.h"
+#include "pyros.h"
 
 void fp_init(FlightPhase* s_flight_phase, StateEst* current_state,
              Vector* imu_up, Vector* high_g_up, AverageBuffer* acc_buffer,
@@ -87,16 +88,12 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                         gps->accuracy_speed < GPS_ACCURACY_LIMIT_VEL;
     uint8_t valid_acc = !isnan(vecData.accel.x) && !isnan(vecData.accel.y) &&
                         !isnan(vecData.accel.z) && !isnan(vecData.acch.x) &&
-                        !isnan(vecData.acch.y) && !isnan(vecData.acch.z) &&
-                        !isnan(vecData.gyro.x) && !isnan(vecData.gyro.y) &&
-                        !isnan(vecData.gyro.z) && !isnan(vecData.mag.x) &&
-                        !isnan(vecData.mag.y) && !isnan(vecData.mag.z);
+                        !isnan(vecData.acch.y) && !isnan(vecData.acch.z);
     uint8_t valid_baro =
         !isnan(vecData.temperature) && !isnan(vecData.pressure);
     // Also check valid_acc not all fields are zero
-    valid_acc = valid_acc &&
-                !((vnorm(vecData.accel) == 0) && (vnorm(vecData.acch) == 0) &&
-                  (vnorm(vecData.gyro) == 0) && (vnorm(vecData.mag) == 0));
+    valid_acc =
+        valid_acc && !((vnorm(vecData.accel) == 0) && (vnorm(vecData.acch)));
     valid_baro =
         valid_baro && !((vecData.temperature == 0) && (vecData.pressure == 0));
 
@@ -183,16 +180,19 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             if ((current_state->velNED.z * -1 < VEL_DROGUE) ||
                 (valid_gps && (gps->vel_down * -1 < VEL_DROGUE))) {
                 *s_flight_phase = FP_DROGUE;
-                printf("DROGUE at %lld\n", data->timestamp/1000);
+                fire_pyro(DROGUE_PYRO);  // fire drogue
+                printf("DROGUE at %lld\n", data->timestamp / 1000);
 
-                // reset baro buffer, this helps in an edge case where the
-                // barometer fails at a altitude below main deployment height,
-                // and then gets all the way here. In this case, we don't want
-                // to use the old data and deploy the main early.
+                // reset baro buffer, this helps in an edge case
+                // where the barometer fails at a altitude below
+                // main deployment height, and then gets all the
+                // way here. In this case, we don't want to use
+                // the old data and deploy the main early.
                 baro_buffer->count = 0;
                 baro_buffer->sum = 0.0;
                 baro_buffer->index = 0;
-                memset(baro_buffer->buffer, 0, baro_buffer->size * sizeof(float));
+                memset(baro_buffer->buffer, 0,
+                       baro_buffer->size * sizeof(float));
             }
             break;
         case FP_DROGUE:
@@ -205,7 +205,8 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                  baro_buffer->count == baro_buffer->size) ||
                 (valid_gps && gps->height_msl - gps_h0 < HEIGHT_MAIN)) {
                 *s_flight_phase = FP_MAIN;
-                printf("MAIN at %lld\n", data->timestamp/1000);
+                fire_pyro(MAIN_PYRO);  // fire main
+                printf("MAIN at %lld\n", data->timestamp / 1000);
             }
             break;
         case FP_MAIN:

@@ -27,6 +27,14 @@
 #define AVG_BUFFER_SIZE \
     (AVERAGING_PERIOD_MS / TARGET_INTERVAL)  // For state estimation
 
+// Pyro fire length (ms)
+#define PYRO_FIRE_LENGTH 1000
+
+// Pyro retries (if we make it to the ground and the pyro didn't fire someone
+// approaching could get injured)
+#define PYRO_MAX_RETRIES 20
+#define PYRO_RETRY_INTERVAL 1000
+
 // Sensor FIFO length
 #define LOG_FIFO_LEN 256
 

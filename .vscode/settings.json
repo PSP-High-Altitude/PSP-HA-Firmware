@@ -63,6 +63,8 @@
                 "lsm6dsox.h": "c",
                 "pressure_altitude.h": "c",
                 "data.h": "c",
-                "vector.h": "c"
+                "vector.h": "c",
+                "timers.h": "c",
+                "pyros.h": "c"
         }
 }
