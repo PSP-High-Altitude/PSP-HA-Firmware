@@ -326,11 +326,9 @@ void do_state_est() {
         fp_update(&s_last_sensor_frame, &s_last_fix, &s_flight_phase,
                   &s_current_state, &imu_up, &high_g_up, &acc_buffer,
                   &baro_buffer);
-#ifdef DEBUG
         printf("phase: %d, accel (m/s^2): {%7.2f, %7.2f, %7.2f}\n",
                s_flight_phase, s_current_state.accBody.x,
                s_current_state.accBody.y, s_current_state.accBody.z);
-#endif
     }
 }
 
