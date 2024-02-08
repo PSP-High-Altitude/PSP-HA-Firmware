@@ -16,6 +16,7 @@
 #include "nand_flash.h"
 #include "pb.h"
 #include "pspcom.h"
+#include "pyros.h"
 #include "sd.h"
 #include "sdmmc/sdmmc.h"
 #include "status.h"
@@ -27,23 +28,30 @@
 #include "task.h"
 
 extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
-SensorFrame s_last_sensor_data;
-GPS_Fix_TypeDef s_last_fix;
-PAL_Data_Typedef s_last_data = {
-    .sensor_frame = &s_last_sensor_data,
-    .gps_fix = &s_last_fix,
-};
-static TickType_t s_last_sensor_read_ticks;
-volatile static int s_fix_avail = 0;
-
+static SensorFrame s_last_sensor_frame;
 static TaskHandle_t s_read_sensors_handle;
 static TaskHandle_t s_read_gps_handle;
 static TaskHandle_t s_store_data_handle;
 static TaskHandle_t s_standard_telem_handle;
+static TaskHandle_t s_do_state_est_handle;
 static TaskHandle_t s_process_commands_handle;
 #ifdef PSPCOM_SENSORS
 static TaskHandle_t s_sensor_telem_handle;
 #endif
+static TickType_t s_last_sensor_read_ticks;
+static GPS_Fix_TypeDef s_last_fix;
+static FlightPhase s_flight_phase;
+static StateEst s_current_state;
+volatile static int s_fix_avail = 0;
+
+PAL_Data_Typedef s_last_data = {&s_last_sensor_frame, &s_last_fix};
+
+float acc_internal_buffer[AVG_BUFFER_SIZE];
+float baro_internal_buffer[AVG_BUFFER_SIZE];
+AverageBuffer acc_buffer = {.buffer = acc_internal_buffer,
+                            .size = AVG_BUFFER_SIZE};
+AverageBuffer baro_buffer = {.buffer = baro_internal_buffer,
+                             .size = AVG_BUFFER_SIZE};
 
 volatile static struct {
     SensorFrame queue[LOG_FIFO_LEN];
@@ -143,36 +151,38 @@ void read_sensors() {
     s_last_sensor_read_ticks = xTaskGetTickCount();
     while (1) {
         BaroData baro =
-            ms5637_read(&s_baro_conf, OSR_256);    // Baro read takes longest
-        uint64_t timestamp = MICROS();             // So measure timestamp after
+            ms5637_read(&s_baro_conf, OSR_256);  // Baro read takes longest
+        uint64_t timestamp = MICROS();           // So measure timestamp after
         Accel acch = kx134_read_accel(&s_acc_conf);
         Accel accel = lsm6dsox_read_accel(&s_imu_conf);
         Gyro gyro = lsm6dsox_read_gyro(&s_imu_conf);
         Mag mag = iis2mdc_read(&s_mag_conf);
 
-        s_last_sensor_data.timestamp = timestamp;
+        // Copy data
+        s_last_sensor_frame.timestamp = timestamp;
 
-        s_last_sensor_data.acc_h_x = acch.accelX;
-        s_last_sensor_data.acc_h_y = acch.accelY;
-        s_last_sensor_data.acc_h_z = acch.accelZ;
+        s_last_sensor_frame.acc_h_x = acch.accelX;
+        s_last_sensor_frame.acc_h_y = acch.accelY;
+        s_last_sensor_frame.acc_h_z = acch.accelZ;
 
-        s_last_sensor_data.acc_i_x = accel.accelX;
-        s_last_sensor_data.acc_i_y = accel.accelY;
-        s_last_sensor_data.acc_i_z = accel.accelZ;
+        s_last_sensor_frame.acc_i_x = accel.accelX;
+        s_last_sensor_frame.acc_i_y = accel.accelY;
+        s_last_sensor_frame.acc_i_z = accel.accelZ;
 
-        s_last_sensor_data.rot_i_x = gyro.gyroX;
-        s_last_sensor_data.rot_i_y = gyro.gyroY;
-        s_last_sensor_data.rot_i_z = gyro.gyroZ;
+        s_last_sensor_frame.rot_i_x = gyro.gyroX;
+        s_last_sensor_frame.rot_i_y = gyro.gyroY;
+        s_last_sensor_frame.rot_i_z = gyro.gyroZ;
 
-        s_last_sensor_data.mag_i_x = mag.magX;
-        s_last_sensor_data.mag_i_y = mag.magY;
-        s_last_sensor_data.mag_i_z = mag.magZ;
+        s_last_sensor_frame.mag_i_x = mag.magX;
+        s_last_sensor_frame.mag_i_y = mag.magY;
+        s_last_sensor_frame.mag_i_z = mag.magZ;
 
-        s_last_sensor_data.temperature = baro.temperature;
-        s_last_sensor_data.pressure = baro.pressure;
+        s_last_sensor_frame.temperature = baro.temperature;
+        s_last_sensor_frame.pressure = baro.pressure;
 
-        write_fifo(s_last_sensor_data);
+        write_fifo(s_last_sensor_frame);
         xTaskNotifyGive(s_store_data_handle);
+        xTaskNotifyGive(s_do_state_est_handle);
         vTaskDelayUntil(&s_last_sensor_read_ticks,
                         pdMS_TO_TICKS(TARGET_INTERVAL));
     }
@@ -241,6 +251,89 @@ GpsFrame gps_fix_to_pb_frame(uint64_t timestamp,
     return gps_frame;
 }
 
+SensorFrame sensor_data_to_pb_frame(const SensorData *sensor_data) {
+    SensorFrame sensor_frame;
+
+    // Copy data
+    sensor_frame.timestamp = sensor_data->timestamp;
+
+    sensor_frame.acc_h_x = sensor_data->acch.x;
+    sensor_frame.acc_h_y = sensor_data->acch.y;
+    sensor_frame.acc_h_z = sensor_data->acch.z;
+
+    sensor_frame.acc_i_x = sensor_data->accel.x;
+    sensor_frame.acc_i_y = sensor_data->accel.y;
+    sensor_frame.acc_i_z = sensor_data->accel.z;
+
+    sensor_frame.rot_i_x = sensor_data->gyro.x;
+    sensor_frame.rot_i_y = sensor_data->gyro.y;
+    sensor_frame.rot_i_z = sensor_data->gyro.z;
+
+    sensor_frame.mag_i_x = sensor_data->mag.x;
+    sensor_frame.mag_i_y = sensor_data->mag.y;
+    sensor_frame.mag_i_z = sensor_data->mag.z;
+
+    sensor_frame.temperature = sensor_data->temperature;
+    sensor_frame.pressure = sensor_data->pressure;
+
+    return sensor_frame;
+}
+
+StateFrame state_data_to_pb_frame(uint64_t timestamp, FlightPhase fp,
+                                  const StateEst *state) {
+    StateFrame state_frame;
+
+    state_frame.timestamp = timestamp;
+    state_frame.flight_phase = fp;
+
+    state_frame.pos_n = state->posNED.x;
+    state_frame.pos_e = state->posNED.y;
+    state_frame.pos_d = state->posNED.z;
+
+    state_frame.vel_n = state->velNED.x;
+    state_frame.vel_e = state->velNED.y;
+    state_frame.vel_d = state->velNED.z;
+
+    state_frame.acc_n = state->accNED.x;
+    state_frame.acc_e = state->accNED.y;
+    state_frame.acc_d = state->accNED.z;
+
+    state_frame.vel_x = state->velBody.x;
+    state_frame.vel_y = state->velBody.y;
+    state_frame.vel_z = state->velBody.z;
+
+    state_frame.acc_x = state->accBody.x;
+    state_frame.acc_y = state->accBody.y;
+    state_frame.acc_z = state->accBody.z;
+
+    state_frame.orient_x = state->orientation.x;
+    state_frame.orient_y = state->orientation.y;
+    state_frame.orient_z = state->orientation.z;
+
+    return state_frame;
+}
+
+void do_state_est() {
+    // initialize stuff
+    Vector imu_up;
+    Vector high_g_up;
+    fp_init(&s_flight_phase, &s_current_state, &imu_up, &high_g_up, &acc_buffer,
+            &baro_buffer);
+
+    while (1) {
+        uint32_t notif_value;
+        xTaskNotifyWait(0, 0xffffffffUL, &notif_value, 100);
+        fp_update(&s_last_sensor_frame, &s_last_fix, &s_flight_phase,
+                  &s_current_state, &imu_up, &high_g_up, &acc_buffer,
+                  &baro_buffer);
+#ifdef DEBUG
+        printf("phase: %d, accel (m/s^2): {%7.2f, %7.2f, %7.2f}\n",
+               s_flight_phase, s_current_state.accBody.x,
+               s_current_state.accBody.y, s_current_state.accBody.z);
+#endif
+    }
+}
+
 void store_data() {
     while (1) {
         uint32_t notif_value;
@@ -273,8 +366,8 @@ void store_data() {
 #endif
         uint32_t entries_read = 0;
         while (fifo.count > 0) {
-            SensorFrame log = read_fifo();
-            Status code = sd_write_sensor_data(&log);
+            SensorFrame sens_data = read_fifo();
+            Status code = sd_write_sensor_data(&sens_data);
             if (code != STATUS_OK) {
                 printf("SD sensor write error %d\n", code);
                 gpio_write(PIN_GREEN, GPIO_LOW);
@@ -300,6 +393,14 @@ void store_data() {
             s_fix_avail = 0;
         }
 
+        // Log state estimation data
+        StateFrame state_frame = state_data_to_pb_frame(
+            xTaskGetTickCount(), s_flight_phase, &s_current_state);
+        Status code = sd_write_state_data(&state_frame);
+        if (code != STATUS_OK) {
+            printf("SD state write error %d\n", code);
+        }
+
         sd_flush();
         gpio_write(PIN_YELLOW, GPIO_LOW);
 
@@ -319,6 +420,7 @@ int main(void) {
     MX_USB_DEVICE_Init();
     gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLUP);
     gpio_write(PIN_RED, GPIO_HIGH);
+    init_pyros();
 
     /*
     gpio_write(PIN_BUZZER, GPIO_HIGH);
@@ -332,6 +434,9 @@ int main(void) {
 
     DELAY(4700);
     printf("Starting initialization...\n");
+
+    // Initialize sensor data
+    s_last_sensor_frame.timestamp = 0;
 
     // Initialize magnetometer
     if (iis2mdc_init(&s_mag_conf, IIS2MDC_ODR_100_HZ) == STATUS_OK) {
@@ -433,6 +538,14 @@ int main(void) {
                 NULL,                  // Parameters
                 tskIDLE_PRIORITY + 3,  // Priority
                 &s_read_gps_handle     // Task handle
+    );
+
+    xTaskCreate(do_state_est,           // Task function
+                "do_state_est",         // Task name
+                2048,                   // Stack size
+                NULL,                   // Parameters
+                tskIDLE_PRIORITY + 3,   // Priority
+                &s_do_state_est_handle  // Task handle
     );
 
     /*

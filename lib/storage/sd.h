@@ -6,6 +6,7 @@
 #include "gps.pb.h"
 #include "sensor.pb.h"
 #include "spi/spi.h"
+#include "state.pb.h"
 #include "status.h"
 
 // Abstract SD peripheral -- could be SPI or SDMMC underneath
@@ -46,6 +47,8 @@ Status sd_flush();
 Status sd_write_sensor_data(SensorFrame* sensor_frame);
 
 Status sd_write_gps_data(GpsFrame* gps_frame);
+
+Status sd_write_state_data(StateFrame* state_frame);
 
 Status hal_reinit_card();
 

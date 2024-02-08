@@ -48,6 +48,8 @@
                 "usbd_ioreq.h": "c",
                 "usbd_conf.h": "c",
                 "uart.h": "c",
+                "state_est.h": "c",
+                "flight_estimation.h": "c",
                 "max_m10s.h": "c",
                 "sd.h": "c",
                 "sensor.pb.h": "c",
@@ -58,6 +60,11 @@
                 "nand_flash.h": "c",
                 "spi.h": "c",
                 "task.h": "c",
-                "lsm6dsox.h": "c"
+                "lsm6dsox.h": "c",
+                "pressure_altitude.h": "c",
+                "data.h": "c",
+                "vector.h": "c",
+                "timers.h": "c",
+                "pyros.h": "c"
         }
 }
