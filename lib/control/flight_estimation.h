@@ -13,7 +13,7 @@
 #define ACC_BOOST 50               // m/s^2
 #define ACC_COAST 0                // m/s^2
 #define VEL_FAST 250               // m/s
-#define IMU_UP -2                  // +/- 1, 2, 3 for x, y, z
+#define IMU_UP 2                  // +/- 1, 2, 3 for x, y, z
 #define HIGH_G_UP 2                // +/- 1, 2, 3 for x, y, z
 #define LOW_G_CUTOFF 14            // g
 #define G 9.81                     // m/s^2

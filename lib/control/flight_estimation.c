@@ -58,8 +58,8 @@ void fp_init(FlightPhase* s_flight_phase, StateEst* current_state,
     baro_buffer->sum = 0.0;
     acc_buffer->index = 0;
     baro_buffer->index = 0;
-    memset(acc_buffer, 0, acc_buffer->size * sizeof(float));
-    memset(baro_buffer, 0, baro_buffer->size * sizeof(float));
+    memset(acc_buffer->buffer, 0, acc_buffer->size * sizeof(float));
+    memset(baro_buffer->buffer, 0, baro_buffer->size * sizeof(float));
 }
 
 void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
@@ -70,8 +70,8 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
     // Vector g_vec = vscale();  // TODO: double check this
     SensorData vecData = sensorFrame2SensorData(*data);
     float dt;
-    float h0 = 0;        // initial height m ASL
-    float gps_h0 = 0;    // initial gps height m MSL
+    static float h0 = 0;        // initial height m ASL
+    static float gps_h0 = 0;    // initial gps height m MSL
     float a_up_avg = 0;  // up acceleration from rolling average
     float x_up_avg = 0;  // from pressure, height ASL
 
@@ -151,6 +151,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             }
             if (a_up_avg > ACC_BOOST) {
                 *s_flight_phase = FP_BOOST;
+                printf("BOOST at %lld\n", data->timestamp/1000);
             }
             break;
         case FP_BOOST:
@@ -162,8 +163,10 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             if ((current_state->velNED.z * -1 > VEL_FAST) ||
                 (valid_gps && (gps->vel_down * -1 > VEL_FAST))) {
                 *s_flight_phase = FP_FAST;
+                printf("FAST at %lld\n", data->timestamp/1000);
             } else if (a_up_avg < ACC_COAST) {
                 *s_flight_phase = FP_COAST;
+                printf("COAST at %lld\n", data->timestamp/1000);
             }
             break;
         case FP_FAST:
@@ -172,6 +175,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                 (valid_gps && (gps->vel_down * -1 < VEL_FAST))) {
                 *s_flight_phase =
                     FP_COAST;  // We are slow enough to be in coast
+                    printf("COAST at %lld\n", data->timestamp/1000);
             }
             break;
         case FP_COAST:
@@ -179,6 +183,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             if ((current_state->velNED.z * -1 < VEL_DROGUE) ||
                 (valid_gps && (gps->vel_down * -1 < VEL_DROGUE))) {
                 *s_flight_phase = FP_DROGUE;
+                printf("DROGUE at %lld\n", data->timestamp/1000);
 
                 // reset baro buffer, this helps in an edge case where the
                 // barometer fails at a altitude below main deployment height,
@@ -187,7 +192,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                 baro_buffer->count = 0;
                 baro_buffer->sum = 0.0;
                 baro_buffer->index = 0;
-                memset(baro_buffer, 0, baro_buffer->size * sizeof(float));
+                memset(baro_buffer->buffer, 0, baro_buffer->size * sizeof(float));
             }
             break;
         case FP_DROGUE:
@@ -200,6 +205,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                  baro_buffer->count == baro_buffer->size) ||
                 (valid_gps && gps->height_msl - gps_h0 < HEIGHT_MAIN)) {
                 *s_flight_phase = FP_MAIN;
+                printf("MAIN at %lld\n", data->timestamp/1000);
             }
             break;
         case FP_MAIN:
@@ -210,6 +216,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                 (valid_gps && fabs(gps->height_msl - gps_h0) < HEIGHT_LANDED) ||
                 (valid_gps && fabs(gps->vel_down * -1) < VEL_LANDED)) {
                 *s_flight_phase = FP_LANDED;
+                printf("LANDED at %lld\n", data->timestamp/1000);
             }
             break;
         case FP_LANDED:
