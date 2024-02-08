@@ -4,6 +4,9 @@
 #include "pressure_altitude.h"
 #include "pyros.h"
 
+#define BUFFER_AVERAGE(buffer) (buffer->sum / buffer->count)
+#define BUFFER_FULL(buffer) (buffer->count == buffer->size)
+
 void fp_init(FlightPhase* s_flight_phase, StateEst* current_state,
              Vector* imu_up, Vector* high_g_up, AverageBuffer* acc_buffer,
              AverageBuffer* baro_buffer) {
@@ -139,21 +142,21 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             if (valid_gps) {
                 gps_h0 = gps->height_msl;  // set gps initial height
             }
-            if (baro_buffer->count == baro_buffer->size) {
-                h0 = baro_buffer->sum /
-                     baro_buffer->count;  // set barometer initial height
+            if (BUFFER_FULL(baro_buffer)) {
+                h0 = BUFFER_AVERAGE(
+                    baro_buffer);  // set barometer initial height
             }
-            if (acc_buffer->count == acc_buffer->size) {
-                a_up_avg = acc_buffer->sum / acc_buffer->count;
+            if (BUFFER_FULL(acc_buffer)) {
+                a_up_avg = BUFFER_AVERAGE(acc_buffer);
             }
-            if (a_up_avg > ACC_BOOST) {
+            if (BUFFER_FULL(acc_buffer) && a_up_avg > ACC_BOOST) {
                 *s_flight_phase = FP_BOOST;
                 printf("BOOST at %lld\n", data->timestamp/1000);
             }
             break;
         case FP_BOOST:
             update_accel_est(current_state, dt);
-            a_up_avg = acc_buffer->sum / acc_buffer->count;
+            a_up_avg = BUFFER_AVERAGE(acc_buffer);
             if (a_up_avg > ACC_BOOST) {
                 break;  // still in boost
             }
@@ -200,9 +203,8 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                 current_state->posNED.z =
                     -1 * (pressureToAltitude(data->pressure) - h0);
             }
-            x_up_avg = (baro_buffer->sum / baro_buffer->count) - h0;
-            if ((x_up_avg < HEIGHT_MAIN &&
-                 baro_buffer->count == baro_buffer->size) ||
+            x_up_avg = BUFFER_AVERAGE(baro_buffer) - h0;
+            if ((x_up_avg < HEIGHT_MAIN && BUFFER_FULL(baro_buffer)) ||
                 (valid_gps && gps->height_msl - gps_h0 < HEIGHT_MAIN)) {
                 *s_flight_phase = FP_MAIN;
                 fire_pyro(MAIN_PYRO);  // fire main
@@ -212,7 +214,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
         case FP_MAIN:
             current_state->posNED.z =
                 -1 * (pressureToAltitude(data->pressure) - h0);
-            x_up_avg = (baro_buffer->sum / baro_buffer->count) - h0;
+            x_up_avg = BUFFER_AVERAGE(baro_buffer) - h0;
             if (fabs(x_up_avg) < HEIGHT_LANDED ||
                 (valid_gps && fabs(gps->height_msl - gps_h0) < HEIGHT_LANDED) ||
                 (valid_gps && fabs(gps->vel_down * -1) < VEL_LANDED)) {
