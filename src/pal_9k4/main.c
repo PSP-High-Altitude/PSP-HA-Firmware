@@ -422,15 +422,7 @@ int main(void) {
     gpio_write(PIN_RED, GPIO_HIGH);
     init_pyros();
 
-    /*
-    gpio_write(PIN_BUZZER, GPIO_HIGH);
-    DELAY(100);
-    gpio_write(PIN_BUZZER, GPIO_LOW);
-    DELAY(100);
-    gpio_write(PIN_BUZZER, GPIO_HIGH);
-    DELAY(100);
-    gpio_write(PIN_BUZZER, GPIO_LOW);
-    */
+    uint8_t init_error = 0;
 
     DELAY(4700);
     printf("Starting initialization...\n");
@@ -443,6 +435,7 @@ int main(void) {
         printf("Magnetometer initialization successful\n");
     } else {
         printf("Magnetometer initialization failed\n");
+        init_error = 1;
     }
 
     // Initialize barometer
@@ -450,6 +443,7 @@ int main(void) {
         printf("Barometer initialization successful\n");
     } else {
         printf("Barometer initialization failed\n");
+        init_error = 1;
     }
 
     // Initialize IMU
@@ -457,6 +451,7 @@ int main(void) {
         printf("IMU initialization successful\n");
     } else {
         printf("IMU initialization failed\n");
+        init_error = 1;
     }
 
     if (lsm6dsox_config_accel(&s_imu_conf, LSM6DSOX_XL_RATE_208_HZ,
@@ -464,6 +459,7 @@ int main(void) {
         printf("IMU accel range set successfully\n");
     } else {
         printf("IMU configuration failed\n");
+        init_error = 1;
     }
 
     if (lsm6dsox_config_gyro(&s_imu_conf, LSM6DSOX_G_RATE_208_HZ,
@@ -471,6 +467,7 @@ int main(void) {
         printf("IMU gyro range set successfully\n");
     } else {
         printf("IMU configuration failed\n");
+        init_error = 1;
     }
 
     // Initialize accelerometer
@@ -479,6 +476,7 @@ int main(void) {
         printf("Accelerometer initialization successful\n");
     } else {
         printf("Accelerometer initialization failed\n");
+        init_error = 1;
     }
 
     // Initialize GPS
@@ -486,6 +484,7 @@ int main(void) {
         printf("GPS initialization successful\n");
     } else {
         printf("GPS initialization failed\n");
+        init_error = 1;
     }
 
     // Initialize SD card
@@ -493,6 +492,7 @@ int main(void) {
         printf("SD card initialization successful\n");
     } else {
         printf("SD card initialization failed\n");
+        init_error = 1;
     }
 
     /*
@@ -509,6 +509,18 @@ int main(void) {
         printf("PSPCOM initialization successful\n");
     } else {
         printf("PSPCOM initialization failed\n");
+        init_error = 1;
+    }
+
+    // Beep once for error, twice for success
+    gpio_write(PIN_BUZZER, GPIO_HIGH);
+    DELAY(100);
+    gpio_write(PIN_BUZZER, GPIO_LOW);
+    DELAY(100);
+    if (!init_error) {
+        gpio_write(PIN_BUZZER, GPIO_HIGH);
+        DELAY(100);
+        gpio_write(PIN_BUZZER, GPIO_LOW);
     }
 
     // https://www.freertos.org/RTOS-Cortex-M3-M4.html
