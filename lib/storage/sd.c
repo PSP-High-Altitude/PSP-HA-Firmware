@@ -114,7 +114,7 @@ static Status sd_create_state_file() {
     }
 
     // Check that the frame will at least nominally fit in our buffer
-    if (SENSOR_BUF_LEN < sizeof(StateFrame)) {
+    if (STATE_BUF_LEN < sizeof(StateFrame)) {
         return STATUS_DATA_ERROR;
     }
 
@@ -240,6 +240,10 @@ Status sd_reinit() {
     if (f_open(&s_gpsfile, s_gpsfname, FA_OPEN_APPEND | FA_WRITE) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
+    if (f_open(&s_statefile, s_statefname, FA_OPEN_APPEND | FA_WRITE) !=
+        FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
 
     return STATUS_OK;
 }
@@ -249,6 +253,9 @@ Status sd_deinit() {
         return STATUS_HARDWARE_ERROR;
     }
     if (f_close(&s_gpsfile) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+    if (f_close(&s_statefile) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
     if (f_unmount(SD_MOUNT_POINT) != FR_OK) {
@@ -263,6 +270,9 @@ Status sd_flush() {
         return STATUS_HARDWARE_ERROR;
     }
     if (f_sync(&s_gpsfile) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+    if (f_sync(&s_statefile) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 

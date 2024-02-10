@@ -4,8 +4,8 @@
 #include "board.h"
 #include "flight_estimation.h"
 
-#define DEBUG
-#define DEBUG_STORAGE
+// #define DEBUG
+// #define DEBUG_STORAGE
 // #define PSPCOM_SENSORS
 
 // Pin configuration

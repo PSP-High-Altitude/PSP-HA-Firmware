@@ -326,9 +326,9 @@ void do_state_est() {
         fp_update(&s_last_sensor_frame, &s_last_fix, &s_flight_phase,
                   &s_current_state, &imu_up, &high_g_up, &acc_buffer,
                   &baro_buffer);
-        printf("phase: %d, accel (m/s^2): {%7.2f, %7.2f, %7.2f}\n",
-               s_flight_phase, s_current_state.accBody.x,
-               s_current_state.accBody.y, s_current_state.accBody.z);
+        // printf("phase: %d, accel (m/s^2): {%7.2f, %7.2f, %7.2f}\n",
+        //        s_flight_phase, s_current_state.accBody.x,
+        //        s_current_state.accBody.y, s_current_state.accBody.z);
     }
 }
 
@@ -392,8 +392,8 @@ void store_data() {
         }
 
         // Log state estimation data
-        StateFrame state_frame = state_data_to_pb_frame(
-            xTaskGetTickCount(), s_flight_phase, &s_current_state);
+        StateFrame state_frame =
+            state_data_to_pb_frame(MICROS(), s_flight_phase, &s_current_state);
         Status code = sd_write_state_data(&state_frame);
         if (code != STATUS_OK) {
             printf("SD state write error %d\n", code);
