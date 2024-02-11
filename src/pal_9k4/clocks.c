@@ -14,7 +14,7 @@ void SystemClock_Config() {
     /** Configure the main internal regulator output voltage
      */
     HAL_PWREx_ConfigSupply(PWR_LDO_SUPPLY);
-    HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE0);
+    HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE1);
     while (!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {
     }
 
@@ -31,9 +31,9 @@ void SystemClock_Config() {
     RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
     RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
     RCC_OscInitStruct.PLL.PLLM = 24;
-    RCC_OscInitStruct.PLL.PLLN = 275;
-    RCC_OscInitStruct.PLL.PLLP = 1;
-    RCC_OscInitStruct.PLL.PLLQ = 11;
+    RCC_OscInitStruct.PLL.PLLN = 300;
+    RCC_OscInitStruct.PLL.PLLP = 3;
+    RCC_OscInitStruct.PLL.PLLQ = 10;
     RCC_OscInitStruct.PLL.PLLR = 2;
     RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_1;
     RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1VCOWIDE;
