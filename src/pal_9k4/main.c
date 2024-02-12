@@ -401,7 +401,6 @@ void store_data() {
 
         sd_flush();
         gpio_write(PIN_YELLOW, GPIO_LOW);
-
 #ifdef DEBUG_STORAGE
         uint64_t elapsed_time = MICROS() - start_time;
         printf("%lu entries read in %lu microseconds\n", entries_read,

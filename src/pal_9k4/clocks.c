@@ -6,7 +6,7 @@
 TIM_HandleTypeDef htim1;
 
 void SystemClock_Config() {
-    // CORE FREQUENCY: 168Mhz
+    // CORE FREQUENCY: 200Mhz
 
     RCC_OscInitTypeDef RCC_OscInitStruct = {0};
     RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
