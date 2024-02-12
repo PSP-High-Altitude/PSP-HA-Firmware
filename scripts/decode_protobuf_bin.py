@@ -76,7 +76,7 @@ def unpack_gps_validity_flags(dataframe):
     # Create new columns for each flag
     for flag, mask in masks.items():
         # Extract bits using the mask
-        dataframe[flag] = (dataframe['valid_flags'] & mask).apply(lambda x: x >> mask.bit_length() - mask.bit_count())
+        dataframe[flag] = (dataframe['valid_flags'] & mask).apply(lambda x: x >> mask.bit_length() - bin(mask).count('1'))
 
     return dataframe
 
