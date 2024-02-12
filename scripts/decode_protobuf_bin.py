@@ -1,7 +1,8 @@
 import struct
-import csv
 import time
 import sys
+
+import pandas as pd
 
 def decode_protobuf_file(file_path, protobuf_class):
     messages = []
@@ -33,53 +34,80 @@ def decode_protobuf_file(file_path, protobuf_class):
 
     end_time = time.time()
     elapsed_time = end_time - start_time
-    print(f"Decoded {len(messages)} {protobuf_class.__name__} messages in {elapsed_time:.6f} seconds")
+    print(f"Decoded {len(messages)} elements in {elapsed_time:.6f} seconds")
 
-    return messages
+    # Convert messages to DataFrame
+    data = [
+        [
+            getattr(message, field.name) 
+            for field in message.DESCRIPTOR.fields
+        ]
+        for message in messages
+    ]
+    column_names = [field.name for field in protobuf_class.DESCRIPTOR.fields]
+    df = pd.DataFrame(data, columns=column_names)
 
-def write_protobuf_messages_to_csv(messages, csv_output_path):
+    return df
+
+def write_dataframe_to_csv(dataframe, csv_output_path):
     start_time = time.time()
 
-    with open(csv_output_path, 'w', newline='') as csv_file:
-        # Create a CSV writer
-        csv_writer = csv.writer(csv_file)
-
-        # Write the CSV header based on the protobuf class fields
-        csv_writer.writerow(messages[0].DESCRIPTOR.fields_by_name.keys())
-
-        for message in messages:
-            # Write the values to the CSV file
-            csv_writer.writerow([getattr(message, field.name) for field in message.DESCRIPTOR.fields])
+    dataframe.to_csv(csv_output_path, index=False, float_format="%.3f")
 
     end_time = time.time()
     elapsed_time = end_time - start_time
-    print(f"Written {len(messages)} elements to CSV in {elapsed_time:.6f} seconds")
+    print(f"Written {len(dataframe)} elements to CSV in {elapsed_time:.6f} seconds")
+
+def unpack_gps_validity_flags(dataframe):
+    # Define the masks for each flag
+    masks = {
+        "date_valid": 1 << 0,
+        "time_valid": 1 << 1,
+        "time_resolved": 1 << 2,
+        "fix_type": (0b111 << 3),
+        "fix_valid": 1 << 8,
+        "diff_used": 1 << 9,
+        "psm_state": (0b111 << 10),
+        "hdg_veh_valid": 1 << 14,
+        "carrier_phase": (0b11 << 15),
+        "invalid_llh": 1 << 19
+    }
+
+    # Create new columns for each flag
+    for flag, mask in masks.items():
+        # Extract bits using the mask
+        dataframe[flag] = (dataframe['valid_flags'] & mask).apply(lambda x: x >> mask.bit_length() - 1)
+
+    return dataframe
 
 if __name__ == "__main__":
     if len(sys.argv) != 4:
-        print("Usage: python decode_protobuf_bin.py [sensor | gps] input_bin output_csv")
+        print("Usage: python decode_protobuf_bin.py [sensor | gps | state] input_bin output_csv")
         sys.exit(1)
 
     frame_kind = sys.argv[1]
     input_bin_path = sys.argv[2]
     output_csv_path = sys.argv[3]
 
-    from proto.sensor_pb2 import SensorFrame
-    from proto.gps_pb2 import GpsFrame
-    from proto.state_pb2 import StateFrame
-
     if frame_kind == "sensor":
+        from proto.sensor_pb2 import SensorFrame
         protobuf_class = SensorFrame
     elif frame_kind == "gps":
+        from proto.gps_pb2 import GpsFrame
         protobuf_class = GpsFrame
     elif frame_kind == "state":
+        from proto.state_pb2 import StateFrame
         protobuf_class = StateFrame
     else:
-        print("Usage: python decode_protobuf_bin.py [sensor | gps] input_bin output_csv")
+        print("Usage: python decode_protobuf_bin.py [sensor | gps | state] input_bin output_csv")
         sys.exit(1)
 
     # Decode the protobuf messages
     sensor_frames = decode_protobuf_file(input_bin_path, protobuf_class)
 
+    # Do any required processing
+    if frame_kind == "gps":
+        sensor_frames = unpack_gps_validity_flags(sensor_frames)
+
     # Write the decoded values to the CSV file
-    write_protobuf_messages_to_csv(sensor_frames, output_csv_path)
+    write_dataframe_to_csv(sensor_frames, output_csv_path)
