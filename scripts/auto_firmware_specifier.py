@@ -12,7 +12,7 @@ def run_git_command(git_command):
         print(f"Error running 'git {git_command}': {e}")
         return None
 
-def get_firmware_specifier():
+def get_latest_commit_info():
     # Try to generate firmware specifier using git describe --tags
     describe_output = run_git_command('describe --tags')
     if describe_output is not None:
@@ -24,7 +24,19 @@ def get_firmware_specifier():
         return rev_parse_output
     
     # If that still didn't work, just return unknown
-    return 'unknown'
+    return 'unknown-commit'
+
+def get_uncommitted_changes_info():
+    # Try to get the diff since the last commit
+    diff_output = run_git_command('diff')
+    if diff_output is not None:
+        return hex(hash(diff_output))
+    
+    # If that didn't work, just return unknown
+    return 'unknown-diff'
+
+def get_firmware_specifier():
+    return get_latest_commit_info() + '\\ ' + get_uncommitted_changes_info()
 
 def get_firmware_specifier_build_flag():
     return "-D FIRMWARE_SPECIFIER=\\\"" + get_firmware_specifier() + "\\\""
