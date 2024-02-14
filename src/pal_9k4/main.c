@@ -21,6 +21,7 @@
 #include "sdmmc/sdmmc.h"
 #include "status.h"
 #include "stm32h7xx.h"
+#include "storage.h"
 #include "timer.h"
 
 // FreeRTOS
@@ -31,7 +32,7 @@ extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
 static SensorFrame s_last_sensor_frame;
 static TaskHandle_t s_read_sensors_handle;
 static TaskHandle_t s_read_gps_handle;
-static TaskHandle_t s_store_data_handle;
+static TaskHandle_t s_storage_task_handle;
 static TaskHandle_t s_standard_telem_handle;
 static TaskHandle_t s_do_state_est_handle;
 static TaskHandle_t s_process_commands_handle;
@@ -52,38 +53,6 @@ AverageBuffer acc_buffer = {.buffer = acc_internal_buffer,
                             .size = AVG_BUFFER_SIZE};
 AverageBuffer baro_buffer = {.buffer = baro_internal_buffer,
                              .size = AVG_BUFFER_SIZE};
-
-volatile static struct {
-    SensorFrame queue[LOG_FIFO_LEN];
-    size_t head;  // Next index that will be read from
-    size_t tail;  // Next index that will be written to
-    size_t count;
-    // ridx == widx -> FIFO is empty
-    // (ridx == widx - 1) mod LOG_FIFO_LEN -> FIFO is full
-} fifo;
-
-void init_fifo() {
-    fifo.head = 0;
-    fifo.tail = 0;
-    fifo.count = 0;
-}
-
-SensorFrame read_fifo() {
-    SensorFrame ret = fifo.queue[fifo.head];
-    fifo.head = (fifo.head + 1) % LOG_FIFO_LEN;
-    fifo.count--;
-    return ret;
-}
-
-void write_fifo(SensorFrame data) {
-    if (fifo.count == LOG_FIFO_LEN) {
-        fifo.head = (fifo.head + 1) % LOG_FIFO_LEN;
-        fifo.count--;
-    }
-    fifo.queue[fifo.tail] = data;
-    fifo.tail = (fifo.tail + 1) % LOG_FIFO_LEN;
-    fifo.count++;
-}
 
 static I2cDevice s_mag_conf = {
     .address = 0x1E,
@@ -106,18 +75,6 @@ static SpiDevice s_imu_conf = {
     .cpha = 0,
     .cs = 0,
     .periph = P_SPI1,
-};
-// SPI mode conf
-/*
-static SdDevice s_sd_conf = {
-    .clk = SD_SPEED_10MHz,
-    .periph = P_SD4,
-};
-*/
-// SDMMC mode conf
-static SdDevice s_sd_conf = {
-    .clk = SD_SPEED_HIGH,
-    .periph = P_SD1,
 };
 static SpiDevice s_acc_conf = {
     .clk = SPI_SPEED_10MHz,
@@ -180,30 +137,10 @@ void read_sensors() {
         s_last_sensor_frame.temperature = baro.temperature;
         s_last_sensor_frame.pressure = baro.pressure;
 
-        write_fifo(s_last_sensor_frame);
-        xTaskNotifyGive(s_store_data_handle);
+        queue_sensor_store(&s_last_sensor_frame);
         xTaskNotifyGive(s_do_state_est_handle);
         vTaskDelayUntil(&s_last_sensor_read_ticks,
                         pdMS_TO_TICKS(TARGET_INTERVAL));
-    }
-}
-
-void read_gps() {
-    while (1) {
-        while (s_fix_avail) {
-            vTaskDelay(1);
-        }
-        Status code = max_m10s_poll_fix(&s_gps_conf, &s_last_fix);
-        if (code == STATUS_OK) {
-            if (s_last_fix.fix_valid)
-                gpio_write(PIN_BLUE, GPIO_HIGH);
-            else
-                gpio_write(PIN_BLUE, GPIO_LOW);
-            s_fix_avail = 1;
-        } else {
-            gpio_write(PIN_BLUE, GPIO_LOW);
-            printf("GPS read failed with code %d\n", code);
-        }
     }
 }
 
@@ -313,6 +250,19 @@ StateFrame state_data_to_pb_frame(uint64_t timestamp, FlightPhase fp,
     return state_frame;
 }
 
+void read_gps() {
+    gpio_write(PIN_BLUE, GPIO_LOW);
+    while (1) {
+        print_status_error(max_m10s_poll_fix(&s_gps_conf, &s_last_fix),
+                           "GPS read");
+
+        gpio_write(PIN_BLUE, s_last_fix.fix_valid != 0);
+
+        GpsFrame gps_frame = gps_fix_to_pb_frame(MICROS(), &s_last_fix);
+        queue_gps_store(&gps_frame);
+    }
+}
+
 void do_state_est() {
     // initialize stuff
     Vector imu_up;
@@ -326,86 +276,12 @@ void do_state_est() {
         fp_update(&s_last_sensor_frame, &s_last_fix, &s_flight_phase,
                   &s_current_state, &imu_up, &high_g_up, &acc_buffer,
                   &baro_buffer);
+        StateFrame state_frame =
+            state_data_to_pb_frame(MICROS(), s_flight_phase, &s_current_state);
+        queue_state_store(&state_frame);
         // printf("phase: %d, accel (m/s^2): {%7.2f, %7.2f, %7.2f}\n",
         //        s_flight_phase, s_current_state.accBody.x,
         //        s_current_state.accBody.y, s_current_state.accBody.z);
-    }
-}
-
-void store_data() {
-    while (1) {
-        uint32_t notif_value;
-        xTaskNotifyWait(0, 0xffffffffUL, &notif_value, 100);
-
-        // If PROG switch is set, unmount SD card and wait
-        if (!gpio_read(PIN_PAUSE)) {
-            sd_deinit();
-            printf("SD safe to remove\n");
-            gpio_write(PIN_BLUE, GPIO_LOW);
-            gpio_write(PIN_GREEN, GPIO_LOW);
-            while (!gpio_read(PIN_PAUSE)) {
-                gpio_write(PIN_GREEN, GPIO_HIGH);
-                vTaskDelay(pdMS_TO_TICKS(500));
-                gpio_write(PIN_GREEN, GPIO_LOW);
-                vTaskDelay(pdMS_TO_TICKS(500));
-            }
-            printf("Remounting SD\n\n");
-            sd_reinit();
-            continue;
-        }
-
-        if (notif_value == 0) {
-            continue;
-        }
-
-        gpio_write(PIN_YELLOW, GPIO_HIGH);
-#ifdef DEBUG_STORAGE
-        uint64_t start_time = MICROS();
-#endif
-        uint32_t entries_read = 0;
-        while (fifo.count > 0) {
-            SensorFrame sens_data = read_fifo();
-            Status code = sd_write_sensor_data(&sens_data);
-            if (code != STATUS_OK) {
-                printf("SD sensor write error %d\n", code);
-                gpio_write(PIN_GREEN, GPIO_LOW);
-                break;
-            }
-            gpio_write(PIN_GREEN, GPIO_HIGH);
-            entries_read += 1;
-            if (entries_read == LOG_FIFO_LEN) {
-                gpio_write(PIN_RED, GPIO_HIGH);
-                break;
-            }
-            gpio_write(PIN_RED, GPIO_LOW);
-        }
-
-        if (s_fix_avail) {
-            // This is an expensive copy but ideally we don't want to expose the
-            // raw GPS format to the SD HAL
-            GpsFrame gps_frame = gps_fix_to_pb_frame(MICROS(), &s_last_fix);
-            Status code = sd_write_gps_data(&gps_frame);
-            if (code != STATUS_OK) {
-                printf("SD GPS write error %d\n", code);
-            }
-            s_fix_avail = 0;
-        }
-
-        // Log state estimation data
-        StateFrame state_frame =
-            state_data_to_pb_frame(MICROS(), s_flight_phase, &s_current_state);
-        Status code = sd_write_state_data(&state_frame);
-        if (code != STATUS_OK) {
-            printf("SD state write error %d\n", code);
-        }
-
-        sd_flush();
-        gpio_write(PIN_YELLOW, GPIO_LOW);
-#ifdef DEBUG_STORAGE
-        uint64_t elapsed_time = MICROS() - start_time;
-        printf("%lu entries read in %lu microseconds\n", entries_read,
-               (uint32_t)elapsed_time);
-#endif
     }
 }
 
@@ -413,7 +289,6 @@ int main(void) {
     HAL_Init();
     SystemClock_Config();
     init_timers();
-    init_fifo();
     MX_USB_DEVICE_Init();
     gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLUP);
     gpio_write(PIN_RED, GPIO_HIGH);
@@ -485,7 +360,7 @@ int main(void) {
     }
 
     // Initialize SD card
-    if (sd_init(&s_sd_conf) == STATUS_OK) {
+    if (init_storage() == STATUS_OK) {
         printf("SD card initialization successful\n");
     } else {
         printf("SD card initialization failed\n");
@@ -526,12 +401,12 @@ int main(void) {
     // https://www.freertos.org/RTOS-Cortex-M3-M4.html
     NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
 
-    xTaskCreate(store_data,            // Task function
-                "store_data",          // Task name
-                2048,                  // Stack size
-                NULL,                  // Parameters
-                tskIDLE_PRIORITY + 1,  // Priority
-                &s_store_data_handle   // Task handle
+    xTaskCreate(storage_task,           // Task function
+                "storage_task",         // Task name
+                2048,                   // Stack size
+                NULL,                   // Parameters
+                tskIDLE_PRIORITY + 1,   // Priority
+                &s_storage_task_handle  // Task handle
     );
 
     xTaskCreate(read_sensors,           // Task function

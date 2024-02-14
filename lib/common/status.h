@@ -12,4 +12,6 @@ typedef enum {
     STATUS_TIMEOUT_ERROR,
 } Status;
 
+Status print_status_error(Status status, const char msg[]);
+
 #endif  // STATUS_H

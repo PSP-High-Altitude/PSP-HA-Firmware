@@ -248,4 +248,18 @@ __attribute__((unused)) static uint32_t GPIO_PIN_TO_MODEPOS[] = {
     GPIO_MODER_MODE0_Pos,  GPIO_MODER_MODE1_Pos,
 };
 
+// Pin aliases
+#define PIN_FIREMAIN PIN_PG12
+#define PIN_FIREDRG PIN_PG11
+#define PIN_FIREAUX PIN_PG10
+#define PIN_CONTMAIN PIN_PG9
+#define PIN_CONTDRG PIN_PD7
+#define PIN_CONTAUX PIN_PD6
+#define PIN_RED PIN_PA0
+#define PIN_YELLOW PIN_PA1
+#define PIN_GREEN PIN_PA2
+#define PIN_BLUE PIN_PA3
+#define PIN_BUZZER PIN_PE0
+#define PIN_PAUSE PIN_PB7  // SDA4
+
 #endif
