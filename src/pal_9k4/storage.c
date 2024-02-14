@@ -5,6 +5,7 @@
 #include "board.h"
 #include "sd.h"
 #include "sdmmc/sdmmc.h"
+#include "timer.h"
 
 // FreeRTOS
 #include "FreeRTOS.h"
@@ -32,14 +33,18 @@ static QueueHandle_t s_sensor_queue_handle;
 static QueueHandle_t s_state_queue_handle;
 static QueueHandle_t s_gps_queue_handle;
 
-static QueueSetHandle_t s_store_queue_set_handle;
-
 static bool s_pause_store;
 
 /*****************/
 /* API FUNCTIONS */
 /*****************/
 Status init_storage() {
+    // For some reason SD init CANNOT go after queue creation
+    Status sd_status = PRINT_STATUS_ERROR(sd_init(&s_sd_conf), "SD init");
+    if (sd_status != STATUS_OK) {
+        return sd_status;
+    }
+
     // Initialize pause flag
     s_pause_store = false;
 
@@ -50,13 +55,7 @@ Status init_storage() {
         xQueueCreate(STATE_QUEUE_LENGTH, STATE_QUEUE_ITEM_SIZE);
     s_gps_queue_handle = xQueueCreate(GPS_QUEUE_LENGTH, GPS_QUEUE_ITEM_SIZE);
 
-    // Create the queue set
-    s_store_queue_set_handle = xQueueCreateSet(QUEUE_SET_LENGTH);
-    xQueueAddToSet(s_sensor_queue_handle, s_store_queue_set_handle);
-    xQueueAddToSet(s_state_queue_handle, s_store_queue_set_handle);
-    xQueueAddToSet(s_gps_queue_handle, s_store_queue_set_handle);
-
-    return sd_init(&s_sd_conf);
+    return STATUS_OK;
 }
 
 Status queue_sensor_store(SensorFrame* sensor_frame) {
@@ -93,9 +92,6 @@ void storage_task() {
     gpio_write(PIN_GREEN, GPIO_LOW);
 
     while (1) {
-        // Wait for new item for up to 1 second
-        xQueueSelectFromSet(s_store_queue_set_handle, pdMS_TO_TICKS(1000));
-
         // Set disk activity warning LED
         gpio_write(PIN_YELLOW, GPIO_HIGH);
 
@@ -125,7 +121,7 @@ void storage_task() {
         }
 
         // Flush everything to SD card
-        Status flush_status = print_status_error(sd_flush(), "SD flush");
+        Status flush_status = PRINT_STATUS_ERROR(sd_flush(), "SD flush");
         gpio_write(PIN_GREEN, flush_status == STATUS_OK);
 
         // Unset disk activity warning LED
@@ -140,9 +136,9 @@ void storage_task() {
             // Blink the green LED while waiting
             while (s_pause_store) {
                 gpio_write(PIN_GREEN, GPIO_HIGH);
-                vTaskDelay(pdMS_TO_TICKS(500));
+                DELAY(500);
                 gpio_write(PIN_GREEN, GPIO_LOW);
-                vTaskDelay(pdMS_TO_TICKS(500));
+                DELAY(500);
             }
 
             // Remount SD card
@@ -153,6 +149,9 @@ void storage_task() {
             xQueueReset(s_sensor_queue_handle);
             xQueueReset(s_state_queue_handle);
             xQueueReset(s_gps_queue_handle);
+        } else {
+            // Let others run first
+            taskYIELD();
         }
     }
 }

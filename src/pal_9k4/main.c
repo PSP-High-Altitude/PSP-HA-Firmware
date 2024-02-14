@@ -253,7 +253,7 @@ StateFrame state_data_to_pb_frame(uint64_t timestamp, FlightPhase fp,
 void read_gps() {
     gpio_write(PIN_BLUE, GPIO_LOW);
     while (1) {
-        print_status_error(max_m10s_poll_fix(&s_gps_conf, &s_last_fix),
+        PRINT_STATUS_ERROR(max_m10s_poll_fix(&s_gps_conf, &s_last_fix),
                            "GPS read");
 
         gpio_write(PIN_BLUE, s_last_fix.fix_valid != 0);
