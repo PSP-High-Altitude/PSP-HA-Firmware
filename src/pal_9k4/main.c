@@ -493,10 +493,15 @@ void vApplicationStackOverflowHook(TaskHandle_t xTask,
 extern void xPortSysTickHandler(void);
 
 void SysTick_Handler(void) {
-    HAL_IncTick();
-
     /* Clear overflow flag */
     SysTick->CTRL;
+
+    // Detect pause condition
+    if (!gpio_read(PIN_PAUSE)) {
+        pause_storage();
+    } else {
+        start_storage();
+    }
 
     if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
         /* Call tick handler */

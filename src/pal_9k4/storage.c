@@ -129,6 +129,13 @@ void storage_task() {
 
         // Check if the pause flag is set
         if (s_pause_store) {
+            // Gather and dump stats
+            char prf_buf[1024];  // 40 bytes per task
+            printf("Dumping prf stats\n");
+            vTaskGetRunTimeStats(prf_buf);
+            sd_dump_prf_stats(prf_buf);
+            printf(prf_buf);
+
             // Unmount SD card
             sd_deinit();
             printf("SD safe to remove\n");
@@ -149,9 +156,6 @@ void storage_task() {
             xQueueReset(s_sensor_queue_handle);
             xQueueReset(s_state_queue_handle);
             xQueueReset(s_gps_queue_handle);
-        } else {
-            // Let others run first
-            taskYIELD();
         }
     }
 }

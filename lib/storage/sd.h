@@ -50,6 +50,8 @@ Status sd_write_gps_data(GpsFrame* gps_frame);
 
 Status sd_write_state_data(StateFrame* state_frame);
 
+Status sd_dump_prf_stats(char stats[]);
+
 Status hal_reinit_card();
 
 #endif  // SD_H
