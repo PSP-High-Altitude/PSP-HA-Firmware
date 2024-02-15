@@ -1,9 +1,7 @@
-#ifndef STORAGE_H
-#define STORAGE_H
+#ifndef SENSORS_H
+#define SENSORS_H
 
-#include "gps.pb.h"
 #include "sensor.pb.h"
-#include "state.pb.h"
 #include "status.h"
 
 // Flag to indicate whether to use SDMMC or SPI peripheral
@@ -21,15 +19,11 @@
 #define STATE_QUEUE_ITEM_SIZE (sizeof(StateFrame))
 #define GPS_QUEUE_ITEM_SIZE (sizeof(GpsFrame))
 
-Status init_storage();
+Status init_sensors(uint32_t polling_period_ms);
 
 void pause_storage();
 void start_storage();
 
-void storage_task();
+void read_sensors_task();
 
-Status queue_sensor_store(SensorFrame* sensor_frame);
-Status queue_state_store(StateFrame* state_frame);
-Status queue_gps_store(GpsFrame* gps_frame);
-
-#endif  // STORAGE_H
+#endif  // SENSORS_H
