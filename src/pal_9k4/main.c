@@ -66,7 +66,7 @@ static I2cDevice s_baro_conf = {
 };
 static I2cDevice s_gps_conf = {
     .address = 0x42,
-    .clk = I2C_SPEED_FAST,
+    .clk = I2C_SPEED_STANDARD,
     .periph = P_I2C2,
 };
 static SpiDevice s_imu_conf = {
@@ -253,8 +253,7 @@ StateFrame state_data_to_pb_frame(uint64_t timestamp, FlightPhase fp,
 void read_gps() {
     gpio_write(PIN_BLUE, GPIO_LOW);
     while (1) {
-        PRINT_STATUS_ERROR(max_m10s_poll_fix(&s_gps_conf, &s_last_fix),
-                           "GPS read");
+        EXPECT_OK(max_m10s_poll_fix(&s_gps_conf, &s_last_fix), "GPS read");
 
         gpio_write(PIN_BLUE, s_last_fix.fix_valid != 0);
 

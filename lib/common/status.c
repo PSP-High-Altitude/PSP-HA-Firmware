@@ -13,8 +13,8 @@ const char* STATUS_NAMES[] = {
     [STATUS_TIMEOUT_ERROR] = "STATUS_TIMEOUT_ERROR",
 };
 
-Status print_status_error(Status status, const char msg[], const char file[],
-                          const int line) {
+Status expect_ok(Status status, const char msg[], const char file[],
+                 const int line) {
     if (status != STATUS_OK) {
         printf("ERROR at %s:%d: %s returned %s\n", file, line, msg,
                STATUS_NAMES[status]);

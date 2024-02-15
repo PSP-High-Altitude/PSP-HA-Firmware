@@ -72,7 +72,7 @@ void SystemClock_Config() {
     PeriphClkInitStruct.OspiClockSelection = RCC_OSPICLKSOURCE_PLL2;
     PeriphClkInitStruct.Spi123ClockSelection = RCC_SPI123CLKSOURCE_PLL2;
     PeriphClkInitStruct.Spi45ClockSelection = RCC_SPI45CLKSOURCE_PLL2;
-    PeriphClkInitStruct.I2c123ClockSelection = RCC_I2C123CLKSOURCE_HSI;
+    PeriphClkInitStruct.I2c1235ClockSelection = RCC_I2C1235CLKSOURCE_HSI;
     PeriphClkInitStruct.I2c4ClockSelection = RCC_I2C4CLKSOURCE_HSI;
     PeriphClkInitStruct.Usart234578ClockSelection =
         RCC_USART234578CLKSOURCE_HSI;

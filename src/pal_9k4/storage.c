@@ -40,7 +40,7 @@ static bool s_pause_store;
 /*****************/
 Status init_storage() {
     // For some reason SD init CANNOT go after queue creation
-    Status sd_status = PRINT_STATUS_ERROR(sd_init(&s_sd_conf), "SD init");
+    Status sd_status = EXPECT_OK(sd_init(&s_sd_conf), "SD init");
     if (sd_status != STATUS_OK) {
         return sd_status;
     }
@@ -97,7 +97,7 @@ void storage_task() {
 
         // Empty the sensor queue
         SensorFrame sensor_frame;
-        while (xQueueReceive(s_sensor_queue_handle, &sensor_frame, 0) ==
+        while (xQueueReceive(s_sensor_queue_handle, &sensor_frame, 1) ==
                pdPASS) {
             if (sd_write_sensor_data(&sensor_frame) != STATUS_OK) {
                 break;
@@ -106,7 +106,7 @@ void storage_task() {
 
         // Empty the state queue
         StateFrame state_frame;
-        while (xQueueReceive(s_state_queue_handle, &state_frame, 0) == pdPASS) {
+        while (xQueueReceive(s_state_queue_handle, &state_frame, 1) == pdPASS) {
             if (sd_write_state_data(&state_frame) != STATUS_OK) {
                 break;
             }
@@ -114,14 +114,14 @@ void storage_task() {
 
         // Empty the GPS queue
         GpsFrame gps_frame;
-        while (xQueueReceive(s_gps_queue_handle, &gps_frame, 0) == pdPASS) {
+        while (xQueueReceive(s_gps_queue_handle, &gps_frame, 1) == pdPASS) {
             if (sd_write_gps_data(&gps_frame) != STATUS_OK) {
                 break;
             }
         }
 
         // Flush everything to SD card
-        Status flush_status = PRINT_STATUS_ERROR(sd_flush(), "SD flush");
+        Status flush_status = EXPECT_OK(sd_flush(), "SD flush");
         gpio_write(PIN_GREEN, flush_status == STATUS_OK);
 
         // Unset disk activity warning LED
