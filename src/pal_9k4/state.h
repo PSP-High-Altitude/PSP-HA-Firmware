@@ -9,7 +9,7 @@
 #define MAX_POLLING_PERIOD_MS 5  // 200 Hz
 #define MAX_AVG_BUFFER_SIZE (AVERAGING_PERIOD_MS / MAX_POLLING_PERIOD_MS)
 
-#define SENSOR_UPDATE_TIMEOUT_MS 100
+#define SENSOR_UPDATE_TIMEOUT_MS 1000
 
 Status init_state_est();
 Status reset_state_est();

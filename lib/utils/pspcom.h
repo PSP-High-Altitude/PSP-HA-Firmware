@@ -73,6 +73,6 @@ void pspcom_send_gps(void *gps_fix);
 
 void pspcom_send_status();
 
-void pspcom_send_standard(void *pal_data);
+void pspcom_send_standard();
 
 #endif
