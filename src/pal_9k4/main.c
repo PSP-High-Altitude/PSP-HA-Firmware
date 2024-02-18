@@ -66,9 +66,10 @@ int main(void) {
 
     DELAY(4700);
     printf("Starting initialization...\n");
-    init_error += (init_sensors() != STATUS_OK);
     init_error += (init_storage() != STATUS_OK);
+    init_error += (init_sensors() != STATUS_OK);
     init_error += (init_state_est() != STATUS_OK);
+    init_error += (EXPECT_OK(pspcom_init(), "pspcom init") != STATUS_OK);
 
     // One beep for error, two for success
     gpio_write(PIN_BUZZER, GPIO_HIGH);
