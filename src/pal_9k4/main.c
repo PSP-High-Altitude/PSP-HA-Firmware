@@ -53,6 +53,23 @@ int _write(int file, char *data, int len) {
     return len;
 }
 
+void handle_pause() {
+    static bool s_last_paused;
+
+    if (!gpio_read(PIN_PAUSE)) {
+        s_last_paused = true;
+
+        pause_sensors();
+        pause_storage();
+    } else if (s_last_paused) {
+        start_storage();
+        start_sensors();
+        reset_state_est();
+
+        s_last_paused = false;
+    }
+}
+
 int main(void) {
     HAL_Init();
     SystemClock_Config();
@@ -72,14 +89,14 @@ int main(void) {
     init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK) << 3;
 
     // One beep for initialization complete
-    gpio_write(PIN_BUZZER, GPIO_HIGH);
+    // gpio_write(PIN_BUZZER, GPIO_HIGH);
     DELAY(100);
     gpio_write(PIN_BUZZER, GPIO_LOW);
     DELAY(100);
 
     // Beep out the failure code (if any)
     for (int i = 0; i < init_error; i++) {
-        gpio_write(PIN_BUZZER, GPIO_HIGH);
+        // gpio_write(PIN_BUZZER, GPIO_HIGH);
         DELAY(50);
         gpio_write(PIN_BUZZER, GPIO_LOW);
         DELAY(50);
@@ -187,14 +204,7 @@ void SysTick_Handler(void) {
     SysTick->CTRL;
 
     // Detect pause condition
-    if (!gpio_read(PIN_PAUSE)) {
-        pause_storage();
-        pause_sensors();
-    } else {
-        start_storage();
-        start_sensors();
-        reset_state_est();
-    }
+    handle_pause();
 
     if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
         /* Call tick handler */

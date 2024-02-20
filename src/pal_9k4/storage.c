@@ -35,6 +35,9 @@ static QueueHandle_t s_gps_queue_handle;
 
 static bool s_pause_store;
 
+uint64_t g_last_tickless_idle_entry_us;
+uint64_t g_total_tickless_idle_us;
+
 /*****************/
 /* API FUNCTIONS */
 /*****************/
@@ -140,6 +143,10 @@ void storage_task() {
             sd_deinit();
             printf("SD safe to remove\n");
 
+            // Record sleep entry time
+            g_total_tickless_idle_us = 0;
+            uint64_t sleep_entry_us = MICROS();
+
             // Blink the green LED while waiting
             while (s_pause_store) {
                 gpio_write(PIN_GREEN, GPIO_HIGH);
@@ -148,9 +155,18 @@ void storage_task() {
                 DELAY(500);
             }
 
+            uint64_t sleep_exit_us = MICROS();
+            uint64_t tickless_idle_us = g_total_tickless_idle_us;
+
             // Remount SD card
             printf("Remounting SD\n");
             sd_reinit();
+
+            // Store tickless idle stats
+            sprintf(prf_buf, "Tickless idle percentage: %f\n\n",
+                    100. * (float)tickless_idle_us /
+                        (float)(sleep_exit_us - sleep_entry_us));
+            sd_dump_prf_stats(prf_buf);
 
             // Clear all queues
             xQueueReset(s_sensor_queue_handle);

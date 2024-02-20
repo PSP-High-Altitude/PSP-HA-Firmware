@@ -45,6 +45,7 @@
 
 /* USER CODE BEGIN Includes */
 /* Section where include file can be added */
+#include "sleep.h"
 /* USER CODE END Includes */
 
 /* Ensure definitions are only used by the compiler, and not by the assembler. */
@@ -81,17 +82,14 @@
   // Added stuff BEGIN
   extern uint64_t MICROS();
   extern uint64_t get_systick_freq();
-  extern int printf(const char *__restrict__, ...);
 
 #define configUSE_TICKLESS_IDLE 1
 #define configSYSTICK_CLOCK_HZ (get_systick_freq())
 
-  /*
-  #define configPRE_SLEEP_PROCESSING(xModifiableIdleTime) \
-        (printf("Pre sleep xModifiableIdleTime: %lu\n", (xModifiableIdleTime)))
-  #define configPOST_SLEEP_PROCESSING(xExpectedIdleTime) \
-        (printf("Post sleep xExpectedIdleTime: %lu\n", (xExpectedIdleTime)))
-  */
+#define configPRE_SLEEP_PROCESSING(xModifiableIdleTime) \
+      pre_sleep(&xModifiableIdleTime)
+#define configPOST_SLEEP_PROCESSING(xExpectedIdleTime) \
+      post_sleep(&xExpectedIdleTime)
 
 #define configGENERATE_RUN_TIME_STATS 1
 #define configUSE_STATS_FORMATTING_FUNCTIONS 1

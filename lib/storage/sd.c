@@ -293,15 +293,11 @@ Status sd_dump_prf_stats(char stats[]) {
         return STATUS_HARDWARE_ERROR;
     }
 
-    // Write the header
-    bw += f_printf(&prffile, "*** Dumping stats at %lu ms***\n",
-                   (uint32_t)MILLIS());
+    // Write a timestamp
+    bw += f_printf(&prffile, "%lu ms: ", (uint32_t)MILLIS());
 
-    // Write the stats table
+    // Write the stats
     bw += f_printf(&prffile, stats);
-
-    // Add a newline
-    bw += f_printf(&prffile, "\n");
 
     // Check that something was written
     if (bw == 0) {
