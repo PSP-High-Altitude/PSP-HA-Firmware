@@ -408,6 +408,7 @@ void pspcom_send_standard() {
         // Get pointers to latest data
         SensorFrame *sensor_frame = get_last_sensor_frame();
         GPS_Fix_TypeDef *gps_fix = get_last_gps_fix();
+        FlightPhase *flight_phase = get_last_flight_phase();
 
         // Standard telemetry
         pspcommsg tx_msg = {
@@ -444,7 +445,8 @@ void pspcom_send_standard() {
             (main_cont << 1) | (drg_cont << 3) | (aux_cont << 5) | 0x15;
 
         // SYS_STAT
-        tx_msg.payload[17] = 0;
+        tx_msg.payload[17] = (uint8_t)*flight_phase & 0x1;
+        tx_msg.payload[17] = ((uint8_t)*flight_phase & 0xF) << 3;
 
         pspcom_send_msg(tx_msg);
 

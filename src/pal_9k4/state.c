@@ -122,3 +122,5 @@ void state_est_task() {
         queue_state_store(&state_frame);
     }
 }
+
+FlightPhase* get_last_flight_phase() { return &s_flight_phase; }
