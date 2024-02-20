@@ -78,15 +78,26 @@
 #define configUSE_COUNTING_SEMAPHORES 1
 #define configUSE_PORT_OPTIMISED_TASK_SELECTION 0
 
-  // Added stuff
+  // Added stuff BEGIN
+  extern uint64_t MICROS();
+  extern uint64_t get_systick_freq();
+  extern int printf(const char *__restrict__, ...);
+
 #define configUSE_TICKLESS_IDLE 1
-#define configUSE_QUEUE_SETS 1
+#define configSYSTICK_CLOCK_HZ (get_systick_freq())
+
+  /*
+  #define configPRE_SLEEP_PROCESSING(xModifiableIdleTime) \
+        (printf("Pre sleep xModifiableIdleTime: %lu\n", (xModifiableIdleTime)))
+  #define configPOST_SLEEP_PROCESSING(xExpectedIdleTime) \
+        (printf("Post sleep xExpectedIdleTime: %lu\n", (xExpectedIdleTime)))
+  */
 
 #define configGENERATE_RUN_TIME_STATS 1
 #define configUSE_STATS_FORMATTING_FUNCTIONS 1
-  extern uint64_t MICROS();
 #define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()
 #define portGET_RUN_TIME_COUNTER_VALUE() (MICROS())
+  // Added stuff END
 
   /* USER CODE BEGIN MESSAGE_BUFFER_LENGTH_TYPE */
   /* Defaults to size_t for backward compatibility, but can be changed

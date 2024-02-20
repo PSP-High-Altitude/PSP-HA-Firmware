@@ -53,6 +53,12 @@ void init_timers(uint32_t sensor_interval_ms) {
     HAL_TIM_Base_Start(&tim2_handle);
 };
 
+uint64_t get_systick_freq() {
+    uint64_t systemClockFreq = HAL_RCC_GetHCLKFreq();
+    uint64_t reloadValue = SysTick->LOAD + 1;
+    return systemClockFreq / reloadValue;
+}
+
 uint64_t MICROS() {
     uint64_t tim2_count = __HAL_TIM_GET_COUNTER(&tim2_handle);
     uint64_t tim3_count = __HAL_TIM_GET_COUNTER(&tim3_handle);

@@ -66,20 +66,23 @@ int main(void) {
 
     DELAY(4700);
     printf("Starting initialization...\n");
-    init_error += (init_storage() != STATUS_OK);
-    init_error += (init_sensors() != STATUS_OK);
-    init_error += (init_state_est() != STATUS_OK);
-    init_error += (EXPECT_OK(pspcom_init(), "pspcom init") != STATUS_OK);
+    init_error |= (EXPECT_OK(init_storage(), "init storage") != STATUS_OK) << 0;
+    init_error |= (EXPECT_OK(init_sensors(), "init sensors") != STATUS_OK) << 1;
+    init_error |= (EXPECT_OK(init_state_est(), "init state") != STATUS_OK) << 2;
+    init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK) << 3;
 
-    // One beep for error, two for success
+    // One beep for initialization complete
     gpio_write(PIN_BUZZER, GPIO_HIGH);
     DELAY(100);
     gpio_write(PIN_BUZZER, GPIO_LOW);
     DELAY(100);
-    if (!init_error) {
+
+    // Beep out the failure code (if any)
+    for (int i = 0; i < init_error; i++) {
         gpio_write(PIN_BUZZER, GPIO_HIGH);
-        DELAY(100);
+        DELAY(50);
         gpio_write(PIN_BUZZER, GPIO_LOW);
+        DELAY(50);
     }
 
     gpio_write(PIN_RED, GPIO_LOW);
@@ -186,8 +189,11 @@ void SysTick_Handler(void) {
     // Detect pause condition
     if (!gpio_read(PIN_PAUSE)) {
         pause_storage();
+        pause_sensors();
     } else {
         start_storage();
+        start_sensors();
+        reset_state_est();
     }
 
     if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
