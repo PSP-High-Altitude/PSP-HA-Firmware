@@ -23,17 +23,29 @@
 #include "task.h"
 
 extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
-static TaskHandle_t s_read_sensors_handle;
-static TaskHandle_t s_read_gps_handle;
-static TaskHandle_t s_storage_task_handle;
-static TaskHandle_t s_standard_telem_handle;
-static TaskHandle_t s_state_est_task_handle;
-static TaskHandle_t s_pyros_task_handle;
-static TaskHandle_t s_process_commands_handle;
-#ifdef PSPCOM_SENSORS
-static TaskHandle_t s_sensor_telem_handle;
-#endif
 
+// Sorry about preprocessor abuse, but this really does make the code cleaner
+#define TASK_STACK_SIZE 2048
+#define TASK_CREATE(func, pri)                                                \
+    TaskHandle_t func##_handle;                                               \
+    if (xTaskCreate(func,                     /* Task function */             \
+                    #func,                    /* Task name */                 \
+                    TASK_STACK_SIZE,          /* Stack size */                \
+                    NULL,                     /* Parameters */                \
+                    tskIDLE_PRIORITY + (pri), /* Priority */                  \
+                    &func##_handle            /* Task handle */               \
+                    ) != pdPASS) {                                            \
+        printf("FATAL: failed to launch task %s at %s:%d\n", #func, __FILE__, \
+               __LINE__);                                                     \
+        while (1) {                                                           \
+            gpio_write(PIN_RED, GPIO_HIGH);                                   \
+            DELAY(1000);                                                      \
+            gpio_write(PIN_RED, GPIO_LOW);                                    \
+            DELAY(1000);                                                      \
+        }                                                                     \
+    } else /* trailing else to eat semicolon */
+
+// Serial debug stuff
 int _write(int file, char *data, int len) {
     if ((file != STDOUT_FILENO) && (file != STDERR_FILENO)) {
         errno = EBADF;
@@ -79,7 +91,7 @@ int main(void) {
     gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLUP);
     gpio_write(PIN_RED, GPIO_HIGH);
 
-    uint8_t init_error = 0;  // Set if error occurs during initialization
+    uint32_t init_error = 0;  // Set if error occurs during initialization
 
     DELAY(4700);
     printf("Starting initialization...\n");
@@ -90,6 +102,7 @@ int main(void) {
     init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK) << 4;
 
     // One beep for initialization complete
+    gpio_write(PIN_RED, GPIO_LOW);
     gpio_write(PIN_BUZZER, GPIO_HIGH);
     DELAY(200);
     gpio_write(PIN_BUZZER, GPIO_LOW);
@@ -98,99 +111,29 @@ int main(void) {
     // Beep out the failure code (if any)
     for (int i = 0; i < init_error; i++) {
         gpio_write(PIN_BUZZER, GPIO_HIGH);
+        gpio_write(PIN_RED, GPIO_HIGH);
         DELAY(100);
         gpio_write(PIN_BUZZER, GPIO_LOW);
+        gpio_write(PIN_RED, GPIO_LOW);
         DELAY(100);
     }
 
-    gpio_write(PIN_RED, GPIO_LOW);
     printf("Initialization complete\n");
 
     // https://www.freertos.org/RTOS-Cortex-M3-M4.html
     NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
 
-    xTaskCreate(storage_task,           // Task function
-                "storage_task",         // Task name
-                2048,                   // Stack size
-                NULL,                   // Parameters
-                tskIDLE_PRIORITY + 1,   // Priority
-                &s_storage_task_handle  // Task handle
-    );
+    printf("Launching tasks...\n");
 
-    xTaskCreate(read_sensors_task,      // Task function
-                "read_sensors_task",    // Task name
-                2048,                   // Stack size
-                NULL,                   // Parameters
-                tskIDLE_PRIORITY + 4,   // Priority
-                &s_read_sensors_handle  // Task handle
-    );
+    TASK_CREATE(pyros_task, +5);
+    TASK_CREATE(read_sensors_task, +4);
+    TASK_CREATE(state_est_task, +3);
+    TASK_CREATE(pspcom_process_bytes, +3);
+    TASK_CREATE(pspcom_send_standard, +2);
+    TASK_CREATE(read_gps_task, +2);
+    TASK_CREATE(storage_task, +1);
 
-    xTaskCreate(read_gps_task,         // Task function
-                "read_gps_task",       // Task name
-                2048,                  // Stack size
-                NULL,                  // Parameters
-                tskIDLE_PRIORITY + 3,  // Priority
-                &s_read_gps_handle     // Task handle
-    );
-
-    xTaskCreate(state_est_task,           // Task function
-                "state_est_task",         // Task name
-                2048,                     // Stack size
-                NULL,                     // Parameters
-                tskIDLE_PRIORITY + 3,     // Priority
-                &s_state_est_task_handle  // Task handle
-    );
-
-    xTaskCreate(pyros_task,            // Task function
-                "pyros_task",          // Task name
-                2048,                  // Stack size
-                NULL,                  // Parameters
-                tskIDLE_PRIORITY + 3,  // Priority
-                &s_pyros_task_handle   // Task handle
-    );
-
-    /*
-        xTaskCreate(pspcom_send_gps,       // Task function
-                    "gps_telem",           // Task name
-                    2048,                  // Stack size
-                    (void *)&s_last_fix,   // Parameters
-                    tskIDLE_PRIORITY + 2,  // Priority
-                    &s_gps_telem_handle    // Task handle
-        );
-
-        xTaskCreate(pspcom_send_status,     // Task function
-                    "status_telem",         // Task name
-                    2048,                   // Stack size
-                    NULL,                   // Parameters
-                    tskIDLE_PRIORITY + 2,   // Priority
-                    &s_status_telem_handle  // Task handle
-        );
-    */
-    xTaskCreate(pspcom_send_standard,     // Task function
-                "send_standard",          // Task name
-                2048,                     // Stack size
-                NULL,                     // Parameters
-                tskIDLE_PRIORITY + 2,     // Priority
-                &s_standard_telem_handle  // Task handle
-    );
-
-    xTaskCreate(pspcom_process_bytes,       // Task function
-                "process_commands",         // Task name
-                2048,                       // Stack size
-                NULL,                       // Parameters
-                tskIDLE_PRIORITY + 3,       // Priority
-                &s_process_commands_handle  // Task handle
-    );
-
-#ifdef PSPCOM_SENSORS
-    xTaskCreate(pspcom_send_sensor,           // Task function
-                "sensor_telem",               // Task name
-                2048,                         // Stack size
-                (void *)&s_last_sensor_data,  // Parameters
-                tskIDLE_PRIORITY + 1,         // Priority
-                &s_sensor_telem_handle        // Task handle
-    );
-#endif
+    printf("Starting scheduler\n");
 
     vTaskStartScheduler();
 

@@ -68,9 +68,9 @@
 #define configCPU_CLOCK_HZ (SystemCoreClock)
 #define configTICK_RATE_HZ ((TickType_t)1000)
 #define configMAX_PRIORITIES (56)
-#define configMINIMAL_STACK_SIZE ((uint16_t)128)
-#define configTOTAL_HEAP_SIZE ((size_t)65536)
-#define configMAX_TASK_NAME_LEN (16)
+#define configMINIMAL_STACK_SIZE ((uint16_t)256)
+#define configTOTAL_HEAP_SIZE ((size_t)262144)
+#define configMAX_TASK_NAME_LEN (32)
 #define configUSE_TRACE_FACILITY 1
 #define configUSE_16_BIT_TICKS 0
 #define configUSE_MUTEXES 1
@@ -81,10 +81,8 @@
 
   // Added stuff BEGIN
   extern uint64_t MICROS();
-  extern uint64_t get_systick_freq();
 
 #define configUSE_TICKLESS_IDLE 0
-#define configSYSTICK_CLOCK_HZ (get_systick_freq())
 
 #define configPRE_SLEEP_PROCESSING(xModifiableIdleTime) \
       pre_sleep(&xModifiableIdleTime)
