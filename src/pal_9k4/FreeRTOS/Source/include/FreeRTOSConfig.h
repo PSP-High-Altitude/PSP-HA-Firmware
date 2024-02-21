@@ -83,7 +83,7 @@
   extern uint64_t MICROS();
   extern uint64_t get_systick_freq();
 
-#define configUSE_TICKLESS_IDLE 1
+#define configUSE_TICKLESS_IDLE 0
 #define configSYSTICK_CLOCK_HZ (get_systick_freq())
 
 #define configPRE_SLEEP_PROCESSING(xModifiableIdleTime) \

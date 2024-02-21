@@ -28,6 +28,7 @@ static TaskHandle_t s_read_gps_handle;
 static TaskHandle_t s_storage_task_handle;
 static TaskHandle_t s_standard_telem_handle;
 static TaskHandle_t s_state_est_task_handle;
+static TaskHandle_t s_pyros_task_handle;
 static TaskHandle_t s_process_commands_handle;
 #ifdef PSPCOM_SENSORS
 static TaskHandle_t s_sensor_telem_handle;
@@ -77,7 +78,6 @@ int main(void) {
     MX_USB_DEVICE_Init();
     gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLUP);
     gpio_write(PIN_RED, GPIO_HIGH);
-    init_pyros();
 
     uint8_t init_error = 0;  // Set if error occurs during initialization
 
@@ -86,7 +86,8 @@ int main(void) {
     init_error |= (EXPECT_OK(init_storage(), "init storage") != STATUS_OK) << 0;
     init_error |= (EXPECT_OK(init_sensors(), "init sensors") != STATUS_OK) << 1;
     init_error |= (EXPECT_OK(init_state_est(), "init state") != STATUS_OK) << 2;
-    init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK) << 3;
+    init_error |= (EXPECT_OK(init_pyros(), "init pyros") != STATUS_OK) << 3;
+    init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK) << 4;
 
     // One beep for initialization complete
     gpio_write(PIN_BUZZER, GPIO_HIGH);
@@ -140,6 +141,14 @@ int main(void) {
                 &s_state_est_task_handle  // Task handle
     );
 
+    xTaskCreate(pyros_task,            // Task function
+                "pyros_task",          // Task name
+                2048,                  // Stack size
+                NULL,                  // Parameters
+                tskIDLE_PRIORITY + 3,  // Priority
+                &s_pyros_task_handle   // Task handle
+    );
+
     /*
         xTaskCreate(pspcom_send_gps,       // Task function
                     "gps_telem",           // Task name
@@ -158,7 +167,7 @@ int main(void) {
         );
     */
     xTaskCreate(pspcom_send_standard,     // Task function
-                "status_telem",           // Task name
+                "send_standard",          // Task name
                 2048,                     // Stack size
                 NULL,                     // Parameters
                 tskIDLE_PRIORITY + 2,     // Priority

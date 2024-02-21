@@ -183,7 +183,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             if ((current_state->velNED.z * -1 < VEL_DROGUE) ||
                 (valid_gps && (gps->vel_down * -1 < VEL_DROGUE))) {
                 *s_flight_phase = FP_DROGUE;
-                fire_pyro(DROGUE_PYRO);  // fire drogue
+                fire_pyro(PYRO_DRG);  // fire drogue
                 printf("DROGUE at %lld\n", data->timestamp / 1000);
 
                 // reset baro buffer, this helps in an edge case
@@ -207,7 +207,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             if ((x_up_avg < HEIGHT_MAIN && BUFFER_FULL(baro_buffer)) ||
                 (valid_gps && gps->height_msl - gps_h0 < HEIGHT_MAIN)) {
                 *s_flight_phase = FP_MAIN;
-                fire_pyro(MAIN_PYRO);  // fire main
+                fire_pyro(PYRO_MAIN);  // fire main
                 printf("MAIN at %lld\n", data->timestamp / 1000);
             }
             break;

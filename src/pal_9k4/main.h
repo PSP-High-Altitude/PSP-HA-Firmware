@@ -11,14 +11,6 @@
 // Sensor read interval (ms)
 #define TARGET_INTERVAL 5  // 200 Hz
 
-// Pyro fire length (ms)
-#define PYRO_FIRE_LENGTH 1000
-
-// Pyro retries (if we make it to the ground and the pyro didn't fire someone
-// approaching could get injured)
-#define PYRO_MAX_RETRIES 20
-#define PYRO_RETRY_INTERVAL 1000
-
 // Misc
 #ifdef USE_SPI_CRC
 #undef USE_SPI_CRC
