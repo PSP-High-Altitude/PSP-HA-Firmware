@@ -49,9 +49,9 @@ Status init_pyros() {
     gpio_mode(PIN_CONTMAIN, GPIO_INPUT);
     gpio_mode(PIN_CONTDRG, GPIO_INPUT);
     gpio_mode(PIN_CONTAUX, GPIO_INPUT);
-    gpio_write(PIN_FIREMAIN, 0);
-    gpio_write(PIN_FIREDRG, 0);
-    gpio_write(PIN_FIREAUX, 0);
+    gpio_write(PIN_FIREMAIN, GPIO_LOW);
+    gpio_write(PIN_FIREDRG, GPIO_LOW);
+    gpio_write(PIN_FIREAUX, GPIO_LOW);
 
     s_pyro_queue_handle = xQueueCreate(PYRO_QUEUE_LEN, sizeof(Pyro));
 

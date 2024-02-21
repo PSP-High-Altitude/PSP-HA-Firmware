@@ -4,6 +4,7 @@
 #include "gpio/gpio.h"
 #include "main.h"
 #include "pal_9k31/FreeRTOS/Source/include/timers.h"
+#include "pyros.h"
 #include "sensors.h"
 #include "state.h"
 #include "stdio.h"
@@ -252,45 +253,15 @@ void pspcom_process_bytes(char *buf, int len) {
                     break;
                 case FIREMAIN:
                     if (user_armed[0]) {
-                        for (int i = 0; i < PYRO_RETRIES_MAN; i++) {
-                            gpio_write(PIN_FIREMAIN, 1);
-                            vTaskDelay(PYRO_FIRE_PERIOD_MAN /
-                                       portTICK_PERIOD_MS);
-                            gpio_write(PIN_FIREMAIN, 0);
-                            vTaskDelay(PYRO_RETRY_PERIOD_MAN /
-                                       portTICK_PERIOD_MS);
-                            if (gpio_read(PIN_CONTMAIN) == 0) {
-                                break;
-                            }
-                        }
+                        fire_pyro(PYRO_MAIN);
                     }
                 case FIREDRG:
                     if (user_armed[1]) {
-                        for (int i = 0; i < PYRO_RETRIES_MAN; i++) {
-                            gpio_write(PIN_FIREDRG, 1);
-                            vTaskDelay(PYRO_FIRE_PERIOD_MAN /
-                                       portTICK_PERIOD_MS);
-                            gpio_write(PIN_FIREDRG, 0);
-                            vTaskDelay(PYRO_RETRY_PERIOD_MAN /
-                                       portTICK_PERIOD_MS);
-                            if (gpio_read(PIN_CONTDRG) == 0) {
-                                break;
-                            }
-                        }
+                        fire_pyro(PYRO_DRG);
                     }
                 case FIREAUX:
                     if (user_armed[2]) {
-                        for (int i = 0; i < PYRO_RETRIES_MAN; i++) {
-                            gpio_write(PIN_FIREAUX, 1);
-                            vTaskDelay(PYRO_FIRE_PERIOD_MAN /
-                                       portTICK_PERIOD_MS);
-                            gpio_write(PIN_FIREAUX, 0);
-                            vTaskDelay(PYRO_RETRY_PERIOD_MAN /
-                                       portTICK_PERIOD_MS);
-                            if (gpio_read(PIN_CONTAUX) == 0) {
-                                break;
-                            }
-                        }
+                        fire_pyro(PYRO_AUX);
                     }
                     break;
                 default:
