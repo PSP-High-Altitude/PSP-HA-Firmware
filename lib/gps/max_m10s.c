@@ -3,9 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "FreeRTOS.h"
 #include "string.h"
-#include "task.h"
 #include "timer.h"
 
 static Status ubx_cfg_valget(I2cDevice*, Max_M10S_Layer_TypeDef, uint32_t*,
@@ -50,16 +48,10 @@ static Status ubx_read_msg(I2cDevice* device, uint8_t header[4],
                 return STATUS_TIMEOUT_ERROR;
             }
 
-            if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-                taskYIELD();
-            }
+            DELAY(1);
 
-            if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
-                return STATUS_ERROR;
-            }
-            if (i2c_read(device, rx_buf, 1) != STATUS_OK) {
-                return STATUS_ERROR;
-            }
+            ASSERT_OK(i2c_write(device, tx_buf, 1), "GPS i2c write");
+            ASSERT_OK(i2c_read(device, rx_buf, 1), "GPS i2c read");
         }
         if (rx_buf[0] == header[header_idx]) {
             if (header_idx == 3) {
@@ -73,33 +65,21 @@ static Status ubx_read_msg(I2cDevice* device, uint8_t header[4],
     // Read out the length bytes
     uint8_t tx_buf[1] = {0xFF};
     uint8_t rx_buf[2] = {0xFF, 0xFF};
-    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
-        return STATUS_ERROR;
-    }
-    if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
-        return STATUS_ERROR;
-    }
+    ASSERT_OK(i2c_write(device, tx_buf, 1), "GPS i2c write");
+    ASSERT_OK(i2c_read(device, rx_buf, 2), "GPS i2c read");
     if (rx_buf[0] == 0xFF && rx_buf[1] == 0xFF) {
-        return STATUS_ERROR;
+        ASSERT_OK(STATUS_DATA_ERROR, "GPS i2c len");
     }
     uint16_t len = rx_buf[0] + ((uint16_t)rx_buf[1] << 8);
     *message_len = len;
 
     // Read out the payload bytes
-    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
-        return STATUS_ERROR;
-    }
-    if (i2c_read(device, message_buf, len) != STATUS_OK) {
-        return STATUS_ERROR;
-    }
+    ASSERT_OK(i2c_write(device, tx_buf, 1), "GPS i2c write");
+    ASSERT_OK(i2c_read(device, message_buf, len), "GPS i2c read");
 
     // Read out the checksum bytes
-    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
-        return STATUS_ERROR;
-    }
-    if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
-        return STATUS_ERROR;
-    }
+    ASSERT_OK(i2c_write(device, tx_buf, 1), "GPS i2c write");
+    ASSERT_OK(i2c_read(device, rx_buf, 2), "GPS i2c read");
 
     // Check checksum
     uint8_t CK_A = 0;
@@ -118,8 +98,11 @@ static Status ubx_read_msg(I2cDevice* device, uint8_t header[4],
     }
     if (CK_A == rx_buf[0] && CK_B == rx_buf[1]) {
         return STATUS_OK;
+    } else {
+        ASSERT_OK(STATUS_DATA_ERROR, "UBX read msg checksum");
     }
-    return STATUS_ERROR;
+
+    return STATUS_DATA_ERROR;
 }
 
 __attribute__((unused)) static Status ubx_cfg_valget(
@@ -151,18 +134,15 @@ __attribute__((unused)) static Status ubx_cfg_valget(
     tx_buf[tx_buf_len - 2] = CK_A;
     tx_buf[tx_buf_len - 1] = CK_B;
 
-    if (i2c_write(device, tx_buf, tx_buf_len) != STATUS_OK) {
-        return STATUS_ERROR;
-    }
+    ASSERT_OK(i2c_write(device, tx_buf, tx_buf_len), "GPS i2c write");
 
     uint8_t message_header[] = {0xB5, 0x62, 0x06, 0x8B};
     uint8_t message_buf[800];
     uint16_t message_len = 0;
 
-    if (ubx_read_msg(device, message_header, message_buf, &message_len, 1000) !=
-        STATUS_OK) {
-        return STATUS_ERROR;
-    }
+    ASSERT_OK(
+        ubx_read_msg(device, message_header, message_buf, &message_len, 1000),
+        "UBX msg read");
 
     uint16_t message_idx = 0;
     for (uint8_t i = 0; i < num_keys; i++) {
@@ -219,24 +199,23 @@ static Status ubx_cfg_valset(I2cDevice* device, Max_M10S_Layer_TypeDef layer,
 
     for (uint16_t i = 0; i < tx_buf_len; i++) {
     }
-    if (i2c_write(device, tx_buf, tx_buf_len) != STATUS_OK) {
-        return STATUS_ERROR;
-    }
+    ASSERT_OK(i2c_write(device, tx_buf, tx_buf_len), "GPS i2c write");
 
     uint8_t message_header[] = {0xB5, 0x62, 0x05, 0x01};
     uint8_t message_buf[800];
     uint16_t message_len = 0;
 
-    if (ubx_read_msg(device, message_header, message_buf, &message_len, 1000) !=
-        STATUS_OK) {
-        return STATUS_ERROR;
-    }
+    ASSERT_OK(
+        ubx_read_msg(device, message_header, message_buf, &message_len, 1000),
+        "UBX msg read");
 
     if (message_buf[0] == 0x06 && message_buf[1] == 0x8A) {
         return STATUS_OK;
     } else {
-        return STATUS_ERROR;
+        ASSERT_OK(STATUS_DATA_ERROR, "UBX msg read contents");
     }
+
+    return STATUS_DATA_ERROR;
 }
 
 Status max_m10s_poll_fix(I2cDevice* device, GPS_Fix_TypeDef* fix) {
@@ -258,21 +237,18 @@ Status max_m10s_poll_fix(I2cDevice* device, GPS_Fix_TypeDef* fix) {
     tx_buf[tx_buf_len - 2] = CK_A;
     tx_buf[tx_buf_len - 1] = CK_B;
 
-    if (i2c_write(device, tx_buf, tx_buf_len) != STATUS_OK) {
-        return STATUS_ERROR;
-    }
+    ASSERT_OK(i2c_write(device, tx_buf, tx_buf_len), "GPS i2c write");
 
     uint8_t message_header[] = {0xB5, 0x62, 0x01, 0x07};
     uint8_t message_buf[800];
     uint16_t message_len = 0;
 
-    if (ubx_read_msg(device, message_header, message_buf, &message_len, 1000) !=
-        STATUS_OK) {
-        return STATUS_ERROR;
-    }
+    ASSERT_OK(
+        ubx_read_msg(device, message_header, message_buf, &message_len, 1000),
+        "UBX msg read");
 
     if (message_len != 92) {
-        return STATUS_ERROR;
+        ASSERT_OK(STATUS_DATA_ERROR, "UBX msg read length");
     }
 
     fix->year = message_buf[4] + (message_buf[5] << 8);

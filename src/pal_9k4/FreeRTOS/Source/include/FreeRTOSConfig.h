@@ -45,6 +45,7 @@
 
 /* USER CODE BEGIN Includes */
 /* Section where include file can be added */
+#include "sleep.h"
 /* USER CODE END Includes */
 
 /* Ensure definitions are only used by the compiler, and not by the assembler. */
@@ -67,9 +68,9 @@
 #define configCPU_CLOCK_HZ (SystemCoreClock)
 #define configTICK_RATE_HZ ((TickType_t)1000)
 #define configMAX_PRIORITIES (56)
-#define configMINIMAL_STACK_SIZE ((uint16_t)128)
-#define configTOTAL_HEAP_SIZE ((size_t)65536)
-#define configMAX_TASK_NAME_LEN (16)
+#define configMINIMAL_STACK_SIZE ((uint16_t)256)
+#define configTOTAL_HEAP_SIZE ((size_t)262144)
+#define configMAX_TASK_NAME_LEN (32)
 #define configUSE_TRACE_FACILITY 1
 #define configUSE_16_BIT_TICKS 0
 #define configUSE_MUTEXES 1
@@ -77,6 +78,23 @@
 #define configUSE_RECURSIVE_MUTEXES 1
 #define configUSE_COUNTING_SEMAPHORES 1
 #define configUSE_PORT_OPTIMISED_TASK_SELECTION 0
+
+  // Added stuff BEGIN
+  extern uint64_t MICROS();
+
+#define configUSE_TICKLESS_IDLE 0
+
+#define configPRE_SLEEP_PROCESSING(xModifiableIdleTime) \
+      pre_sleep(&xModifiableIdleTime)
+#define configPOST_SLEEP_PROCESSING(xExpectedIdleTime) \
+      post_sleep(&xExpectedIdleTime)
+
+#define configGENERATE_RUN_TIME_STATS 1
+#define configUSE_STATS_FORMATTING_FUNCTIONS 1
+#define portCONFIGURE_TIMER_FOR_RUN_TIME_STATS()
+#define portGET_RUN_TIME_COUNTER_VALUE() (MICROS())
+  // Added stuff END
+
   /* USER CODE BEGIN MESSAGE_BUFFER_LENGTH_TYPE */
   /* Defaults to size_t for backward compatibility, but can be changed
      if lengths will always be less than the number of bytes in a size_t. */

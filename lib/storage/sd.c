@@ -19,6 +19,7 @@ static FATFS s_fs;
 static char s_filename[FNAME_LEN] = SD_MOUNT_POINT "/dat_00.pb3";
 static char s_gpsfname[FNAME_LEN] = SD_MOUNT_POINT "/gps_00.pb3";
 static char s_statefname[FNAME_LEN] = SD_MOUNT_POINT "/fsl_00.pb3";
+static char s_prffname[FNAME_LEN] = SD_MOUNT_POINT "/prf_00.txt";
 
 static FIL s_datfile;
 static FIL s_gpsfile;
@@ -148,6 +149,10 @@ Status sd_init(SdDevice* dev) {
         s_filename[5 + strlen(SD_MOUNT_POINT)];
     s_statefname[6 + strlen(SD_MOUNT_POINT)] =
         s_filename[6 + strlen(SD_MOUNT_POINT)];
+    s_prffname[5 + strlen(SD_MOUNT_POINT)] =
+        s_filename[5 + strlen(SD_MOUNT_POINT)];
+    s_prffname[6 + strlen(SD_MOUNT_POINT)] =
+        s_filename[6 + strlen(SD_MOUNT_POINT)];
 
     // Initialize the sensor file and stream
     Status sensor_status = sd_create_sensor_file();
@@ -273,6 +278,34 @@ Status sd_flush() {
         return STATUS_HARDWARE_ERROR;
     }
     if (f_sync(&s_statefile) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    return STATUS_OK;
+}
+
+Status sd_dump_prf_stats(char stats[]) {
+    FIL prffile;
+    UINT bw = 0;
+
+    // Create performance dump file
+    if (f_open(&prffile, s_prffname, FA_OPEN_APPEND | FA_WRITE) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    // Write a timestamp
+    bw += f_printf(&prffile, "%lu ms: ", (uint32_t)MILLIS());
+
+    // Write the stats
+    bw += f_printf(&prffile, stats);
+
+    // Check that something was written
+    if (bw == 0) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    // Close the file
+    if (f_close(&prffile) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 

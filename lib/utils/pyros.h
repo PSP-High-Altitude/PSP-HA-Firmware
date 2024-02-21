@@ -2,12 +2,29 @@
 #define PYROS_H
 
 #include <stdint.h>
-#define MAIN_PYRO 0
-#define DROGUE_PYRO 1
-#define AUX_PYRO(x) (2 + (x))
 
-void init_pyros();
+#include "status.h"
 
-void fire_pyro(uint8_t pyro);
+// Max number of queued fire commands (including retries)
+#define PYRO_QUEUE_LEN 8
+
+// Pyro fire length (ms)
+#define PYRO_FIRE_LENGTH_MS 1000
+
+// Pyro retries (if we make it to the ground and the pyro didn't fire someone
+// approaching could get injured)
+#define PYRO_MAX_RETRIES 100
+
+typedef enum {
+    PYRO_MAIN,
+    PYRO_DRG,
+    PYRO_AUX,
+} Pyro;
+
+Status init_pyros();
+
+Status fire_pyro(Pyro pyro);
+
+void pyros_task();
 
 #endif

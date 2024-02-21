@@ -4,6 +4,9 @@
 #include "gpio/gpio.h"
 #include "main.h"
 #include "pal_9k31/FreeRTOS/Source/include/timers.h"
+#include "pyros.h"
+#include "sensors.h"
+#include "state.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "stm32h7xx_hal.h"
@@ -250,45 +253,15 @@ void pspcom_process_bytes(char *buf, int len) {
                     break;
                 case FIREMAIN:
                     if (user_armed[0]) {
-                        for (int i = 0; i < PYRO_RETRIES_MAN; i++) {
-                            gpio_write(PIN_FIREMAIN, 1);
-                            vTaskDelay(PYRO_FIRE_PERIOD_MAN /
-                                       portTICK_PERIOD_MS);
-                            gpio_write(PIN_FIREMAIN, 0);
-                            vTaskDelay(PYRO_RETRY_PERIOD_MAN /
-                                       portTICK_PERIOD_MS);
-                            if (gpio_read(PIN_CONTMAIN) == 0) {
-                                break;
-                            }
-                        }
+                        fire_pyro(PYRO_MAIN);
                     }
                 case FIREDRG:
                     if (user_armed[1]) {
-                        for (int i = 0; i < PYRO_RETRIES_MAN; i++) {
-                            gpio_write(PIN_FIREDRG, 1);
-                            vTaskDelay(PYRO_FIRE_PERIOD_MAN /
-                                       portTICK_PERIOD_MS);
-                            gpio_write(PIN_FIREDRG, 0);
-                            vTaskDelay(PYRO_RETRY_PERIOD_MAN /
-                                       portTICK_PERIOD_MS);
-                            if (gpio_read(PIN_CONTDRG) == 0) {
-                                break;
-                            }
-                        }
+                        fire_pyro(PYRO_DRG);
                     }
                 case FIREAUX:
                     if (user_armed[2]) {
-                        for (int i = 0; i < PYRO_RETRIES_MAN; i++) {
-                            gpio_write(PIN_FIREAUX, 1);
-                            vTaskDelay(PYRO_FIRE_PERIOD_MAN /
-                                       portTICK_PERIOD_MS);
-                            gpio_write(PIN_FIREAUX, 0);
-                            vTaskDelay(PYRO_RETRY_PERIOD_MAN /
-                                       portTICK_PERIOD_MS);
-                            if (gpio_read(PIN_CONTAUX) == 0) {
-                                break;
-                            }
-                        }
+                        fire_pyro(PYRO_AUX);
                     }
                     break;
                 default:
@@ -400,9 +373,15 @@ void pspcom_send_status() {
     }
 }
 
-void pspcom_send_standard(void *pal_data) {
-    PAL_Data_Typedef *data = (PAL_Data_Typedef *)pal_data;
+void pspcom_send_standard() {
+    TickType_t last_standard_tx_ticks = xTaskGetTickCount();
+
     while (1) {
+        // Get pointers to latest data
+        SensorFrame *sensor_frame = get_last_sensor_frame();
+        GPS_Fix_TypeDef *gps_fix = get_last_gps_fix();
+        FlightPhase *flight_phase = get_last_flight_phase();
+
         // Standard telemetry
         pspcommsg tx_msg = {
             .payload_len = 18,
@@ -412,22 +391,21 @@ void pspcom_send_standard(void *pal_data) {
 
         // GPS_POS
         gps_pos_packed gps_pos;
-        gps_pos.num_sats = data->gps_fix->num_sats & 0x1F;
-        gps_pos.lat = ((int32_t)(data->gps_fix->lat / 0.0000108)) & 0x00FFFFFF;
-        gps_pos.lon = ((int32_t)(data->gps_fix->lon / 0.0000108)) & 0x01FFFFFF;
-        gps_pos.alt =
-            ((uint32_t)(data->gps_fix->height_msl + 1000)) & 0x0003FFFF;
+        gps_pos.num_sats = gps_fix->num_sats & 0x1F;
+        gps_pos.lat = ((int32_t)(gps_fix->lat / 0.0000108)) & 0x00FFFFFF;
+        gps_pos.lon = ((int32_t)(gps_fix->lon / 0.0000108)) & 0x01FFFFFF;
+        gps_pos.alt = ((uint32_t)(gps_fix->height_msl + 1000)) & 0x0003FFFF;
         memcpy(tx_msg.payload, &gps_pos, sizeof(gps_pos_packed));
 
         // GPS_VEL
         gps_vel_packed gps_vel;
-        gps_vel.veln = ((int16_t)(data->gps_fix->vel_north)) & 0x1FFF;
-        gps_vel.vele = ((int16_t)(data->gps_fix->vel_east)) & 0x1FFF;
-        gps_vel.veld = ((int16_t)(data->gps_fix->vel_down)) & 0x3FFF;
+        gps_vel.veln = ((int16_t)(gps_fix->vel_north)) & 0x1FFF;
+        gps_vel.vele = ((int16_t)(gps_fix->vel_east)) & 0x1FFF;
+        gps_vel.veld = ((int16_t)(gps_fix->vel_down)) & 0x3FFF;
         memcpy(tx_msg.payload + 9, &gps_vel, sizeof(gps_vel_packed));
 
         // PRES
-        uint16_t pres = (uint16_t)(data->sensor_frame->pressure / 0.025);
+        uint16_t pres = (uint16_t)(sensor_frame->pressure / 0.025);
         tx_msg.payload[14] = pres & 0xFF;
         tx_msg.payload[15] = (pres >> 8) & 0xFF;
 
@@ -439,11 +417,13 @@ void pspcom_send_standard(void *pal_data) {
             (main_cont << 1) | (drg_cont << 3) | (aux_cont << 5) | 0x15;
 
         // SYS_STAT
-        tx_msg.payload[17] = 0;
+        tx_msg.payload[17] = (uint8_t)*flight_phase & 0x1;
+        tx_msg.payload[17] = ((uint8_t)*flight_phase & 0xF) << 3;
 
         pspcom_send_msg(tx_msg);
 
-        vTaskDelay(STD_TELEM_PERIOD / portTICK_PERIOD_MS);
+        vTaskDelayUntil(&last_standard_tx_ticks,
+                        pdMS_TO_TICKS(STD_TELEM_PERIOD));
     }
 }
 
