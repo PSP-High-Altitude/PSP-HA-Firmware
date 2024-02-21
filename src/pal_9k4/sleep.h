@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#define USE_DEEPSLEEP
+#define USE_HAL_SLEEP
 
 extern uint64_t g_last_tickless_idle_entry_us;
 extern uint64_t g_total_tickless_idle_us;

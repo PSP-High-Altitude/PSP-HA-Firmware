@@ -5,6 +5,7 @@
 #include "main.h"
 #include "pal_9k31/FreeRTOS/Source/include/timers.h"
 #include "sensors.h"
+#include "state.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "stm32h7xx_hal.h"

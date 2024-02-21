@@ -9,10 +9,10 @@ void pre_sleep(uint32_t* xModifiableIdleTime) {
     g_last_tickless_idle_entry_us = MICROS();
 
 // If we're using core deep sleep, indicate that to FreeRTOS and enter
-#ifdef USE_DEEPSLEEP
+#ifdef USE_HAL_SLEEP
     *xModifiableIdleTime = 0;
     HAL_PWR_EnterSLEEPMode(PWR_LOWPOWERREGULATOR_ON, PWR_SLEEPENTRY_WFI);
-#endif  // USE_DEEPSLEEP
+#endif  // USE_HAL_SLEEP
 }
 
 void post_sleep(uint32_t* xExpectedIdleTime) {

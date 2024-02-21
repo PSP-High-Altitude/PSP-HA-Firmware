@@ -89,17 +89,17 @@ int main(void) {
     init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK) << 3;
 
     // One beep for initialization complete
-    // gpio_write(PIN_BUZZER, GPIO_HIGH);
-    DELAY(100);
+    gpio_write(PIN_BUZZER, GPIO_HIGH);
+    DELAY(200);
     gpio_write(PIN_BUZZER, GPIO_LOW);
-    DELAY(100);
+    DELAY(200);
 
     // Beep out the failure code (if any)
     for (int i = 0; i < init_error; i++) {
-        // gpio_write(PIN_BUZZER, GPIO_HIGH);
-        DELAY(50);
+        gpio_write(PIN_BUZZER, GPIO_HIGH);
+        DELAY(100);
         gpio_write(PIN_BUZZER, GPIO_LOW);
-        DELAY(50);
+        DELAY(100);
     }
 
     gpio_write(PIN_RED, GPIO_LOW);
