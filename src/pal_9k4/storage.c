@@ -167,11 +167,6 @@ void storage_task() {
                     100. * (float)tickless_idle_us /
                         (float)(sleep_exit_us - sleep_entry_us));
             sd_dump_prf_stats(prf_buf);
-
-            // Clear all queues
-            xQueueReset(s_sensor_queue_handle);
-            xQueueReset(s_state_queue_handle);
-            xQueueReset(s_gps_queue_handle);
         }
     }
 }

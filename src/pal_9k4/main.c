@@ -26,24 +26,26 @@ extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
 
 // Sorry about preprocessor abuse, but this really does make the code cleaner
 #define TASK_STACK_SIZE 2048
-#define TASK_CREATE(func, pri)                                                \
-    TaskHandle_t func##_handle;                                               \
-    if (xTaskCreate(func,                     /* Task function */             \
-                    #func,                    /* Task name */                 \
-                    TASK_STACK_SIZE,          /* Stack size */                \
-                    NULL,                     /* Parameters */                \
-                    tskIDLE_PRIORITY + (pri), /* Priority */                  \
-                    &func##_handle            /* Task handle */               \
-                    ) != pdPASS) {                                            \
-        printf("FATAL: failed to launch task %s at %s:%d\n", #func, __FILE__, \
-               __LINE__);                                                     \
-        while (1) {                                                           \
-            gpio_write(PIN_RED, GPIO_HIGH);                                   \
-            DELAY(1000);                                                      \
-            gpio_write(PIN_RED, GPIO_LOW);                                    \
-            DELAY(1000);                                                      \
-        }                                                                     \
-    } else /* trailing else to eat semicolon */
+#define TASK_CREATE(func, pri)                                          \
+    do {                                                                \
+        static TaskHandle_t s_##func##_handle;                          \
+        if (xTaskCreate(func,                     /* Task function */   \
+                        #func,                    /* Task name */       \
+                        TASK_STACK_SIZE,          /* Stack size */      \
+                        NULL,                     /* Parameters */      \
+                        tskIDLE_PRIORITY + (pri), /* Priority */        \
+                        &s_##func##_handle        /* Task handle */     \
+                        ) != pdPASS) {                                  \
+            printf("FATAL: failed to launch task %s at %s:%d\n", #func, \
+                   __FILE__, __LINE__);                                 \
+            while (1) {                                                 \
+                gpio_write(PIN_RED, GPIO_HIGH);                         \
+                DELAY(1000);                                            \
+                gpio_write(PIN_RED, GPIO_LOW);                          \
+                DELAY(1000);                                            \
+            }                                                           \
+        }                                                               \
+    } while (0)
 
 // Serial debug stuff
 int _write(int file, char *data, int len) {
@@ -77,7 +79,6 @@ void handle_pause() {
     } else if (s_last_paused) {
         start_storage();
         start_sensors();
-        reset_state_est();
 
         s_last_paused = false;
     }
@@ -123,7 +124,7 @@ int main(void) {
     // https://www.freertos.org/RTOS-Cortex-M3-M4.html
     NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
 
-    printf("Launching tasks...\n");
+    printf("Launching tasks\n");
 
     TASK_CREATE(pyros_task, +5);
     TASK_CREATE(read_sensors_task, +4);

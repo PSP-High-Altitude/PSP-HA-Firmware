@@ -77,6 +77,7 @@ void pyros_task() {
             pdPASS) {
             // If we somehow time out here, just go back to the start because we
             // do NOT want to accidentally trigger pyros
+            printf("pyro restart recv\n");
             continue;
         }
 
@@ -89,6 +90,7 @@ void pyros_task() {
         // If the pin is somehow invalid, something weird is going on so just
         // abort and wait for a new command
         if (pin_status != STATUS_OK) {
+            printf("pyro invalid pin\n");
             continue;
         }
 
@@ -101,6 +103,8 @@ void pyros_task() {
         // If we still detect continuity on the pin, retry if we still have
         // retries left by readding the command to the queue
         if (gpio_read(cont_pin) == GPIO_HIGH && s_retries_left[pyro] > 0) {
+            printf("Pyro retrying (%lu retries left)\n", s_retries_left[pyro]);
+
             while (xQueueSend(s_pyro_queue_handle, &pyro, 1) != pdPASS) {
                 // This should be impossible with a long enough queue, but retry
                 // a few times anyway just in case

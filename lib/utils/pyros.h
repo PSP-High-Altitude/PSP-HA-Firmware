@@ -13,8 +13,7 @@
 
 // Pyro retries (if we make it to the ground and the pyro didn't fire someone
 // approaching could get injured)
-#define PYRO_MAX_RETRIES 20
-#define PYRO_RETRY_INTERVAL_MS 1000
+#define PYRO_MAX_RETRIES 100
 
 typedef enum {
     PYRO_MAIN,
