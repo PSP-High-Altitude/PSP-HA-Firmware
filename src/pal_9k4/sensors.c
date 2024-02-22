@@ -17,6 +17,10 @@
 #include "FreeRTOS.h"
 #include "queue.h"
 
+#ifdef HWIL_TEST
+#include "hwil/hwil.h"
+#endif
+
 /*********************/
 /* PERIPHERAL CONFIG */
 /*********************/
@@ -170,6 +174,13 @@ void read_sensors_task() {
         s_last_sensor_frame.temperature = baro.temperature;
         s_last_sensor_frame.pressure = baro.pressure;
 
+#ifdef HWIL_TEST
+        SensorFrame hwil_sensor_frame;
+        if (get_hwil_sensor_frame(&hwil_sensor_frame) == STATUS_OK) {
+            s_last_sensor_frame = hwil_sensor_frame;
+        }
+#endif  // HWIL_TEST
+
         queue_sensor_store(&s_last_sensor_frame);
         update_latest_sensor_frame(&s_last_sensor_frame);
 
@@ -189,6 +200,13 @@ void read_gps_task() {
 
     while (1) {
         EXPECT_OK(max_m10s_poll_fix(&s_gps_conf, &s_last_gps_fix), "GPS read");
+
+#ifdef HWIL_TEST
+        GPS_Fix_TypeDef hwil_gps_fix;
+        if (get_hwil_gps_fix(&hwil_gps_fix) == STATUS_OK) {
+            s_last_gps_fix = hwil_gps_fix;
+        }
+#endif
 
         gpio_write(PIN_BLUE, s_last_gps_fix.fix_valid != 0);
 
