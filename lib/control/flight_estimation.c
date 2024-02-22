@@ -88,15 +88,19 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                         gps->num_sats >= 4 &&
                         gps->accuracy_horiz < GPS_ACCURACY_LIMIT_POS &&
                         gps->accuracy_vertical < GPS_ACCURACY_LIMIT_POS &&
-                        gps->accuracy_speed < GPS_ACCURACY_LIMIT_VEL;
+                        gps->accuracy_speed < GPS_ACCURACY_LIMIT_VEL &&
+                        !isnan(gps->height_msl) && !isnan(gps->vel_down);
+
     uint8_t valid_acc = !isnan(vecData.accel.x) && !isnan(vecData.accel.y) &&
                         !isnan(vecData.accel.z) && !isnan(vecData.acch.x) &&
                         !isnan(vecData.acch.y) && !isnan(vecData.acch.z);
+
     uint8_t valid_baro =
         !isnan(vecData.temperature) && !isnan(vecData.pressure);
+
     // Also check valid_acc not all fields are zero
-    valid_acc =
-        valid_acc && !((vnorm(vecData.accel) == 0) && (vnorm(vecData.acch)));
+    valid_acc = valid_acc &&
+                !((vnorm(vecData.accel) == 0) && (vnorm(vecData.acch) == 0));
     valid_baro =
         valid_baro && !((vecData.temperature == 0) && (vecData.pressure == 0));
 
