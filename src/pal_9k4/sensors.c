@@ -175,6 +175,7 @@ void read_sensors_task() {
         s_last_sensor_frame.pressure = baro.pressure;
 
 #ifdef HWIL_TEST
+        gpio_write(PIN_RED, GPIO_HIGH);
         SensorFrame hwil_sensor_frame;
         if (get_hwil_sensor_frame(&hwil_sensor_frame) == STATUS_OK) {
             s_last_sensor_frame = hwil_sensor_frame;
@@ -202,6 +203,7 @@ void read_gps_task() {
         EXPECT_OK(max_m10s_poll_fix(&s_gps_conf, &s_last_gps_fix), "GPS read");
 
 #ifdef HWIL_TEST
+        gpio_write(PIN_RED, GPIO_HIGH);
         GPS_Fix_TypeDef hwil_gps_fix;
         if (get_hwil_gps_fix(&hwil_gps_fix) == STATUS_OK) {
             s_last_gps_fix = hwil_gps_fix;
