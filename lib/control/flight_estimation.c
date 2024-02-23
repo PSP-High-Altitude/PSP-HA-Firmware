@@ -76,6 +76,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
     float dt;
     static float h0 = 0;        // initial height m ASL
     static float gps_h0 = 0;    // initial gps height m MSL
+    static uint64_t t0 = 0;     // launch time in milliseconds
     float a_up_avg = 0;  // up acceleration from rolling average
     float x_up_avg = 0;  // from pressure, height ASL
 
@@ -153,6 +154,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             if (BUFFER_FULL(acc_buffer)) {
                 a_up_avg = BUFFER_AVERAGE(acc_buffer);
             }
+            t0 = MILLIS();
             if (BUFFER_FULL(acc_buffer) && a_up_avg > ACC_BOOST) {
                 *s_flight_phase = FP_BOOST;
                 printf("BOOST at %lld\n", data->timestamp/1000);
@@ -184,8 +186,9 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             break;
         case FP_COAST:
             update_accel_est(current_state, dt);
-            if ((current_state->velNED.z * -1 < VEL_DROGUE) ||
-                (valid_gps && (gps->vel_down * -1 < VEL_DROGUE))) {
+            if (MILLIS() - t0 > DROGUE_LOCKOUT_MS &&
+                ((current_state->velNED.z * -1 < VEL_DROGUE) ||
+                 (valid_gps && (gps->vel_down * -1 < VEL_DROGUE)))) {
                 *s_flight_phase = FP_DROGUE;
                 fire_pyro(PYRO_DRG);  // fire drogue
                 printf("DROGUE at %lld\n", data->timestamp / 1000);

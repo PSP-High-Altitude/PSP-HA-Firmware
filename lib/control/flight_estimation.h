@@ -13,7 +13,7 @@
 #define ACC_BOOST 50               // m/s^2
 #define ACC_COAST 0                // m/s^2
 #define VEL_FAST 250               // m/s
-#define IMU_UP 2                  // +/- 1, 2, 3 for x, y, z
+#define IMU_UP 2                   // +/- 1, 2, 3 for x, y, z
 #define HIGH_G_UP 2                // +/- 1, 2, 3 for x, y, z
 #define LOW_G_CUTOFF 14            // g
 #define G 9.81                     // m/s^2
@@ -23,6 +23,7 @@
 #define GPS_ACCURACY_LIMIT_POS 20  // m
 #define GPS_ACCURACY_LIMIT_VEL 5   // m/s
 #define AVERAGING_PERIOD_MS 100    // period of rolling average buffer
+#define DROGUE_LOCKOUT_MS 10000  // time after launch to lock out drogue deploy
 
 typedef struct {
     float* buffer;
