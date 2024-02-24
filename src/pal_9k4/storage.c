@@ -44,9 +44,6 @@ uint64_t g_total_tickless_idle_us;
 Status init_storage() {
     // For some reason SD init CANNOT go after queue creation
     Status sd_status = EXPECT_OK(sd_init(&s_sd_conf), "SD init");
-    if (sd_status != STATUS_OK) {
-        return sd_status;
-    }
 
     // Initialize pause flag
     s_pause_store = false;
@@ -58,7 +55,7 @@ Status init_storage() {
         xQueueCreate(STATE_QUEUE_LENGTH, STATE_QUEUE_ITEM_SIZE);
     s_gps_queue_handle = xQueueCreate(GPS_QUEUE_LENGTH, GPS_QUEUE_ITEM_SIZE);
 
-    return STATUS_OK;
+    return sd_status;
 }
 
 Status queue_sensor_store(SensorFrame* sensor_frame) {

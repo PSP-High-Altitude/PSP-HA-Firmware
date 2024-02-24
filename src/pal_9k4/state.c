@@ -1,6 +1,8 @@
 #include "state.h"
 
 #include "data.h"
+#include "gpio/gpio.h"
+#include "main.h"
 #include "storage.h"
 #include "vector.h"
 
@@ -124,3 +126,9 @@ void state_est_task() {
 }
 
 FlightPhase* get_last_flight_phase() { return &s_flight_phase; }
+
+void launch_warning(uint8_t state) {
+#ifndef HWIL_TEST  // Because its SUPER annoying
+    gpio_write(PIN_BUZZER, state ? GPIO_HIGH : GPIO_LOW);
+#endif
+}

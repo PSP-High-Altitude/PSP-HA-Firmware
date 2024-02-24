@@ -74,11 +74,11 @@ void handle_pause() {
     if (!gpio_read(PIN_PAUSE)) {
         s_last_paused = true;
 
-        pause_sensors();
+        // pause_sensors();
         pause_storage();
     } else if (s_last_paused) {
         start_storage();
-        start_sensors();
+        // start_sensors();
 
         s_last_paused = false;
     }

@@ -65,6 +65,7 @@
                 "data.h": "c",
                 "vector.h": "c",
                 "timers.h": "c",
-                "pyros.h": "c"
+                "pyros.h": "c",
+                "gps.pb.h": "c"
         }
 }

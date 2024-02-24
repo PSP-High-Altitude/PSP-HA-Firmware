@@ -3,6 +3,7 @@
 #include "accel_est.h"
 #include "pressure_altitude.h"
 #include "pyros.h"
+#include "timer.h"
 
 #define BUFFER_AVERAGE(buffer) (buffer->sum / buffer->count)
 #define BUFFER_FULL(buffer) (buffer->count == buffer->size)
@@ -157,7 +158,8 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             t0 = MILLIS();
             if (BUFFER_FULL(acc_buffer) && a_up_avg > ACC_BOOST) {
                 *s_flight_phase = FP_BOOST;
-                printf("BOOST at %lld\n", data->timestamp/1000);
+                launch_warning(1);  // turn on launch warning
+                printf("BOOST at %.2fs\n", data->timestamp / 1000000.0);
             }
             break;
         case FP_BOOST:
@@ -169,10 +171,10 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             if ((current_state->velNED.z * -1 > VEL_FAST) ||
                 (valid_gps && (gps->vel_down * -1 > VEL_FAST))) {
                 *s_flight_phase = FP_FAST;
-                printf("FAST at %lld\n", data->timestamp/1000);
+                printf("FAST at %.2fs\n", data->timestamp / 1000000.0);
             } else if (a_up_avg < ACC_COAST) {
                 *s_flight_phase = FP_COAST;
-                printf("COAST at %lld\n", data->timestamp/1000);
+                printf("COAST at %.2fs\n", data->timestamp / 1000000.0);
             }
             break;
         case FP_FAST:
@@ -181,7 +183,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                 (valid_gps && (gps->vel_down * -1 < VEL_FAST))) {
                 *s_flight_phase =
                     FP_COAST;  // We are slow enough to be in coast
-                    printf("COAST at %lld\n", data->timestamp/1000);
+                printf("COAST at %.2fs\n", data->timestamp / 1000000.0);
             }
             break;
         case FP_COAST:
@@ -190,8 +192,9 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                 ((current_state->velNED.z * -1 < VEL_DROGUE) ||
                  (valid_gps && (gps->vel_down * -1 < VEL_DROGUE)))) {
                 *s_flight_phase = FP_DROGUE;
+                launch_warning(0);    // turn off launch warning
                 fire_pyro(PYRO_DRG);  // fire drogue
-                printf("DROGUE at %lld\n", data->timestamp / 1000);
+                printf("DROGUE at %.2fs\n", data->timestamp / 1000000.0);
 
                 // reset baro buffer, this helps in an edge case
                 // where the barometer fails at a altitude below
@@ -215,7 +218,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                 (valid_gps && gps->height_msl - gps_h0 < HEIGHT_MAIN)) {
                 *s_flight_phase = FP_MAIN;
                 fire_pyro(PYRO_MAIN);  // fire main
-                printf("MAIN at %lld\n", data->timestamp / 1000);
+                printf("MAIN at %.2fs\n", data->timestamp / 1000000.0);
             }
             break;
         case FP_MAIN:
@@ -226,7 +229,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
                 (valid_gps && fabs(gps->height_msl - gps_h0) < HEIGHT_LANDED) ||
                 (valid_gps && fabs(gps->vel_down * -1) < VEL_LANDED)) {
                 *s_flight_phase = FP_LANDED;
-                printf("LANDED at %lld\n", data->timestamp/1000);
+                printf("LANDED at %.2fs\n", data->timestamp / 1000000.0);
             }
             break;
         case FP_LANDED:

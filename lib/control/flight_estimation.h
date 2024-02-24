@@ -58,7 +58,7 @@ typedef struct {
 SensorData sensorFrame2SensorData(SensorFrame frame);
 
 /**
- * @brief
+ * @brief Initialize the flight state machine
  *
  * @param s_flight_phase current flight phase
  * @param current_state current state
@@ -74,7 +74,7 @@ void fp_init(FlightPhase* s_flight_phase, StateEst* current_state,
              AverageBuffer* baro_buffer);
 
 /**
- * @brief
+ * @brief Update the flight state machine
  *
  * @param data sensor data
  * @param gps gps fix
@@ -95,11 +95,19 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
 StateEst zeroState();
 
 /**
- * @brief
+ * @brief Push a new value into the average buffer
  *
  * @param new_value value to push into the average buffer
  * @param buffer buffer to push the value into
  */
 void push_to_average(float new_value, AverageBuffer* buffer);
+
+/**
+ * @brief Sound the buzzer to warn of a detected launch (implement in hw
+ * specific code)
+ *
+ * @param state whether to turn the buzzer on or off
+ */
+void launch_warning(uint8_t state);
 
 #endif  // FLIGHT_ESTIMATION_H

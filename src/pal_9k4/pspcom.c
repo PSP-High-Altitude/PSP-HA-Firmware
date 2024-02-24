@@ -19,7 +19,8 @@
 #define SENSOR_TELEM_PERIOD 5000
 #define GPS_TELEM_PERIOD 5000
 #define STATUS_TELEM_PERIOD 5000
-#define STD_TELEM_PERIOD 5000
+#define STD_TELEM_PERIOD_GROUND 5000
+#define STD_TELEM_PERIOD_FLIGHT 1000
 
 #define PYRO_RETRIES_MAN 3
 #define PYRO_RETRY_PERIOD_MAN 1000
@@ -422,8 +423,14 @@ void pspcom_send_standard() {
 
         pspcom_send_msg(tx_msg);
 
-        vTaskDelayUntil(&last_standard_tx_ticks,
-                        pdMS_TO_TICKS(STD_TELEM_PERIOD));
+        // Transmit interval is based on whether the rocket is in flight
+        if (*flight_phase <= FP_READY || *flight_phase >= FP_LANDED) {
+            vTaskDelayUntil(&last_standard_tx_ticks,
+                            pdMS_TO_TICKS(STD_TELEM_PERIOD_GROUND));
+        } else {
+            vTaskDelayUntil(&last_standard_tx_ticks,
+                            pdMS_TO_TICKS(STD_TELEM_PERIOD_FLIGHT));
+        }
     }
 }
 
