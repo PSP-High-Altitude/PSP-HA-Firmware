@@ -419,7 +419,7 @@ void pspcom_send_standard() {
 
         // SYS_STAT
         tx_msg.payload[17] = gps_fix->fix_valid & 0x1;
-        tx_msg.payload[17] = ((uint8_t)*flight_phase & 0xF) << 3;
+        tx_msg.payload[17] |= ((uint8_t)*flight_phase & 0xF) << 3;
 
         pspcom_send_msg(tx_msg);
 
