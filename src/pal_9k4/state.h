@@ -4,10 +4,11 @@
 #include "flight_estimation.h"
 #include "max_m10s.h"
 #include "sensor.pb.h"
+#include "sensors.h"
 #include "status.h"
 
-#define MAX_POLLING_PERIOD_MS 5  // 200 Hz
-#define MAX_AVG_BUFFER_SIZE (AVERAGING_PERIOD_MS / MAX_POLLING_PERIOD_MS)
+#define MAX_AVG_BUFFER_SIZE \
+    (AVERAGING_PERIOD_MS / SENSOR_NORMAL_READ_INTERVAL_MS)
 
 #define SENSOR_UPDATE_TIMEOUT_MS 1000
 
