@@ -52,7 +52,7 @@ def decode_protobuf_file(file_path, protobuf_class):
 def write_dataframe_to_csv(dataframe, csv_output_path):
     start_time = time.time()
 
-    dataframe.to_csv(csv_output_path, index=False, float_format="%.3f")
+    dataframe.to_csv(csv_output_path, index=False, float_format="%.6f")
 
     end_time = time.time()
     elapsed_time = end_time - start_time
