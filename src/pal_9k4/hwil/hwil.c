@@ -47,6 +47,62 @@ static GPS_Fix_TypeDef pb_frame_to_gps_fix(const GpsFrame* gps_frame) {
     return gps_fix;
 }
 
+static SensorFrame interpolate_sensor_frames(SensorFrame last_sensor_frame,
+                                             SensorFrame next_sensor_frame) {
+    //
+
+    uint64_t real_us = MICROS();
+
+    float dt_last_to_real = (float)(real_us - last_sensor_frame.timestamp);
+    float dt_real_to_next = (float)(next_sensor_frame.timestamp - real_us);
+
+    float dt_last_to_next =
+        (float)(next_sensor_frame.timestamp - last_sensor_frame.timestamp);
+
+    // Swapped because we want the shorter distance to have higher weight
+    float last_weight = dt_real_to_next / dt_last_to_next;
+    float next_weight = dt_last_to_real / dt_last_to_next;
+
+    SensorFrame interpolated_frame = {
+        .timestamp = real_us,
+
+        .acc_h_x = last_weight * last_sensor_frame.acc_h_x +
+                   next_weight * next_sensor_frame.acc_h_x,
+        .acc_h_y = last_weight * last_sensor_frame.acc_h_y +
+                   next_weight * next_sensor_frame.acc_h_y,
+        .acc_h_z = last_weight * last_sensor_frame.acc_h_z +
+                   next_weight * next_sensor_frame.acc_h_z,
+
+        .acc_i_x = last_weight * last_sensor_frame.acc_i_x +
+                   next_weight * next_sensor_frame.acc_i_x,
+        .acc_i_y = last_weight * last_sensor_frame.acc_i_y +
+                   next_weight * next_sensor_frame.acc_i_y,
+        .acc_i_z = last_weight * last_sensor_frame.acc_i_z +
+                   next_weight * next_sensor_frame.acc_i_z,
+
+        .mag_i_x = last_weight * last_sensor_frame.mag_i_x +
+                   next_weight * next_sensor_frame.mag_i_x,
+        .mag_i_y = last_weight * last_sensor_frame.mag_i_y +
+                   next_weight * next_sensor_frame.mag_i_y,
+        .mag_i_z = last_weight * last_sensor_frame.mag_i_z +
+                   next_weight * next_sensor_frame.mag_i_z,
+
+        .rot_i_x = last_weight * last_sensor_frame.rot_i_x +
+                   next_weight * next_sensor_frame.rot_i_x,
+        .rot_i_y = last_weight * last_sensor_frame.rot_i_y +
+                   next_weight * next_sensor_frame.rot_i_y,
+        .rot_i_z = last_weight * last_sensor_frame.rot_i_z +
+                   next_weight * next_sensor_frame.rot_i_z,
+
+        .pressure = last_weight * last_sensor_frame.pressure +
+                    next_weight * next_sensor_frame.pressure,
+        .temperature = last_weight * last_sensor_frame.temperature +
+                       next_weight * next_sensor_frame.temperature,
+    };
+
+    return interpolated_frame;
+}
+
 Status get_hwil_sensor_frame(SensorFrame* sensor_frame) {
     // Catch up the HWIL data stream to real time
     while ((HWIL_SENSOR_DATA[s_hwil_sensor_data_idx].timestamp < MICROS()) &&
@@ -59,8 +115,15 @@ Status get_hwil_sensor_frame(SensorFrame* sensor_frame) {
         return STATUS_ERROR;
     }
 
-    // Otherwise use the entry at the current index
-    *sensor_frame = HWIL_SENSOR_DATA[s_hwil_sensor_data_idx];
+    if (s_hwil_sensor_data_idx <= 0) {
+        // If our index is zero, just use the earliest frame
+        *sensor_frame = HWIL_SENSOR_DATA[s_hwil_sensor_data_idx];
+    } else {
+        // Otherwise, interpolate the current and previous frame
+        *sensor_frame = interpolate_sensor_frames(
+            HWIL_SENSOR_DATA[s_hwil_sensor_data_idx - 1],
+            HWIL_SENSOR_DATA[s_hwil_sensor_data_idx]);
+    }
 
     return STATUS_OK;
 }
