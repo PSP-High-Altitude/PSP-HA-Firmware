@@ -32,9 +32,12 @@ def generate_hwil_data_file():
 
     return f"""
 #include <stdint.h>
+#include <math.h>
 
 #include "sensor.pb.h"
 #include "gps.pb.h"
+
+#define nan NAN
 
 {sensor_data_defs}
 
