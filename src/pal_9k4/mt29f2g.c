@@ -222,7 +222,6 @@ Status mt29f2g_read_pages(uint8_t *buffer, uint32_t page, uint32_t num_pages) {
     }
     return STATUS_OK;
 }
-
 Status mt29f2g_write_pages(uint8_t *buffer, uint32_t page, uint32_t num_pages) {
     for (int i = 0; i < num_pages; i++) {
         if (write_enable() != STATUS_OK) {
@@ -266,4 +265,56 @@ Status mt29f2g_sync() {
         return STATUS_ERROR;
     }
     return STATUS_OK;
+}
+
+int lfs_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
+             void *buffer, lfs_size_t size) {
+    uint32_t row_addr = (block << 6) + (off / 2048);
+    if (mt29f2g_read_pages(buffer, row_addr, size / 2048) != STATUS_OK) {
+        return LFS_ERR_IO;
+    }
+    return LFS_ERR_OK;
+}
+
+int lfs_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
+             const void *buffer, lfs_size_t size) {
+    uint32_t row_addr = (block << 6) + (off / 2048);
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
+    if (mt29f2g_write_pages(buffer, row_addr, size / 2048) != STATUS_OK) {
+        return LFS_ERR_IO;
+    }
+#pragma GCC diagnostic pop
+    return LFS_ERR_OK;
+}
+
+int lfs_erase(const struct lfs_config *c, lfs_block_t block) {
+    if (mt29f2g_erase_blocks(block, block) != STATUS_OK) {
+        return LFS_ERR_IO;
+    }
+    return LFS_ERR_OK;
+}
+
+int lfs_sync(const struct lfs_config *c) {
+    if (mt29f2g_sync() != STATUS_OK) {
+        return LFS_ERR_IO;
+    }
+    return LFS_ERR_OK;
+}
+
+struct lfs_config *mt29f2g_get_lfs_config() {
+    static struct lfs_config lfs_cfg;
+    lfs_cfg.read = lfs_read;
+    lfs_cfg.prog = lfs_prog;
+    lfs_cfg.erase = lfs_erase;
+    lfs_cfg.sync = lfs_sync;
+    lfs_cfg.read_size = 2048;
+    lfs_cfg.prog_size = 2048;
+    lfs_cfg.block_size = 131072;
+    lfs_cfg.block_count = 2048;
+    lfs_cfg.cache_size = 2048;
+    lfs_cfg.lookahead_size = 2048;
+    lfs_cfg.block_cycles = 500;
+
+    return &lfs_cfg;
 }

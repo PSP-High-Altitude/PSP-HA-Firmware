@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 #include "board.h"
+#include "nand_flash.h"
 #include "sd.h"
 #include "sdmmc/sdmmc.h"
 #include "timer.h"
@@ -44,6 +45,7 @@ uint64_t g_total_tickless_idle_us;
 Status init_storage() {
     // For some reason SD init CANNOT go after queue creation
     Status sd_status = EXPECT_OK(sd_init(&s_sd_conf), "SD init");
+    EXPECT_OK(nand_flash_init(), "NAND init");
 
     // Initialize pause flag
     s_pause_store = false;
