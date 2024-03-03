@@ -21,7 +21,7 @@
 #define VEL_LANDED 2               // m/s
 #define HEIGHT_LANDED 50           // m
 #define GPS_ACCURACY_LIMIT_POS 20  // m
-#define GPS_ACCURACY_LIMIT_VEL 5   // m/s
+#define GPS_ACCURACY_LIMIT_VEL 2.5  // m/s
 #define AVERAGING_PERIOD_MS 100    // period of rolling average buffer
 #define DROGUE_LOCKOUT_MS 5000  // time after launch to lock out drogue deploy
 
