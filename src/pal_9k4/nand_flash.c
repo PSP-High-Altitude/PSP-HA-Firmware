@@ -113,6 +113,7 @@ static Status nand_flash_create_state_file() {
     return STATUS_OK;
 }
 
+// From user geky on github
 int lfs_ls(lfs_t *lfs, const char *path) {
     lfs_dir_t dir;
     int err = lfs_dir_open(lfs, &dir, path);
