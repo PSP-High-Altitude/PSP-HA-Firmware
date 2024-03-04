@@ -19,7 +19,7 @@
 
 #include "FreeRTOS.h"
 #include "gpio/gpio.h"
-#include "mt29f2g.h"
+#include "mt29f4g.h"
 #include "sd.h"
 #include "sdmmc/sdmmc.h"
 #include "spi/spi.h"
@@ -421,7 +421,7 @@ DSTATUS disk_initialize(BYTE drv /* Physical drive number (0) */
 #endif
         return Stat[0];
     } else if (drv == 1) {
-        if (mt29f2g_init() != STATUS_OK) {
+        if (mt29f4g_init() != STATUS_OK) {
             Stat[1] = STA_NOINIT;
             return Stat[1];
         }
@@ -487,7 +487,7 @@ DRESULT disk_read(
         return RES_OK;
 #endif
     } else if (drv == 1) {
-        if (mt29f2g_read_pages((uint8_t *)buff, sect, count) != STATUS_OK) {
+        if (mt29f4g_read_pages((uint8_t *)buff, sect, count) != STATUS_OK) {
             return RES_ERROR;
         }
         return RES_OK;
@@ -543,7 +543,7 @@ DRESULT disk_write(BYTE drv,         /* Physical drive number (0) */
         return RES_OK;
 #endif
     } else if (drv == 1) {
-        if (mt29f2g_write_pages((uint8_t *)buff, sect, count) != STATUS_OK) {
+        if (mt29f4g_write_pages((uint8_t *)buff, sect, count) != STATUS_OK) {
             return RES_ERROR;
         }
         return RES_OK;
@@ -758,7 +758,7 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
     } else if (drv == 1) {
         switch (cmd) {
             case CTRL_SYNC:
-                if (mt29f2g_sync() != STATUS_OK) {
+                if (mt29f4g_sync() != STATUS_OK) {
                     return RES_ERROR;
                 }
                 return RES_OK;
@@ -775,7 +775,7 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
                 dp = buff;
                 st = (DWORD)dp[0];
                 ed = (DWORD)dp[1];
-                if (mt29f2g_erase_blocks(st, ed) != STATUS_OK) {
+                if (mt29f4g_erase_blocks(st, ed) != STATUS_OK) {
                     return RES_ERROR;
                 }
                 return RES_OK;

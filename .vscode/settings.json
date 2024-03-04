@@ -66,6 +66,9 @@
                 "vector.h": "c",
                 "timers.h": "c",
                 "pyros.h": "c",
-                "gps.pb.h": "c"
+                "gps.pb.h": "c",
+                "pb_encode.h": "c",
+                "state.pb.h": "c",
+                "mt29f4g.h": "c"
         }
 }
