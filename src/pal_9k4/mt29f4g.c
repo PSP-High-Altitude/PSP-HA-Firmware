@@ -303,6 +303,24 @@ Status mt29f4g_write_pages(uint8_t *buffer, uint32_t page, uint32_t num_pages) {
     return STATUS_OK;
 }
 
+Status mt29f4g_write_partial_page(uint8_t *buffer, uint32_t page,
+                                  uint32_t offset, uint32_t size) {
+    if (write_enable() != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+    if (program_load_x4(offset, 0, buffer, size) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+    if (program_execute(page) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+    if (poll_oip() != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    return STATUS_OK;
+}
+
 Status mt29f4g_erase_blocks(uint32_t block_start, uint32_t block_end) {
     while (block_start <= block_end) {
         if (write_enable() != STATUS_OK) {
@@ -356,14 +374,26 @@ int lfs_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
 int lfs_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
              const void *buffer, lfs_size_t size) {
     uint32_t row_addr = (block << 6) + (off / MT29F4G_PAGE_SIZE);
+    uint32_t col_addr = off % MT29F4G_PAGE_SIZE;
 
+    while (size > 0) {
+        uint32_t write_size = size > MT29F4G_PAGE_SIZE - col_addr
+                                  ? MT29F4G_PAGE_SIZE - col_addr
+                                  : size;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
-    if (mt29f4g_write_pages(buffer, row_addr, size / MT29F4G_PAGE_SIZE) !=
-        STATUS_OK) {
-        return LFS_ERR_IO;
-    }
+        if (mt29f4g_write_partial_page(buffer, row_addr, col_addr,
+                                       write_size) != STATUS_OK) {
+            return LFS_ERR_IO;
+        }
 #pragma GCC diagnostic pop
+
+        size -= write_size;
+        buffer += write_size;
+        col_addr = 0;
+        row_addr++;
+    }
+
     return LFS_ERR_OK;
 }
 
@@ -387,12 +417,12 @@ struct lfs_config *mt29f4g_get_lfs_config() {
     lfs_cfg.prog = lfs_prog;
     lfs_cfg.erase = lfs_erase;
     lfs_cfg.sync = lfs_sync;
-    lfs_cfg.read_size = MT29F4G_PAGE_SIZE;
-    lfs_cfg.prog_size = MT29F4G_PAGE_SIZE;
+    lfs_cfg.read_size = MT29F4G_PAGE_SIZE / 4;
+    lfs_cfg.prog_size = MT29F4G_PAGE_SIZE / 4;
     lfs_cfg.block_size = MT29F4G_PAGE_SIZE * MT29F4G_PAGE_PER_BLOCK;
     lfs_cfg.block_count = MT29F4G_BLOCK_COUNT;
-    lfs_cfg.cache_size = MT29F4G_PAGE_SIZE;
-    lfs_cfg.lookahead_size = MT29F4G_PAGE_SIZE;
+    lfs_cfg.cache_size = MT29F4G_PAGE_SIZE / 4;
+    lfs_cfg.lookahead_size = MT29F4G_PAGE_SIZE / 4;
     lfs_cfg.block_cycles = 500;
 
     return &lfs_cfg;

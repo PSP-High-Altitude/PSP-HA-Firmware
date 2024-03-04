@@ -29,6 +29,10 @@ Status mt29f4g_read_page_spare(uint8_t *buffer, uint32_t page);
 
 Status mt29f4g_write_pages(uint8_t *buffer, uint32_t page, uint32_t num_pages);
 
+// Only 4 partial programs are allowed per page
+Status mt29f4g_write_partial_page(uint8_t *buffer, uint32_t page,
+                                  uint32_t offset, uint32_t size);
+
 Status mt29f4g_erase_blocks(uint32_t block_start, uint32_t block_end);
 
 Status mt29f4g_erase_chip();
