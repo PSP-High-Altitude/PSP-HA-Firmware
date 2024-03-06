@@ -63,9 +63,9 @@ extern "C" {
   */
 
  /*---------- -----------*/
-#define USBD_MAX_NUM_INTERFACES 2U
+#define USBD_MAX_NUM_INTERFACES 3U
 /*---------- -----------*/
-#define USBD_MAX_NUM_CONFIGURATION 1U
+#define USBD_MAX_NUM_CONFIGURATION 3U
 /*---------- -----------*/
 #define USBD_MAX_STR_DESC_SIZ 512U
 /*---------- -----------*/
@@ -76,7 +76,7 @@ extern "C" {
 #define USBD_SELF_POWERED 1U
 
 #define USE_USBD_COMPOSITE
-#define USBD_COMPOSITE_USE_IAD 1
+// #define USBD_COMPOSITE_USE_IAD 1
 #define USE_USB_HS
 
 /****************************************/
