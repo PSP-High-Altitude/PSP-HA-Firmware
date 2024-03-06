@@ -27,8 +27,7 @@
 #include "usbd_cdc_if.h"
 
 /* USER CODE BEGIN Includes */
-#include "usbd_mtp.h"
-#include "usbd_mtp_if.h"
+
 /* USER CODE END Includes */
 
 /* USER CODE BEGIN PV */
@@ -43,13 +42,12 @@ extern void Error_Handler(void);
 
 /* USB Device Core handle declaration. */
 USBD_HandleTypeDef hUsbDeviceHS;
-extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
+
 /*
  * -- Insert your variables declaration here --
  */
 /* USER CODE BEGIN 0 */
-static uint8_t cdc_ep_addr[3] = {CDC_IN_EP, CDC_OUT_EP, CDC_CMD_EP};
-static uint8_t mtp_ep_addr[3] = {MTP_IN_EP, MTP_OUT_EP, MTP_CMD_EP};
+
 /* USER CODE END 0 */
 
 /*
@@ -74,26 +72,14 @@ void MX_USB_DEVICE_Init(void)
   {
     Error_Handler();
   }
-
-  if (USBD_RegisterClassComposite(&hUsbDeviceHS, &USBD_CDC, CLASS_TYPE_CDC,
-                                  cdc_ep_addr) != USBD_OK) {
-      Error_Handler();
+  if (USBD_RegisterClass(&hUsbDeviceHS, &USBD_CDC) != USBD_OK)
+  {
+    Error_Handler();
   }
-
-  if (USBD_RegisterClassComposite(&hUsbDeviceHS, &USBD_MTP, CLASS_TYPE_MTP,
-                                  mtp_ep_addr) != USBD_OK) {
-      Error_Handler();
+  if (USBD_CDC_RegisterInterface(&hUsbDeviceHS, &USBD_Interface_fops_HS) != USBD_OK)
+  {
+    Error_Handler();
   }
-
-  if (USBD_CDC_RegisterInterface(&hUsbDeviceHS, &USBD_Interface_fops_HS) !=
-      USBD_OK) {
-      Error_Handler();
-  }
-
-  if (USBD_MTP_RegisterInterface(&hUsbDeviceHS, &USBD_MTP_fops) != USBD_OK) {
-      Error_Handler();
-  }
-
   if (USBD_Start(&hUsbDeviceHS) != USBD_OK)
   {
     Error_Handler();

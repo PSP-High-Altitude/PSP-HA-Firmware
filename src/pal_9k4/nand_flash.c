@@ -3,7 +3,6 @@
 #include "littlefs/lfs.h"
 #include "pb_encode.h"
 #include "stdio.h"
-#include "timer.h"
 
 static lfs_t s_fs;
 struct lfs_config *lfs_cfg;
