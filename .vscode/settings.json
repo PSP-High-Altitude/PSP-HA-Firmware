@@ -69,6 +69,10 @@
                 "gps.pb.h": "c",
                 "pb_encode.h": "c",
                 "state.pb.h": "c",
-                "mt29f4g.h": "c"
+                "mt29f4g.h": "c",
+                "sensors.h": "c",
+                "usbd_mtp_storage.h": "c",
+                "usbd_ctlreq.h": "c",
+                "usbd_composite_builder.h": "c"
         }
 }

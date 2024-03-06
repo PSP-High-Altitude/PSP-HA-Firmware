@@ -7,7 +7,7 @@
 
 static OSpiDevice dev = {
     .bank = OSPI_PORT1_7_4,
-    .clk = OSPI_SPEED_10MHz,
+    .clk = OSPI_SPEED_80MHz,
 };
 static uint8_t chip_ready = 0;
 
