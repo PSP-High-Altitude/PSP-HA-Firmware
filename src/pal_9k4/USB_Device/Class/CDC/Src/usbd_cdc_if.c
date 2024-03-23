@@ -20,9 +20,10 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "usbd_cdc_if.h"
+#include "main.h"
 
 /* USER CODE BEGIN INCLUDE */
-
+#include "usbd_composite_builder.h"
 /* USER CODE END INCLUDE */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -155,7 +156,8 @@ static int8_t CDC_Init_HS(void)
 {
   /* USER CODE BEGIN 8 */
   /* Set Application Buffers */
-  USBD_CDC_SetTxBuffer(&hUsbDeviceHS, UserTxBufferHS, 0);
+  uint8_t classId = USBD_CMPSIT_GetClassID(&hUsbDeviceHS, CLASS_TYPE_CDC, 0);
+  USBD_CDC_SetTxBuffer(&hUsbDeviceHS, UserTxBufferHS, 0, classId);
   USBD_CDC_SetRxBuffer(&hUsbDeviceHS, UserRxBufferHS);
   return (USBD_OK);
   /* USER CODE END 8 */
@@ -227,7 +229,13 @@ static int8_t CDC_Control_HS(uint8_t cmd, uint8_t* pbuf, uint16_t length)
     break;
 
   case CDC_GET_LINE_CODING:
-
+    pbuf[0] = (uint8_t) SERIAL_BAUD_RATE;
+    pbuf[1] = (uint8_t) (SERIAL_BAUD_RATE >> 8);
+    pbuf[2] = (uint8_t) (SERIAL_BAUD_RATE >> 16);
+    pbuf[3] = (uint8_t) (SERIAL_BAUD_RATE >> 24);
+    pbuf[4] = SERIAL_STOP_BITS;
+    pbuf[5] = SERIAL_PARITY;
+    pbuf[6] = SERIAL_DATA_BITS;
     break;
 
   case CDC_SET_CONTROL_LINE_STATE:
@@ -281,12 +289,14 @@ uint8_t CDC_Transmit_HS(uint8_t* Buf, uint16_t Len)
 {
   uint8_t result = USBD_OK;
   /* USER CODE BEGIN 12 */
-  USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceHS.pClassData;
+  uint8_t classId = USBD_CMPSIT_GetClassID(&hUsbDeviceHS, CLASS_TYPE_CDC, 0);
+  USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceHS.pClassDataCmsit[classId];
   if (hcdc->TxState != 0){
     return USBD_BUSY;
   }
-  USBD_CDC_SetTxBuffer(&hUsbDeviceHS, Buf, Len);
-  result = USBD_CDC_TransmitPacket(&hUsbDeviceHS);
+  
+  USBD_CDC_SetTxBuffer(&hUsbDeviceHS, Buf, Len, classId);
+  result = USBD_CDC_TransmitPacket(&hUsbDeviceHS, classId);
   /* USER CODE END 12 */
   return result;
 }

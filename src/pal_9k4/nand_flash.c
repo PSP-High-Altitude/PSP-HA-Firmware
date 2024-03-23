@@ -3,9 +3,7 @@
 #include "littlefs/lfs.h"
 #include "pb_encode.h"
 #include "stdio.h"
-
-static lfs_t s_fs;
-struct lfs_config *lfs_cfg;
+#include "usbd_mtp_if.h"
 
 #define FNAME_LEN 16
 #define HEADER_LEN 64
@@ -29,10 +27,13 @@ static struct lfs_file s_statefile;
 
 static const char s_header[HEADER_LEN] = FIRMWARE_SPECIFIER;
 
+extern char mtp_file_names[128][LFS_NAME_MAX + 1];  // 128 files
+extern uint32_t mtp_file_idx;
+
 static Status nand_flash_create_sensor_file() {
     // Create sensor data file
-    if (lfs_file_open(&s_fs, &s_datfile, s_filename,
-                      LFS_O_CREAT | LFS_O_WRONLY) != LFS_ERR_OK) {
+    if (nand_file_open(&s_fs, &s_datfile, s_filename,
+                       LFS_O_CREAT | LFS_O_WRONLY) != LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -59,8 +60,8 @@ static Status nand_flash_create_sensor_file() {
 
 static Status nand_flash_create_gps_file() {
     // Create gps data file
-    if (lfs_file_open(&s_fs, &s_gpsfile, s_gpsfname,
-                      LFS_O_CREAT | LFS_O_WRONLY) != LFS_ERR_OK) {
+    if (nand_file_open(&s_fs, &s_gpsfile, s_gpsfname,
+                       LFS_O_CREAT | LFS_O_WRONLY) != LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -87,8 +88,8 @@ static Status nand_flash_create_gps_file() {
 
 static Status nand_flash_create_state_file() {
     // Create state data file
-    if (lfs_file_open(&s_fs, &s_statefile, s_statefname,
-                      LFS_O_CREAT | LFS_O_WRONLY) != LFS_ERR_OK) {
+    if (nand_file_open(&s_fs, &s_statefile, s_statefname,
+                       LFS_O_CREAT | LFS_O_WRONLY) != LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -111,57 +112,6 @@ static Status nand_flash_create_state_file() {
     }
 
     return STATUS_OK;
-}
-
-// From user geky on github
-int lfs_ls(lfs_t *lfs, const char *path) {
-    lfs_dir_t dir;
-    int err = lfs_dir_open(lfs, &dir, path);
-    if (err) {
-        return err;
-    }
-
-    struct lfs_info info;
-    while (true) {
-        int res = lfs_dir_read(lfs, &dir, &info);
-        if (res < 0) {
-            return res;
-        }
-
-        if (res == 0) {
-            break;
-        }
-
-        switch (info.type) {
-            case LFS_TYPE_REG:
-                printf("reg ");
-                break;
-            case LFS_TYPE_DIR:
-                printf("dir ");
-                break;
-            default:
-                printf("?   ");
-                break;
-        }
-
-        static const char *prefixes[] = {"", "K", "M", "G"};
-        for (int i = sizeof(prefixes) / sizeof(prefixes[0]) - 1; i >= 0; i--) {
-            if (info.size >= (1 << 10 * i) - 1) {
-                printf("%*lu%sB ", 4 - (i != 0), info.size >> 10 * i,
-                       prefixes[i]);
-                break;
-            }
-        }
-
-        printf("%s\n", info.name);
-    }
-
-    err = lfs_dir_close(lfs, &dir);
-    if (err) {
-        return err;
-    }
-
-    return 0;
 }
 
 Status nand_flash_init() {
@@ -213,7 +163,8 @@ Status nand_flash_init() {
         printf("Failed to get file system space\n");
         return STATUS_HARDWARE_ERROR;
     } else {
-        lfs_size_t fs_free = (lfs_cfg->block_count * lfs_cfg->block_size);
+        lfs_size_t fs_free =
+            (lfs_cfg->block_count * lfs_cfg->block_size) - fs_size;
         static const char *prefixes[] = {"", "K", "M", "G"};
         for (int i = sizeof(prefixes) / sizeof(prefixes[0]) - 1; i >= 0; i--) {
             if (fs_free >= (1 << 10 * i) - 1) {
@@ -264,4 +215,13 @@ Status nand_flash_init() {
     }
 
     return STATUS_OK;
+}
+
+int nand_file_open(lfs_t* lfs, lfs_file_t* file, const char* path, int flags) {
+    int ret = lfs_file_open(lfs, file, path, flags);
+    if ((flags & LFS_O_CREAT) == LFS_O_CREAT && ret == LFS_ERR_OK) {
+        memcpy(mtp_file_names[mtp_file_idx], path, strlen(path) + 1);
+        mtp_file_idx++;
+    }
+    return ret;
 }

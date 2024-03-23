@@ -23,8 +23,12 @@
 #include "usb_device.h"
 #include "usbd_core.h"
 #include "usbd_desc.h"
+#include "usbd_composite_builder.h"
+#include "usbd_mtp.h"
+#include "usbd_mtp_if.h"
 #include "usbd_cdc.h"
 #include "usbd_cdc_if.h"
+
 
 /* USER CODE BEGIN Includes */
 
@@ -63,23 +67,48 @@ USBD_HandleTypeDef hUsbDeviceHS;
   */
 void MX_USB_DEVICE_Init(void)
 {
-  /* USER CODE BEGIN USB_DEVICE_Init_PreTreatment */
-
-  /* USER CODE END USB_DEVICE_Init_PreTreatment */
+  /*
+   * NOTE: change USBD_static_malloc for class in use 
+   */
 
   /* Init Device Library, add supported class and start the library. */
-  if (USBD_Init(&hUsbDeviceHS, &HS_Desc, DEVICE_HS) != USBD_OK)
+  if (USBD_Init(&hUsbDeviceHS, &Class_Desc, DEVICE_HS) != USBD_OK)
   {
     Error_Handler();
   }
-  if (USBD_RegisterClass(&hUsbDeviceHS, &USBD_CDC) != USBD_OK)
-  {
-    Error_Handler();
-  }
+
+  /*CDC Interface Init*/
+  uint8_t CDC_EP[] = {
+    CDC_IN_EP,
+    CDC_OUT_EP,
+    CDC_CMD_EP
+  };
+
   if (USBD_CDC_RegisterInterface(&hUsbDeviceHS, &USBD_Interface_fops_HS) != USBD_OK)
   {
     Error_Handler();
   }
+  if (USBD_RegisterClassComposite(&hUsbDeviceHS, &USBD_CDC, CLASS_TYPE_CDC, CDC_EP) != USBD_OK)
+  {
+    Error_Handler();
+  }
+  
+  /* MTP Interface Init */
+  uint8_t MTP_EP[] = {
+    MTP_IN_EP,
+    MTP_OUT_EP,
+    MTP_CMD_EP
+  };
+
+  if (USBD_MTP_RegisterInterface(&hUsbDeviceHS, &USBD_MTP_fops) != USBD_OK)
+  {
+    Error_Handler();
+  }
+  if (USBD_RegisterClassComposite(&hUsbDeviceHS, &USBD_MTP, CLASS_TYPE_MTP, MTP_EP) != USBD_OK)
+  {
+    Error_Handler();
+  }
+
   if (USBD_Start(&hUsbDeviceHS) != USBD_OK)
   {
     Error_Handler();

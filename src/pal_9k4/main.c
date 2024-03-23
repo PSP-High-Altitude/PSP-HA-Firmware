@@ -3,8 +3,6 @@
 #include <errno.h>
 #include <sys/unistd.h>
 
-#include "USB_Device/App/usb_device.h"
-#include "USB_Device/App/usbd_cdc_if.h"
 #include "clocks.h"
 #include "data.h"
 #include "gpio/gpio.h"
@@ -17,6 +15,8 @@
 #include "stm32h7xx.h"
 #include "storage.h"
 #include "timer.h"
+#include "usb_device.h"
+#include "usbd_cdc_if.h"
 
 // FreeRTOS
 #include "FreeRTOS.h"

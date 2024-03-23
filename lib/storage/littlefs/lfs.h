@@ -780,4 +780,8 @@ int lfs_migrate(lfs_t *lfs, const struct lfs_config *cfg);
 } /* extern "C" */
 #endif
 
+// Prints the files and directories at the specified path
+// Returns an error code on failure
+int lfs_ls(lfs_t *lfs, const char *path);
+
 #endif

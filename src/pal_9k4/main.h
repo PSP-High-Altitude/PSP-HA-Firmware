@@ -14,4 +14,10 @@
 #endif
 #define USE_SPI_CRC 0
 
+// USB
+#define SERIAL_BAUD_RATE 115200
+#define SERIAL_STOP_BITS 0  // 0 - 1, 1 - 1.5, 2 - 2
+#define SERIAL_PARITY 0     // 0 - None, 1 - Odd, 2 - Even, 3 - Mark, 4 - Space
+#define SERIAL_DATA_BITS 8  // 5, 6, 7, 8 or 16
+
 #endif  // MAIN_H

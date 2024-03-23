@@ -6443,3 +6443,53 @@ int lfs_migrate(lfs_t *lfs, const struct lfs_config *cfg) {
 }
 #endif
 
+// From user geky on github
+int lfs_ls(lfs_t *lfs, const char *path) {
+    lfs_dir_t dir;
+    int err = lfs_dir_open(lfs, &dir, path);
+    if (err) {
+        return err;
+    }
+
+    struct lfs_info info;
+    while (true) {
+        int res = lfs_dir_read(lfs, &dir, &info);
+        if (res < 0) {
+            return res;
+        }
+
+        if (res == 0) {
+            break;
+        }
+
+        switch (info.type) {
+            case LFS_TYPE_REG:
+                printf("reg ");
+                break;
+            case LFS_TYPE_DIR:
+                printf("dir ");
+                break;
+            default:
+                printf("?   ");
+                break;
+        }
+
+        static const char *prefixes[] = {"", "K", "M", "G"};
+        for (int i = sizeof(prefixes) / sizeof(prefixes[0]) - 1; i >= 0; i--) {
+            if (info.size >= (1 << 10 * i) - 1) {
+                printf("%*lu%sB ", 4 - (i != 0), info.size >> 10 * i,
+                       prefixes[i]);
+                break;
+            }
+        }
+
+        printf("%s\n", info.name);
+    }
+
+    err = lfs_dir_close(lfs, &dir);
+    if (err) {
+        return err;
+    }
+
+    return 0;
+}
