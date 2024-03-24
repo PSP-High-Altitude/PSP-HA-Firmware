@@ -145,8 +145,9 @@ static uint32_t USBD_MTP_Itf_GetParentObject(uint32_t Param) { return parent; }
  * @retval object format
  */
 static uint16_t USBD_MTP_Itf_GetObjectFormat(uint32_t Param) {
+    /*
     struct lfs_info info;
-    lfs_stat(&s_fs, mtp_file_names[Param], &info);
+    lfs_stat(&g_fs, mtp_file_names[Param], &info);
 
     switch (info.type) {
         case LFS_TYPE_DIR:
@@ -159,6 +160,8 @@ static uint16_t USBD_MTP_Itf_GetObjectFormat(uint32_t Param) {
             return 0U;
             break;
     }
+    */
+    return 0;
 }
 
 /**
@@ -191,15 +194,19 @@ static void USBD_MTP_Itf_GetObjectName(uint32_t Param, uint8_t obj_len,
  * @retval object size in SD card
  */
 static uint32_t USBD_MTP_Itf_GetObjectSize(uint32_t Param) {
-    lfs_file_t s_file;
-    if (lfs_file_open(&s_fs, &s_file, mtp_file_names[Param], LFS_O_RDONLY) !=
-        LFS_ERR_OK) {
+    if (g_fs.cfg) {
+        lfs_file_t s_file;
+        if (lfs_file_open(&g_fs, &s_file, mtp_file_names[Param],
+                          LFS_O_RDONLY) != LFS_ERR_OK) {
+            return 0;
+        }
+        lfs_soff_t size = lfs_file_size(&g_fs, &s_file);
+        lfs_file_close(&g_fs, &s_file);
+
+        return (uint32_t)size;
+    } else {
         return 0;
     }
-    lfs_soff_t size = lfs_file_size(&s_fs, &s_file);
-    lfs_file_close(&s_fs, &s_file);
-
-    return (uint32_t)size;
 }
 
 /**
@@ -236,10 +243,15 @@ static uint64_t USBD_MTP_Itf_GetMaxCapability(void) {
  * @retval free space in bytes
  */
 static uint64_t USBD_MTP_Itf_GetFreeSpaceInBytes(void) {
-    lfs_ssize_t fs_size = lfs_fs_size(&s_fs);
-    lfs_size_t fs_free = (lfs_cfg->block_count * lfs_cfg->block_size) - fs_size;
+    if (g_fs.cfg) {
+        lfs_ssize_t fs_size = lfs_fs_size(&g_fs);
+        lfs_size_t fs_free =
+            (g_lfs_cfg->block_count * g_lfs_cfg->block_size) - fs_size;
 
-    return (uint64_t)fs_free;
+        return (uint64_t)fs_free;
+    } else {
+        return 0;
+    }
 }
 
 /**

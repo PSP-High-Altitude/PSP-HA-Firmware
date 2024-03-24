@@ -23,6 +23,7 @@
 #include "task.h"
 
 extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
+uint8_t usb_initialized = 0;
 
 // Sorry about preprocessor abuse, but this really does make the code cleaner
 #define TASK_STACK_SIZE 2048
@@ -51,6 +52,10 @@ extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
 int _write(int file, char *data, int len) {
     if ((file != STDOUT_FILENO) && (file != STDERR_FILENO)) {
         errno = EBADF;
+        return -1;
+    }
+
+    if (usb_initialized == 0) {
         return -1;
     }
 
@@ -84,13 +89,9 @@ void handle_pause() {
     }
 }
 
-int main(void) {
-    HAL_Init();
-    SystemClock_Config();
-    init_timers();
-    MX_USB_DEVICE_Init();
-    gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLUP);
-    gpio_write(PIN_RED, GPIO_HIGH);
+void init_task() {
+    // Suspend all tasks until initialization is complete
+    vTaskSuspendAll();
 
     uint32_t init_error = 0;  // Set if error occurs during initialization
 
@@ -101,6 +102,9 @@ int main(void) {
     init_error |= (EXPECT_OK(init_state_est(), "init state") != STATUS_OK) << 2;
     init_error |= (EXPECT_OK(init_pyros(), "init pyros") != STATUS_OK) << 3;
     init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK) << 4;
+
+    MX_USB_DEVICE_Init();
+    usb_initialized = 1;
 
     // One beep for initialization complete
     gpio_write(PIN_RED, GPIO_LOW);
@@ -120,11 +124,9 @@ int main(void) {
     }
 
     printf("Initialization complete\n");
-
-    // https://www.freertos.org/RTOS-Cortex-M3-M4.html
-    NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
-
     printf("Launching tasks\n");
+
+    xTaskResumeAll();
 
     TASK_CREATE(pyros_task, +5);
     TASK_CREATE(read_sensors_task, +4);
@@ -133,6 +135,23 @@ int main(void) {
     TASK_CREATE(pspcom_send_standard, +2);
     TASK_CREATE(read_gps_task, +2);
     TASK_CREATE(storage_task, +1);
+
+    while (1) {
+        DELAY(0xFFFF);
+    }
+}
+
+int main(void) {
+    HAL_Init();
+    SystemClock_Config();
+    init_timers();
+    gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLUP);
+    gpio_write(PIN_RED, GPIO_HIGH);
+
+    // https://www.freertos.org/RTOS-Cortex-M3-M4.html
+    NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
+
+    TASK_CREATE(init_task, -1);
 
     printf("Starting scheduler\n");
 
@@ -174,25 +193,21 @@ void Error_Handler(void) {
 void NMI_Handler(void) { printf("nmi\n"); }
 
 void HardFault_Handler(void) {
-    printf("hard fault\n");
     while (1) {
     }
 }
 
 void MemManage_Handler(void) {
-    printf("memmanage\n");
     while (1) {
     }
 }
 
 void BusFault_Handler(void) {
-    printf("bus fault\n");
     while (1) {
     }
 }
 
 void UsageFault_Handler(void) {
-    printf("usage fault\n");
     while (1) {
     }
 }

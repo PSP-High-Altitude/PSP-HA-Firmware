@@ -6,8 +6,8 @@
 #include "sensor.pb.h"
 #include "state.pb.h"
 
-lfs_t s_fs;
-struct lfs_config* lfs_cfg;
+extern lfs_t g_fs;
+extern struct lfs_config* g_lfs_cfg;
 
 #define NAND_ALLOW_REFORMAT
 

@@ -14,7 +14,7 @@
 
 #define SD_MOUNT_POINT "/SD"
 
-static FATFS s_fs;
+static FATFS g_fs;
 
 static char s_filename[FNAME_LEN] = SD_MOUNT_POINT "/dat_00.pb3";
 static char s_gpsfname[FNAME_LEN] = SD_MOUNT_POINT "/gps_00.pb3";
@@ -124,7 +124,7 @@ static Status sd_create_state_file() {
 
 Status sd_init(SdDevice* dev) {
     diskio_init(dev);
-    if (f_mount(&s_fs, SD_MOUNT_POINT, 0) != FR_OK) {
+    if (f_mount(&g_fs, SD_MOUNT_POINT, 0) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -236,7 +236,7 @@ Status sd_reinit() {
     if (hal_reinit_card() != STATUS_OK) {
         return STATUS_HARDWARE_ERROR;
     }
-    if (f_mount(&s_fs, SD_MOUNT_POINT, 0) != FR_OK) {
+    if (f_mount(&g_fs, SD_MOUNT_POINT, 0) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
     if (f_open(&s_datfile, s_filename, FA_OPEN_APPEND | FA_WRITE) != FR_OK) {

@@ -21,6 +21,9 @@ static struct lfs_file s_datfile;
 static struct lfs_file s_gpsfile;
 static struct lfs_file s_statefile;
 
+lfs_t g_fs = {0};
+struct lfs_config* g_lfs_cfg;
+
 // static pb_byte_t s_sensor_buffer[SENSOR_BUF_LEN];
 // static pb_byte_t s_gps_buffer[GPS_BUF_LEN];
 // static pb_byte_t s_state_buffer[STATE_BUF_LEN];
@@ -32,13 +35,13 @@ extern uint32_t mtp_file_idx;
 
 static Status nand_flash_create_sensor_file() {
     // Create sensor data file
-    if (nand_file_open(&s_fs, &s_datfile, s_filename,
+    if (nand_file_open(&g_fs, &s_datfile, s_filename,
                        LFS_O_CREAT | LFS_O_WRONLY) != LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
     // Write the header
-    lfs_ssize_t bw = lfs_file_write(&s_fs, &s_datfile, s_header, HEADER_LEN);
+    lfs_ssize_t bw = lfs_file_write(&g_fs, &s_datfile, s_header, HEADER_LEN);
 
     // Check the correct number of bytes was written
     if (bw != HEADER_LEN) {
@@ -46,7 +49,7 @@ static Status nand_flash_create_sensor_file() {
     }
 
     // Flush the header to disk
-    if (lfs_file_sync(&s_fs, &s_datfile) != LFS_ERR_OK) {
+    if (lfs_file_sync(&g_fs, &s_datfile) != LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -60,13 +63,13 @@ static Status nand_flash_create_sensor_file() {
 
 static Status nand_flash_create_gps_file() {
     // Create gps data file
-    if (nand_file_open(&s_fs, &s_gpsfile, s_gpsfname,
+    if (nand_file_open(&g_fs, &s_gpsfile, s_gpsfname,
                        LFS_O_CREAT | LFS_O_WRONLY) != LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
     // Write the header
-    lfs_ssize_t bw = lfs_file_write(&s_fs, &s_gpsfile, s_header, HEADER_LEN);
+    lfs_ssize_t bw = lfs_file_write(&g_fs, &s_gpsfile, s_header, HEADER_LEN);
 
     // Check the correct number of bytes was written
     if (bw != HEADER_LEN) {
@@ -74,7 +77,7 @@ static Status nand_flash_create_gps_file() {
     }
 
     // Flush the header to disk
-    if (lfs_file_sync(&s_fs, &s_gpsfile) != LFS_ERR_OK) {
+    if (lfs_file_sync(&g_fs, &s_gpsfile) != LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -88,13 +91,13 @@ static Status nand_flash_create_gps_file() {
 
 static Status nand_flash_create_state_file() {
     // Create state data file
-    if (nand_file_open(&s_fs, &s_statefile, s_statefname,
+    if (nand_file_open(&g_fs, &s_statefile, s_statefname,
                        LFS_O_CREAT | LFS_O_WRONLY) != LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
     // Write the header
-    lfs_ssize_t bw = lfs_file_write(&s_fs, &s_statefile, s_header, HEADER_LEN);
+    lfs_ssize_t bw = lfs_file_write(&g_fs, &s_statefile, s_header, HEADER_LEN);
 
     // Check the correct number of bytes was written
     if (bw != HEADER_LEN) {
@@ -102,7 +105,7 @@ static Status nand_flash_create_state_file() {
     }
 
     // Flush the header to disk
-    if (lfs_file_sync(&s_fs, &s_statefile) != LFS_ERR_OK) {
+    if (lfs_file_sync(&g_fs, &s_statefile) != LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -120,8 +123,8 @@ Status nand_flash_init() {
         return STATUS_HARDWARE_ERROR;
     }
 
-    lfs_cfg = mt29f4g_get_lfs_config();
-    int status = lfs_mount(&s_fs, lfs_cfg);
+    g_lfs_cfg = mt29f4g_get_lfs_config();
+    int status = lfs_mount(&g_fs, g_lfs_cfg);
     if (status != LFS_ERR_OK) {
 #ifdef NAND_ALLOW_REFORMAT
         if (status != LFS_ERR_IO) {
@@ -132,12 +135,12 @@ Status nand_flash_init() {
                 printf("Failed to erase NAND: %d\n", status);
                 return STATUS_HARDWARE_ERROR;
             }
-            status = lfs_format(&s_fs, lfs_cfg);
+            status = lfs_format(&g_fs, g_lfs_cfg);
             if (status != LFS_ERR_OK) {
                 printf("Failed to format NAND: %d\n", status);
                 return STATUS_HARDWARE_ERROR;
             }
-            status = lfs_mount(&s_fs, lfs_cfg);
+            status = lfs_mount(&g_fs, g_lfs_cfg);
             if (status != LFS_ERR_OK) {
                 printf("Failed to mount NAND: %d\n", status);
                 return STATUS_HARDWARE_ERROR;
@@ -152,19 +155,19 @@ Status nand_flash_init() {
     }
 
     // See the files in the root directory
-    if (lfs_ls(&s_fs, "/") != 0) {
+    if (lfs_ls(&g_fs, "/") != 0) {
         printf("Failed to list files on flash\n");
         return STATUS_HARDWARE_ERROR;
     }
 
     // See the space remaining
-    lfs_ssize_t fs_size = lfs_fs_size(&s_fs);
+    lfs_ssize_t fs_size = lfs_fs_size(&g_fs);
     if (fs_size < 0) {
         printf("Failed to get file system space\n");
         return STATUS_HARDWARE_ERROR;
     } else {
         lfs_size_t fs_free =
-            (lfs_cfg->block_count * lfs_cfg->block_size) - fs_size;
+            (g_lfs_cfg->block_count * g_lfs_cfg->block_size) - fs_size;
         static const char *prefixes[] = {"", "K", "M", "G"};
         for (int i = sizeof(prefixes) / sizeof(prefixes[0]) - 1; i >= 0; i--) {
             if (fs_free >= (1 << 10 * i) - 1) {
@@ -178,7 +181,7 @@ Status nand_flash_init() {
     // Increment the suffix of the filename until we find an unused name
     // I'll do this properly at some point I swear
     struct lfs_info info;
-    while (lfs_stat(&s_fs, s_filename, &info) == LFS_ERR_OK) {
+    while (lfs_stat(&g_fs, s_filename, &info) == LFS_ERR_OK) {
         if (s_filename[5] == '9') {
             if (s_filename[4] == '9') {
                 return STATUS_DATA_ERROR;
