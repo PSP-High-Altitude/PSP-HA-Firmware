@@ -118,9 +118,9 @@ static Status ospi_setup(OSpiDevice* dev) {
 
     __HAL_LINKDMA(&ospi1_handle, hmdma, hmdma_octospi1_fifo_th);
 
-    HAL_NVIC_SetPriority(OCTOSPI1_IRQn, 5, 0);
+    HAL_NVIC_SetPriority(OCTOSPI1_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(OCTOSPI1_IRQn);
-    HAL_NVIC_SetPriority(MDMA_IRQn, 5, 0);
+    HAL_NVIC_SetPriority(MDMA_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(MDMA_IRQn);
 
     return STATUS_OK;

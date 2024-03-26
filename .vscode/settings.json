@@ -72,6 +72,8 @@
                 "mt29f4g.h": "c",
                 "storage.h": "c",
                 "usbd_mtp_if.h": "c",
-                "lfs_util.h": "c"
+                "lfs_util.h": "c",
+                "main.h": "c",
+                "usbd_mtp.h": "c"
         }
 }

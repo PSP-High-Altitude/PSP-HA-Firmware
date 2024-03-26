@@ -20,6 +20,7 @@
 #include "usbd_mtp_if.h"
 
 #include "nand_flash.h"
+#include "usbd_mtp_opt.h"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
@@ -34,11 +35,22 @@ static SD_Object_TypeDef sd_object;
 */
 extern USBD_HandleTypeDef USBD_Device;
 
-char mtp_file_names[128][LFS_NAME_MAX + 1];  // 128 files
-uint32_t mtp_file_idx = 1;
+#define MTP_MAX_OBJECT_NUM 50
+
+typedef struct {
+    uint32_t Storage_id;
+    uint16_t ObjectFormat;
+    uint32_t ParentObject;
+    uint32_t AssociationType;
+    uint32_t AssociationDesc;
+    uint32_t ObjectCompressedSize;
+    uint8_t Filename[255];
+} mtp_object_info;
+
+mtp_object_info mtp_files[MTP_MAX_OBJECT_NUM];
+uint32_t mtp_file_idx = 0;
 
 uint32_t parent = 0;
-/* static char path[255]; */
 uint32_t sc_buff[MTP_IF_SCRATCH_BUFF_SZE / 4U];
 uint32_t sc_len = 0U;
 uint32_t pckt_cnt = 1U;
@@ -56,7 +68,7 @@ static uint16_t USBD_MTP_Itf_Create_NewObject(MTP_ObjectInfoTypeDef ObjectInfo,
 
 static uint32_t USBD_MTP_Itf_GetIdx(uint32_t Param3, uint32_t *obj_handle);
 static uint32_t USBD_MTP_Itf_GetParentObject(uint32_t Param);
-static uint16_t USBD_MTP_Itf_GetObjectFormat(uint32_t Param);
+static MTP_ObjectInfoTypeDef USBD_MTP_Itf_GetObjectInfo(uint32_t Param);
 static uint8_t USBD_MTP_Itf_GetObjectName_len(uint32_t Param);
 static void USBD_MTP_Itf_GetObjectName(uint32_t Param, uint8_t obj_len,
                                        uint16_t *buf);
@@ -78,7 +90,7 @@ USBD_MTP_ItfTypeDef USBD_MTP_fops = {
     USBD_MTP_Itf_Create_NewObject,
     USBD_MTP_Itf_GetIdx,
     USBD_MTP_Itf_GetParentObject,
-    USBD_MTP_Itf_GetObjectFormat,
+    USBD_MTP_Itf_GetObjectInfo,
     USBD_MTP_Itf_GetObjectName_len,
     USBD_MTP_Itf_GetObjectName,
     USBD_MTP_Itf_GetObjectSize,
@@ -101,9 +113,82 @@ USBD_MTP_ItfTypeDef USBD_MTP_fops = {
  * @param  None
  * @retval status value
  */
+static void traverse_fs(char path[LFS_NAME_MAX + 1], uint32_t parent) {
+    lfs_dir_t dir;
+    int err = lfs_dir_open(&g_fs, &dir, path);
+    if (err) {
+        return;
+    }
+
+    struct lfs_info info;
+    while (1) {
+        int res = lfs_dir_read(&g_fs, &dir, &info);
+        if (res <= 0) {
+            lfs_dir_close(&g_fs, &dir);
+            return;
+        }
+        if (strcmp(info.name, ".") == 0 || strcmp(info.name, "..") == 0) {
+            continue;
+        }
+        if (info.type == LFS_TYPE_REG) {
+            if (mtp_file_idx >= MTP_MAX_OBJECT_NUM) {
+                lfs_dir_close(&g_fs, &dir);
+                return;
+            }
+            memcpy(mtp_files[mtp_file_idx].Filename, info.name,
+                   strlen(info.name) + 1);
+            mtp_files[mtp_file_idx].Storage_id = mtp_file_idx + 1;
+            mtp_files[mtp_file_idx].ObjectFormat = MTP_OBJ_FORMAT_TEXT;
+            mtp_files[mtp_file_idx].ParentObject =
+                parent == 0xFFFFFFFF ? 0xFFFFFFFF : parent + 1;
+            mtp_files[mtp_file_idx].AssociationType = 0;
+            mtp_files[mtp_file_idx].AssociationDesc = 0;
+            mtp_files[mtp_file_idx].ObjectCompressedSize = info.size;
+            mtp_files[parent].ObjectCompressedSize++;
+            mtp_file_idx++;
+        } else {
+            if (mtp_file_idx >= MTP_MAX_OBJECT_NUM) {
+                lfs_dir_close(&g_fs, &dir);
+                return;
+            }
+            memcpy(mtp_files[mtp_file_idx].Filename, info.name,
+                   strlen(info.name) + 1);
+            mtp_files[mtp_file_idx].Storage_id = mtp_file_idx + 1;
+            mtp_files[mtp_file_idx].ObjectFormat = MTP_OBJ_FORMAT_ASSOCIATION;
+            mtp_files[mtp_file_idx].ParentObject =
+                parent == 0xFFFFFFFF ? 0xFFFFFFFF : parent + 1;
+            mtp_files[mtp_file_idx].AssociationType = 1;
+            mtp_files[mtp_file_idx].AssociationDesc = 0;
+            mtp_files[mtp_file_idx].ObjectCompressedSize = 0;
+            mtp_file_idx++;
+            // lfs_dir_close(&g_fs, &dir);
+            traverse_fs(info.name, mtp_file_idx - 1);
+            // int err = lfs_dir_open(&g_fs, &dir, path);
+            // if (err) {
+            //     return;
+            // }
+        }
+    }
+    lfs_dir_close(&g_fs, &dir);
+}
+
 static uint8_t USBD_MTP_Itf_Init(void) {
-    memset(mtp_file_names, 0, sizeof(mtp_file_names));
-    memcpy(mtp_file_names[0], "/", 2);
+    memset(mtp_files, 0, sizeof(mtp_files));
+    mtp_files[0].Storage_id = mtp_file_idx + 1;
+    mtp_files[0].ObjectFormat = MTP_OBJ_FORMAT_ASSOCIATION;
+    mtp_files[0].ParentObject = 0;
+    mtp_files[0].AssociationType = 1;
+    mtp_files[0].AssociationDesc = 0;
+    mtp_files[0].ObjectCompressedSize = 0;
+    traverse_fs("/", 0xFFFFFFFF);
+    for (int i = 0; i < mtp_file_idx; i++) {
+        printf(
+            "File %u\nStorage ID: %lu\nObject Format: %u\nParent Object: "
+            "%lu\nAssociation: %lu,%lu\nObject Size: %lu\n",
+            i, mtp_files[i].Storage_id, mtp_files[i].ObjectFormat,
+            mtp_files[i].ParentObject, mtp_files[i].AssociationType,
+            mtp_files[i].AssociationDesc, mtp_files[i].ObjectCompressedSize);
+    }
     return 0;
 }
 
@@ -124,8 +209,12 @@ static uint8_t USBD_MTP_Itf_DeInit(void) { return 0; }
  */
 static uint32_t USBD_MTP_Itf_GetIdx(uint32_t Param3, uint32_t *obj_handle) {
     uint32_t count = 0U;
-    UNUSED(Param3);
-    UNUSED(obj_handle);
+    for (int i = Param3; i < MTP_MAX_OBJECT_NUM; i++) {
+        if (mtp_files[i].ParentObject == Param3) {
+            obj_handle[count] = i + 1;
+            count++;
+        }
+    }
 
     return count;
 }
@@ -136,32 +225,33 @@ static uint32_t USBD_MTP_Itf_GetIdx(uint32_t Param3, uint32_t *obj_handle) {
  * @param  Param: object handle (object index)
  * @retval parent object
  */
-static uint32_t USBD_MTP_Itf_GetParentObject(uint32_t Param) { return parent; }
+static uint32_t USBD_MTP_Itf_GetParentObject(uint32_t Param) {
+    uint32_t idx = Param - 1;
 
+    return mtp_files[idx].ParentObject;
+}
 /**
  * @brief  USBD_MTP_Itf_GetObjectFormat
  *         Get object format
  * @param  Param: object handle (object index)
  * @retval object format
  */
-static uint16_t USBD_MTP_Itf_GetObjectFormat(uint32_t Param) {
-    /*
-    struct lfs_info info;
-    lfs_stat(&g_fs, mtp_file_names[Param], &info);
+static MTP_ObjectInfoTypeDef USBD_MTP_Itf_GetObjectInfo(uint32_t Param) {
+    uint32_t idx = Param - 1;
 
-    switch (info.type) {
-        case LFS_TYPE_DIR:
-            return 1U;
-            break;
-        case LFS_TYPE_REG:
-            return 0U;
-            break;
-        default:
-            return 0U;
-            break;
+    MTP_ObjectInfoTypeDef object_info = {
+        .Storage_id = mtp_files[idx].Storage_id,
+        .ObjectFormat = mtp_files[idx].ObjectFormat,
+        .ObjectCompressedSize = mtp_files[idx].ObjectCompressedSize,
+        .AssociationType = mtp_files[idx].AssociationType,
+        .AssociationDesc = mtp_files[idx].AssociationDesc,
+        .Filename_len = strlen((char *)mtp_files[idx].Filename),
+    };
+    for (int i = 0; i < object_info.Filename_len; i++) {
+        object_info.Filename[i] = mtp_files[idx].Filename[i];
     }
-    */
-    return 0;
+
+    return object_info;
 }
 
 /**
@@ -171,7 +261,9 @@ static uint16_t USBD_MTP_Itf_GetObjectFormat(uint32_t Param) {
  * @retval object name length
  */
 static uint8_t USBD_MTP_Itf_GetObjectName_len(uint32_t Param) {
-    return strlen(mtp_file_names[Param]);
+    uint32_t idx = Param - 1;
+
+    return strlen((char *)mtp_files[idx].Filename) + 1;
 }
 
 /**
@@ -184,7 +276,11 @@ static uint8_t USBD_MTP_Itf_GetObjectName_len(uint32_t Param) {
  */
 static void USBD_MTP_Itf_GetObjectName(uint32_t Param, uint8_t obj_len,
                                        uint16_t *buf) {
-    memcpy(buf, mtp_file_names[Param], obj_len);
+    uint32_t idx = Param - 1;
+
+    for (int i = 0; i < obj_len; i++) {
+        buf[i] = mtp_files[idx].Filename[i];
+    }
 }
 
 /**
@@ -194,19 +290,9 @@ static void USBD_MTP_Itf_GetObjectName(uint32_t Param, uint8_t obj_len,
  * @retval object size in SD card
  */
 static uint32_t USBD_MTP_Itf_GetObjectSize(uint32_t Param) {
-    if (g_fs.cfg) {
-        lfs_file_t s_file;
-        if (lfs_file_open(&g_fs, &s_file, mtp_file_names[Param],
-                          LFS_O_RDONLY) != LFS_ERR_OK) {
-            return 0;
-        }
-        lfs_soff_t size = lfs_file_size(&g_fs, &s_file);
-        lfs_file_close(&g_fs, &s_file);
+    uint32_t idx = Param - 1;
 
-        return (uint32_t)size;
-    } else {
-        return 0;
-    }
+    return mtp_files[idx].ObjectCompressedSize;
 }
 
 /**
@@ -219,7 +305,7 @@ static uint32_t USBD_MTP_Itf_GetObjectSize(uint32_t Param) {
  */
 static uint16_t USBD_MTP_Itf_Create_NewObject(MTP_ObjectInfoTypeDef ObjectInfo,
                                               uint32_t objhandle) {
-    uint16_t rep_code = 1U;  // Read-only
+    uint16_t rep_code = 0U;  // Read-only
 
     return rep_code;
 }
@@ -231,7 +317,7 @@ static uint16_t USBD_MTP_Itf_Create_NewObject(MTP_ObjectInfoTypeDef ObjectInfo,
  * @retval max capability
  */
 static uint64_t USBD_MTP_Itf_GetMaxCapability(void) {
-    uint64_t max_cap = 0U;
+    uint64_t max_cap = g_lfs_cfg->block_count * g_lfs_cfg->block_size;
 
     return max_cap;
 }
@@ -261,7 +347,7 @@ static uint64_t USBD_MTP_Itf_GetFreeSpaceInBytes(void) {
  * @retval object handle
  */
 static uint32_t USBD_MTP_Itf_GetNewIndex(uint16_t objformat) {
-    return mtp_file_idx;
+    return mtp_file_idx + 1;
 }
 
 /**
@@ -285,10 +371,9 @@ static void USBD_MTP_Itf_WriteData(uint16_t len, uint8_t *buff) {
  * @retval length of generic container
  */
 static uint32_t USBD_MTP_Itf_GetContainerLength(uint32_t Param1) {
-    uint32_t length = 0U;
-    UNUSED(Param1);
+    uint32_t idx = Param1 - 1;
 
-    return length;
+    return mtp_files[idx].ObjectCompressedSize;
 }
 
 /**
@@ -330,9 +415,51 @@ static uint16_t USBD_MTP_Itf_DeleteObject(uint32_t Param1) {
  */
 static uint32_t USBD_MTP_Itf_ReadData(uint32_t Param1, uint8_t *buff,
                                       MTP_DataLengthTypeDef *data_length) {
-    UNUSED(Param1);
-    UNUSED(buff);
-    UNUSED(data_length);
+    if (g_fs.cfg) {
+        // Open file
+        lfs_file_t file;
+        lfs_ssize_t res = lfs_file_open(
+            &g_fs, &file, (char *)mtp_files[Param1 - 1].Filename, LFS_O_RDONLY);
+        if (res < 0) {
+            return 0;
+        }
+
+        // Get file size if not already done
+        if (data_length->temp_length == 0) {
+            lfs_soff_t size = lfs_file_size(&g_fs, &file);
+            if (size < 0) {
+                lfs_file_close(&g_fs, &file);
+                return 0;
+            }
+            data_length->totallen = size;
+        }
+
+        // Go to last read position
+        if (lfs_file_seek(&g_fs, &file, data_length->temp_length,
+                          LFS_SEEK_SET) < 0) {
+            lfs_file_close(&g_fs, &file);
+            return 0;
+        }
+
+        // Read data
+        lfs_ssize_t read =
+            lfs_file_read(&g_fs, &file, buff,
+                          MTP_DATA_MAX_HS_PACKET_SIZE - MTP_CONT_HEADER_SIZE);
+        if (read < 0) {
+            lfs_file_close(&g_fs, &file);
+            return 0;
+        }
+
+        // Increment read position
+        data_length->temp_length += read;
+        data_length->readbytes = read;
+
+        // Close file
+        lfs_file_close(&g_fs, &file);
+
+    } else {
+        return 0;
+    }
 
     return 0U;
 }

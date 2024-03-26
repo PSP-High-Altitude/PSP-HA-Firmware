@@ -21,14 +21,16 @@
 /* Includes ------------------------------------------------------------------*/
 
 #include "usb_device.h"
-#include "usbd_core.h"
-#include "usbd_desc.h"
-#include "usbd_composite_builder.h"
-#include "usbd_mtp.h"
-#include "usbd_mtp_if.h"
+
+#include "gpio/gpio.h"
+#include "main.h"
 #include "usbd_cdc.h"
 #include "usbd_cdc_if.h"
-
+#include "usbd_composite_builder.h"
+#include "usbd_core.h"
+#include "usbd_desc.h"
+#include "usbd_mtp.h"
+#include "usbd_mtp_if.h"
 
 /* USER CODE BEGIN Includes */
 
@@ -65,17 +67,11 @@ USBD_HandleTypeDef hUsbDeviceHS;
   * Init USB device Library, add supported class and start the library
   * @retval None
   */
-void MX_USB_DEVICE_Init(void)
-{
-  /*
-   * NOTE: change USBD_static_malloc for class in use 
-   */
-
-  /* Init Device Library, add supported class and start the library. */
-  if (USBD_Init(&hUsbDeviceHS, &Class_Desc, DEVICE_HS) != USBD_OK)
-  {
-    Error_Handler();
-  }
+void MX_USB_DEVICE_Init(uint8_t usb_mode) {
+    /* Init Device Library, add supported class and start the library. */
+    if (USBD_Init(&hUsbDeviceHS, &Class_Desc, DEVICE_HS) != USBD_OK) {
+        Error_Handler();
+    }
 
   /*CDC Interface Init*/
   uint8_t CDC_EP[] = {
@@ -92,21 +88,19 @@ void MX_USB_DEVICE_Init(void)
   {
     Error_Handler();
   }
-  
-  /* MTP Interface Init */
-  uint8_t MTP_EP[] = {
-    MTP_IN_EP,
-    MTP_OUT_EP,
-    MTP_CMD_EP
-  };
 
-  if (USBD_MTP_RegisterInterface(&hUsbDeviceHS, &USBD_MTP_fops) != USBD_OK)
-  {
-    Error_Handler();
-  }
-  if (USBD_RegisterClassComposite(&hUsbDeviceHS, &USBD_MTP, CLASS_TYPE_MTP, MTP_EP) != USBD_OK)
-  {
-    Error_Handler();
+  if (usb_mode == 0) {
+      /* MTP Interface Init */
+      uint8_t MTP_EP[] = {MTP_IN_EP, MTP_OUT_EP, MTP_CMD_EP};
+
+      if (USBD_MTP_RegisterInterface(&hUsbDeviceHS, &USBD_MTP_fops) !=
+          USBD_OK) {
+          Error_Handler();
+      }
+      if (USBD_RegisterClassComposite(&hUsbDeviceHS, &USBD_MTP, CLASS_TYPE_MTP,
+                                      MTP_EP) != USBD_OK) {
+          Error_Handler();
+      }
   }
 
   if (USBD_Start(&hUsbDeviceHS) != USBD_OK)

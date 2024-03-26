@@ -287,6 +287,10 @@ static int8_t CDC_Receive_HS(uint8_t* Buf, uint32_t *Len)
   */
 uint8_t CDC_Transmit_HS(uint8_t* Buf, uint16_t Len)
 {
+    if (Len == 0) {
+        return USBD_OK;
+    }
+
   uint8_t result = USBD_OK;
   /* USER CODE BEGIN 12 */
   uint8_t classId = USBD_CMPSIT_GetClassID(&hUsbDeviceHS, CLASS_TYPE_CDC, 0);

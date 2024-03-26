@@ -106,8 +106,10 @@ uint8_t USBD_MTP_STORAGE_ReadData(USBD_HandleTypeDef  *pdev)
       MTP_DataLength.temp_length = 0U;
 
       /* Perform the low layer read operation on the scratch buffer */
-      (void)((USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId])->ReadData(hmtp->OperationsContainer.Param1,
-                                                                              (uint8_t *)data_buff, &MTP_DataLength);
+      (void)((USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId])
+          ->ReadData(hmtp->OperationsContainer.Param1,
+                     (uint8_t *)data_buff + MTP_CONT_HEADER_SIZE,
+                     &MTP_DataLength);
 
       /* Add the container header to the data buffer */
       (void)USBD_memcpy((uint8_t *)data_buff, (uint8_t *)&hmtp->GenericContainer, MTP_CONT_HEADER_SIZE);

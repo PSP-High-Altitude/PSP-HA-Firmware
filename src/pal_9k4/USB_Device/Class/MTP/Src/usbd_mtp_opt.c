@@ -747,9 +747,9 @@ static void MTP_Get_StorageInfo(USBD_HandleTypeDef  *pdev)
 {
   USBD_MTP_ItfTypeDef *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId];
 
-  MTP_StorageInfo.StorageType = MTP_STORAGE_REMOVABLE_RAM;
-  MTP_StorageInfo.FilesystemType = MTP_FILESYSTEM_GENERIC_FLAT;
-  MTP_StorageInfo.AccessCapability = MTP_ACCESS_CAP_RW;
+  MTP_StorageInfo.StorageType = MTP_STORAGE_FIXED_ROM;
+  MTP_StorageInfo.FilesystemType = MTP_FILESYSTEM_GENERIC_HIERARCH;
+  MTP_StorageInfo.AccessCapability = MTP_ACCESS_CAP_RO_WITHOUT_DEL;
   MTP_StorageInfo.MaxCapability = hmtpif->GetMaxCapability();
   MTP_StorageInfo.FreeSpaceInBytes = hmtpif->GetFreeSpaceInBytes();
   MTP_StorageInfo.FreeSpaceInObjects = FREE_SPACE_IN_OBJ_NOT_USED; /* not used */
@@ -911,10 +911,13 @@ static uint8_t *MTP_Get_ObjectPropValue(USBD_HandleTypeDef *pdev)
       break;
 
     case MTP_OB_PROP_OBJECT_FORMAT:
-      MTP_PropertyValue.u16 = hmtpif->GetObjectFormat(hmtp->OperationsContainer.Param1);
-      (void)USBD_memcpy(buf, (const uint8_t *)&MTP_PropertyValue, sizeof(uint16_t));
-      hmtp->ResponseLength = sizeof(uint16_t);
-      break;
+        MTP_PropertyValue.u16 =
+            hmtpif->GetObjectInfo(hmtp->OperationsContainer.Param1)
+                .ObjectFormat;
+        (void)USBD_memcpy(buf, (const uint8_t *)&MTP_PropertyValue,
+                          sizeof(uint16_t));
+        hmtp->ResponseLength = sizeof(uint16_t);
+        break;
 
     case MTP_OB_PROP_OBJ_FILE_NAME:
       MTP_FileName.FileName_len = hmtpif->GetObjectName_len(hmtp->OperationsContainer.Param1);
@@ -981,7 +984,8 @@ static void MTP_Get_ObjectPropList(USBD_HandleTypeDef  *pdev)
       case MTP_OB_PROP_OBJECT_FORMAT :
         MTP_PropertiesList.MTP_Properties[i].PropertyCode = MTP_OB_PROP_OBJECT_FORMAT;
         MTP_PropertiesList.MTP_Properties[i].Datatype = MTP_DATATYPE_UINT16;
-        format = hmtpif->GetObjectFormat(hmtp->OperationsContainer.Param1);
+        format = hmtpif->GetObjectInfo(hmtp->OperationsContainer.Param1)
+                     .ObjectFormat;
         MTP_PropertiesList.MTP_Properties[i].propval = (uint8_t *)&format;
         break;
 
@@ -1079,10 +1083,13 @@ static void MTP_Get_ObjectInfo(USBD_HandleTypeDef  *pdev)
   USBD_MTP_ItfTypeDef *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId];
   USBD_MTP_HandleTypeDef *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   uint16_t filename[255];
+  MTP_ObjectInfoTypeDef obj_info =
+      hmtpif->GetObjectInfo(hmtp->OperationsContainer.Param1);
 
   MTP_ObjectInfo.Storage_id = MTP_STORAGE_ID;
-  MTP_ObjectInfo.ObjectFormat = hmtpif->GetObjectFormat(hmtp->OperationsContainer.Param1);
-  MTP_ObjectInfo.ObjectCompressedSize = hmtpif->GetObjectSize(hmtp->OperationsContainer.Param1);
+  MTP_ObjectInfo.ObjectFormat = obj_info.ObjectFormat;
+  MTP_ObjectInfo.ObjectCompressedSize =
+      hmtpif->GetObjectSize(hmtp->OperationsContainer.Param1);
   MTP_ObjectInfo.ProtectionStatus = 0U;
   MTP_ObjectInfo.ThumbFormat = MTP_OBJ_FORMAT_UNDEFINED;
   MTP_ObjectInfo.ThumbCompressedSize  = 0U;
@@ -1092,8 +1099,8 @@ static void MTP_Get_ObjectInfo(USBD_HandleTypeDef  *pdev)
   MTP_ObjectInfo.ImagePixHeight = 0U;
   MTP_ObjectInfo.ImageBitDepth = 0U;
   MTP_ObjectInfo.ParentObject = hmtpif->GetParentObject(hmtp->OperationsContainer.Param1);
-  MTP_ObjectInfo.AssociationType = 0U;
-  MTP_ObjectInfo.AssociationDesc = 0U;
+  MTP_ObjectInfo.AssociationType = obj_info.AssociationType;
+  MTP_ObjectInfo.AssociationDesc = obj_info.AssociationDesc;
   MTP_ObjectInfo.SequenceNumber = 0U;
 
   /* we have to get this value before MTP_ObjectInfo.Filename */

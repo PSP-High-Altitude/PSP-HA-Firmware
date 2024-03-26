@@ -1,21 +1,26 @@
 #include "nand_flash.h"
 
 #include "littlefs/lfs.h"
+#include "main.h"
 #include "pb_encode.h"
 #include "stdio.h"
 #include "usbd_mtp_if.h"
 
 #define FNAME_LEN 16
+#define FDIR_LEN 32
 #define HEADER_LEN 64
 
 #define SENSOR_BUF_LEN 256
 #define GPS_BUF_LEN 256
 #define STATE_BUF_LEN 256
 
-static char s_filename[FNAME_LEN] = "dat_00.pb3";
-static char s_gpsfname[FNAME_LEN] = "gps_00.pb3";
-static char s_statefname[FNAME_LEN] = "fsl_00.pb3";
-static char s_prffname[FNAME_LEN] = "prf_00.txt";
+extern uint8_t usb_mode;
+
+static char s_fltdata_dir[FDIR_LEN] = "";
+static char s_filename[FNAME_LEN + FDIR_LEN] = "dat_00.pb3";
+static char s_gpsfname[FNAME_LEN + FDIR_LEN] = "gps_00.pb3";
+static char s_statefname[FNAME_LEN + FDIR_LEN] = "fsl_00.pb3";
+static char s_prffname[FNAME_LEN + FDIR_LEN] = "prf_00.txt";
 
 static struct lfs_file s_datfile;
 static struct lfs_file s_gpsfile;
@@ -35,8 +40,8 @@ extern uint32_t mtp_file_idx;
 
 static Status nand_flash_create_sensor_file() {
     // Create sensor data file
-    if (nand_file_open(&g_fs, &s_datfile, s_filename,
-                       LFS_O_CREAT | LFS_O_WRONLY) != LFS_ERR_OK) {
+    if (lfs_file_open(&g_fs, &s_datfile, s_filename,
+                      LFS_O_CREAT | LFS_O_WRONLY) != LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -63,8 +68,8 @@ static Status nand_flash_create_sensor_file() {
 
 static Status nand_flash_create_gps_file() {
     // Create gps data file
-    if (nand_file_open(&g_fs, &s_gpsfile, s_gpsfname,
-                       LFS_O_CREAT | LFS_O_WRONLY) != LFS_ERR_OK) {
+    if (lfs_file_open(&g_fs, &s_gpsfile, s_gpsfname,
+                      LFS_O_CREAT | LFS_O_WRONLY) != LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -91,8 +96,8 @@ static Status nand_flash_create_gps_file() {
 
 static Status nand_flash_create_state_file() {
     // Create state data file
-    if (nand_file_open(&g_fs, &s_statefile, s_statefname,
-                       LFS_O_CREAT | LFS_O_WRONLY) != LFS_ERR_OK) {
+    if (lfs_file_open(&g_fs, &s_statefile, s_statefname,
+                      LFS_O_CREAT | LFS_O_WRONLY) != LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -112,6 +117,99 @@ static Status nand_flash_create_state_file() {
     // Check that the frame will at least nominally fit in our buffer
     if (STATE_BUF_LEN < sizeof(StateFrame)) {
         return STATUS_DATA_ERROR;
+    }
+
+    return STATUS_OK;
+}
+
+static Status nand_flash_open_files() {
+    // Traverse the directory to find the oldest and newest files
+    lfs_dir_t dir;
+    int err = lfs_dir_open(&g_fs, &dir, s_fltdata_dir);
+    if (err) {
+        return STATUS_ERROR;
+    }
+
+    int32_t min_file_suffix = 100;
+    int32_t max_file_suffix = -1;
+
+    struct lfs_info info;
+    while (true) {
+        int res = lfs_dir_read(&g_fs, &dir, &info);
+        if (res < 0) {
+            lfs_dir_close(&g_fs, &dir);
+            return STATUS_ERROR;
+        }
+
+        if (res == 0) {
+            break;
+        }
+
+        if (info.type != LFS_TYPE_REG) {
+            continue;
+        }
+
+        if (strncmp(info.name, "dat_", 4) == 0) {
+            int32_t suffix = atoi(info.name + 4);
+            if (suffix > max_file_suffix) {
+                max_file_suffix = suffix;
+            }
+            if (suffix < min_file_suffix) {
+                min_file_suffix = suffix;
+            }
+        }
+    }
+
+    lfs_dir_close(&g_fs, &dir);
+
+    // Remove files if there are more than NAND_MAX_FLIGHTS
+    while (max_file_suffix - min_file_suffix > NAND_MAX_FLIGHTS - 1) {
+        snprintf(s_filename, FNAME_LEN + FDIR_LEN, "%sdat_%02ld.pb3",
+                 s_fltdata_dir, min_file_suffix);
+        snprintf(s_gpsfname, FNAME_LEN + FDIR_LEN, "%sgps_%02ld.pb3",
+                 s_fltdata_dir, min_file_suffix);
+        snprintf(s_statefname, FNAME_LEN + FDIR_LEN, "%sfsl_%02ld.pb3",
+                 s_fltdata_dir, min_file_suffix);
+        snprintf(s_prffname, FNAME_LEN + FDIR_LEN, "%sprf_%02ld.txt",
+                 s_fltdata_dir, min_file_suffix);
+        lfs_remove(&g_fs, s_filename);
+        lfs_remove(&g_fs, s_gpsfname);
+        lfs_remove(&g_fs, s_statefname);
+        lfs_remove(&g_fs, s_prffname);
+        min_file_suffix++;
+    }
+
+    // Roll around if we reach 99
+    if (max_file_suffix > 99) {
+        max_file_suffix = 0;
+    }
+
+    // Create new file names
+    snprintf(s_filename, FNAME_LEN + FDIR_LEN, "%sdat_%02ld.pb3", s_fltdata_dir,
+             max_file_suffix + 1);
+    snprintf(s_gpsfname, FNAME_LEN + FDIR_LEN, "%sgps_%02ld.pb3", s_fltdata_dir,
+             max_file_suffix + 1);
+    snprintf(s_statefname, FNAME_LEN + FDIR_LEN, "%sfsl_%02ld.pb3",
+             s_fltdata_dir, max_file_suffix + 1);
+    snprintf(s_prffname, FNAME_LEN + FDIR_LEN, "%sprf_%02ld.txt", s_fltdata_dir,
+             max_file_suffix + 1);
+
+    // Initialize the sensor file and stream
+    Status sensor_status = nand_flash_create_sensor_file();
+    if (sensor_status != STATUS_OK) {
+        return sensor_status;
+    }
+
+    // Initialize the GPS file and stream
+    Status gps_status = nand_flash_create_gps_file();
+    if (gps_status != STATUS_OK) {
+        return gps_status;
+    }
+
+    // Initialize the flight state file and stream
+    Status state_status = nand_flash_create_state_file();
+    if (state_status != STATUS_OK) {
+        return state_status;
     }
 
     return STATUS_OK;
@@ -154,6 +252,14 @@ Status nand_flash_init() {
 #endif
     }
 
+    if (usb_mode == 1) {
+        // Open the files
+        Status open_file_stat = nand_flash_open_files();
+        if (open_file_stat != STATUS_OK) {
+            return open_file_stat;
+        }
+    }
+
     // See the files in the root directory
     if (lfs_ls(&g_fs, "/") != 0) {
         printf("Failed to list files on flash\n");
@@ -178,53 +284,5 @@ Status nand_flash_init() {
         }
     }
 
-    // Increment the suffix of the filename until we find an unused name
-    // I'll do this properly at some point I swear
-    struct lfs_info info;
-    while (lfs_stat(&g_fs, s_filename, &info) == LFS_ERR_OK) {
-        if (s_filename[5] == '9') {
-            if (s_filename[4] == '9') {
-                return STATUS_DATA_ERROR;
-            }
-            s_filename[4] += 1;
-            s_filename[5] = '0';
-        } else {
-            s_filename[5] += 1;
-        }
-    }
-    s_gpsfname[4] = s_filename[4];
-    s_gpsfname[5] = s_filename[5];
-    s_statefname[4] = s_filename[4];
-    s_statefname[5] = s_filename[5];
-    s_prffname[4] = s_filename[4];
-    s_prffname[5] = s_filename[5];
-
-    // Initialize the sensor file and stream
-    Status sensor_status = nand_flash_create_sensor_file();
-    if (sensor_status != STATUS_OK) {
-        return sensor_status;
-    }
-
-    // Initialize the GPS file and stream
-    Status gps_status = nand_flash_create_gps_file();
-    if (gps_status != STATUS_OK) {
-        return gps_status;
-    }
-
-    // Initialize the flight state file and stream
-    Status state_status = nand_flash_create_state_file();
-    if (state_status != STATUS_OK) {
-        return state_status;
-    }
-
     return STATUS_OK;
-}
-
-int nand_file_open(lfs_t* lfs, lfs_file_t* file, const char* path, int flags) {
-    int ret = lfs_file_open(lfs, file, path, flags);
-    if ((flags & LFS_O_CREAT) == LFS_O_CREAT && ret == LFS_ERR_OK) {
-        memcpy(mtp_file_names[mtp_file_idx], path, strlen(path) + 1);
-        mtp_file_idx++;
-    }
-    return ret;
 }

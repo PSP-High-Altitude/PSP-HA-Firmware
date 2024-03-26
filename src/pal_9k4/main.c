@@ -24,6 +24,9 @@
 
 extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
 uint8_t usb_initialized = 0;
+char usb_serial_buffer[SERIAL_BUFFER_SIZE];
+uint32_t usb_serial_buffer_idx = 0;
+uint8_t usb_mode = 1;
 
 // Sorry about preprocessor abuse, but this really does make the code cleaner
 #define TASK_STACK_SIZE 2048
@@ -56,15 +59,30 @@ int _write(int file, char *data, int len) {
     }
 
     if (usb_initialized == 0) {
-        return -1;
+        uint32_t copy_size =
+            MIN(len, SERIAL_BUFFER_SIZE - usb_serial_buffer_idx);
+        memcpy(usb_serial_buffer + usb_serial_buffer_idx, data,
+               copy_size * sizeof(char));
+        usb_serial_buffer_idx += copy_size;
+        return len;
     }
 
 #ifdef DEBUG
     uint64_t start_time = MILLIS();
     USBD_StatusTypeDef rc = USBD_OK;
+
+    do {
+        rc = CDC_Transmit_HS((uint8_t *)usb_serial_buffer,
+                             usb_serial_buffer_idx);
+    } while (USBD_BUSY == rc && MILLIS() - start_time < 10);
+
+    start_time = MILLIS();
+
     do {
         rc = CDC_Transmit_HS((uint8_t *)data, len);
     } while (USBD_BUSY == rc && MILLIS() - start_time < 10);
+
+    usb_serial_buffer_idx = 0;
 
     if (USBD_FAIL == rc) {
         return 0;
@@ -93,18 +111,25 @@ void init_task() {
     // Suspend all tasks until initialization is complete
     vTaskSuspendAll();
 
+    memset(usb_serial_buffer, 0, SERIAL_BUFFER_SIZE);
     uint32_t init_error = 0;  // Set if error occurs during initialization
 
-    DELAY(4700);
     printf("Starting initialization...\n");
     init_error |= (EXPECT_OK(init_storage(), "init storage") != STATUS_OK) << 0;
-    init_error |= (EXPECT_OK(init_sensors(), "init sensors") != STATUS_OK) << 1;
-    init_error |= (EXPECT_OK(init_state_est(), "init state") != STATUS_OK) << 2;
-    init_error |= (EXPECT_OK(init_pyros(), "init pyros") != STATUS_OK) << 3;
-    init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK) << 4;
+    if (usb_mode == 1) {
+        init_error |= (EXPECT_OK(init_sensors(), "init sensors") != STATUS_OK)
+                      << 1;
+        init_error |= (EXPECT_OK(init_state_est(), "init state") != STATUS_OK)
+                      << 2;
+        init_error |= (EXPECT_OK(init_pyros(), "init pyros") != STATUS_OK) << 3;
+        init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK)
+                      << 4;
+    }
 
-    MX_USB_DEVICE_Init();
+    MX_USB_DEVICE_Init(usb_mode);
     usb_initialized = 1;
+
+    DELAY(4700);
 
     // One beep for initialization complete
     gpio_write(PIN_RED, GPIO_LOW);
@@ -124,17 +149,20 @@ void init_task() {
     }
 
     printf("Initialization complete\n");
-    printf("Launching tasks\n");
 
     xTaskResumeAll();
 
-    TASK_CREATE(pyros_task, +5);
-    TASK_CREATE(read_sensors_task, +4);
-    TASK_CREATE(state_est_task, +3);
-    TASK_CREATE(pspcom_process_bytes, +3);
-    TASK_CREATE(pspcom_send_standard, +2);
-    TASK_CREATE(read_gps_task, +2);
-    TASK_CREATE(storage_task, +1);
+    // Start tasks if we are in normal mode
+    if (usb_mode == 1) {
+        printf("Launching tasks\n");
+        TASK_CREATE(pyros_task, +5);
+        TASK_CREATE(read_sensors_task, +4);
+        TASK_CREATE(state_est_task, +3);
+        TASK_CREATE(pspcom_process_bytes, +3);
+        TASK_CREATE(pspcom_send_standard, +2);
+        TASK_CREATE(read_gps_task, +2);
+        TASK_CREATE(storage_task, +1);
+    }
 
     while (1) {
         DELAY(0xFFFF);
@@ -147,6 +175,10 @@ int main(void) {
     init_timers();
     gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLUP);
     gpio_write(PIN_RED, GPIO_HIGH);
+
+    gpio_mode(PIN_USB_MODE, GPIO_INPUT_PULLUP);
+    DELAY(1);
+    usb_mode = gpio_read(PIN_USB_MODE);
 
     // https://www.freertos.org/RTOS-Cortex-M3-M4.html
     NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);

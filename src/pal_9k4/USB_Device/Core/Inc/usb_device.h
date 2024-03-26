@@ -75,23 +75,23 @@
   */
 
 /** USB Device initialization function. */
-void MX_USB_DEVICE_Init(void);
+ void MX_USB_DEVICE_Init(uint8_t usb_mode);
 
-/*
- * -- Insert functions declaration here --
- */
-/* USER CODE BEGIN FD */
+ /*
+  * -- Insert functions declaration here --
+  */
+ /* USER CODE BEGIN FD */
 
-/* USER CODE END FD */
-/**
+ /* USER CODE END FD */
+ /**
   * @}
   */
 
-/**
+ /**
   * @}
   */
 
-/**
+ /**
   * @}
   */
 

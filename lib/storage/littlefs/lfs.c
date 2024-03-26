@@ -6455,6 +6455,7 @@ int lfs_ls(lfs_t *lfs, const char *path) {
     while (true) {
         int res = lfs_dir_read(lfs, &dir, &info);
         if (res < 0) {
+            lfs_dir_close(lfs, &dir);
             return res;
         }
 

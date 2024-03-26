@@ -312,11 +312,11 @@ typedef struct _USBD_MTP_ItfTypeDef
   uint8_t (*Init)(void);
   uint8_t (*DeInit)(void);
   uint32_t (*ReadData)(uint32_t Param1, uint8_t *buff, MTP_DataLengthTypeDef *data_length);
-  uint16_t (*Create_NewObject)(MTP_ObjectInfoTypeDef ObjectInfo, uint32_t objhandle);
-
+  uint16_t (*Create_NewObject)(MTP_ObjectInfoTypeDef ObjectInfo,
+                               uint32_t objhandle);
   uint32_t (*GetIdx)(uint32_t Param3, uint32_t *obj_handle);
   uint32_t (*GetParentObject)(uint32_t Param);
-  uint16_t (*GetObjectFormat)(uint32_t Param);
+  MTP_ObjectInfoTypeDef (*GetObjectInfo)(uint32_t Param);
   uint8_t (*GetObjectName_len)(uint32_t Param);
   void (*GetObjectName)(uint32_t Param, uint8_t obj_len, uint16_t *buf);
   uint32_t (*GetObjectSize)(uint32_t Param);

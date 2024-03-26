@@ -80,7 +80,7 @@ uint16_t crc(uint16_t checksum, pspcommsg msg) {
 }
 
 Status pspcom_init() {
-    HAL_NVIC_SetPriority(UART7_IRQn, 0, 0);
+    HAL_NVIC_SetPriority(UART7_IRQn, 3, 0);
     HAL_NVIC_EnableIRQ(UART7_IRQn);
 
     GPIO_InitTypeDef GPIO_InitStruct = {0};
