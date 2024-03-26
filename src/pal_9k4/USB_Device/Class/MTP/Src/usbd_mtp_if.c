@@ -383,10 +383,27 @@ static uint32_t USBD_MTP_Itf_GetContainerLength(uint32_t Param1) {
  * @retval response code
  */
 static uint16_t USBD_MTP_Itf_DeleteObject(uint32_t Param1) {
-    uint16_t rep_code = 0U;
-    UNUSED(Param1);
+    int idx = Param1 - 1;
+    if (mtp_files[idx].ObjectFormat == MTP_OBJ_FORMAT_ASSOCIATION) {
+        for (int i = idx; i < mtp_file_idx; i++) {
+            if (mtp_files[i].ParentObject == Param1) {
+                if (USBD_MTP_Itf_DeleteObject(i + 1) != 0x2001) {
+                    return 0x2002;
+                }
+            }
+        }
+        int ret = lfs_remove(&g_fs, (char *)mtp_files[idx].Filename);
+        if (ret < 0) {
+            return 0x2002;
+        }
+    } else {
+        int ret = lfs_remove(&g_fs, (char *)mtp_files[idx].Filename);
+        if (ret < 0) {
+            return 0x2002;
+        }
+    }
 
-    return rep_code;
+    return 0x2001;
 }
 
 /**

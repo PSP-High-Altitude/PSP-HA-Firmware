@@ -747,9 +747,9 @@ static void MTP_Get_StorageInfo(USBD_HandleTypeDef  *pdev)
 {
   USBD_MTP_ItfTypeDef *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId];
 
-  MTP_StorageInfo.StorageType = MTP_STORAGE_FIXED_ROM;
+  MTP_StorageInfo.StorageType = MTP_STORAGE_FIXED_RAM;
   MTP_StorageInfo.FilesystemType = MTP_FILESYSTEM_GENERIC_HIERARCH;
-  MTP_StorageInfo.AccessCapability = MTP_ACCESS_CAP_RO_WITHOUT_DEL;
+  MTP_StorageInfo.AccessCapability = MTP_ACCESS_CAP_RO_WITH_DEL;
   MTP_StorageInfo.MaxCapability = hmtpif->GetMaxCapability();
   MTP_StorageInfo.FreeSpaceInBytes = hmtpif->GetFreeSpaceInBytes();
   MTP_StorageInfo.FreeSpaceInObjects = FREE_SPACE_IN_OBJ_NOT_USED; /* not used */
