@@ -2,17 +2,14 @@
 
 #include "littlefs/lfs.h"
 #include "main.h"
-#include "pb_encode.h"
+#include "pb_create.h"
 #include "stdio.h"
+#include "timer.h"
 #include "usbd_mtp_if.h"
 
 #define FNAME_LEN 16
 #define FDIR_LEN 32
 #define HEADER_LEN 64
-
-#define SENSOR_BUF_LEN 256
-#define GPS_BUF_LEN 256
-#define STATE_BUF_LEN 256
 
 extern uint8_t usb_mode;
 
@@ -215,6 +212,84 @@ static Status nand_flash_open_files() {
     return STATUS_OK;
 }
 
+Status nand_flash_write_sensor_data(SensorFrame* frame) {
+    size_t buf_size;
+    pb_byte_t* buf = create_sensor_buffer(frame, &buf_size);
+
+    if (buf == NULL) {
+        return STATUS_ERROR;
+    }
+
+    if (lfs_file_write(&g_fs, &s_datfile, buf, buf_size) != LFS_ERR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    return STATUS_OK;
+}
+
+Status nand_flash_write_gps_data(GpsFrame* frame) {
+    size_t buf_size;
+    pb_byte_t* buf = create_gps_buffer(frame, &buf_size);
+
+    if (buf == NULL) {
+        return STATUS_ERROR;
+    }
+
+    if (lfs_file_write(&g_fs, &s_gpsfile, buf, buf_size) != LFS_ERR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    return STATUS_OK;
+}
+
+Status nand_flash_write_state_data(StateFrame* frame) {
+    size_t buf_size;
+    pb_byte_t* buf = create_state_buffer(frame, &buf_size);
+
+    if (buf == NULL) {
+        return STATUS_ERROR;
+    }
+
+    if (lfs_file_write(&g_fs, &s_statefile, buf, buf_size) != LFS_ERR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    return STATUS_OK;
+}
+
+Status nand_flash_dump_prf_stats(char stats[]) {
+    lfs_file_t prffile;
+    size_t bw = 0;
+
+    // Create performance dump file
+    if (lfs_file_open(&g_fs, &prffile, s_prffname,
+                      LFS_O_APPEND | LFS_O_CREAT) != LFS_ERR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    // Write a timestamp
+    char timestamp[32];
+    int size = snprintf(timestamp, 32, "%lu ms: ", (uint32_t)MILLIS());
+    if (size > 0) {
+        bw += lfs_file_write(&g_fs, &prffile, timestamp, size);
+    }
+
+    // Write the stats
+    bw += lfs_file_write(&g_fs, &prffile, stats, strlen(stats));
+
+    // Check that something was written
+    if (bw == 0) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    // Close the file
+    if (lfs_file_close(&g_fs, &prffile) != LFS_ERR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    return STATUS_OK;
+}
+
 Status nand_flash_init() {
     if (mt29f4g_init() != STATUS_OK) {
         printf("Failed to initialize NAND hardware\n");
@@ -282,6 +357,51 @@ Status nand_flash_init() {
                 break;
             }
         }
+    }
+
+    return STATUS_OK;
+}
+
+Status nand_flash_reinit() {
+    if (lfs_file_open(&g_fs, &s_datfile, s_filename,
+                      LFS_O_APPEND | LFS_O_WRONLY) != LFS_ERR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+    if (lfs_file_open(&g_fs, &s_gpsfile, s_gpsfname,
+                      LFS_O_APPEND | LFS_O_WRONLY) != LFS_ERR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+    if (lfs_file_open(&g_fs, &s_statefile, s_statefname,
+                      LFS_O_APPEND | LFS_O_WRONLY) != LFS_ERR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    return STATUS_OK;
+}
+
+Status nand_flash_deinit() {
+    if (lfs_file_close(&g_fs, &s_datfile) != LFS_ERR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+    if (lfs_file_close(&g_fs, &s_gpsfile) != LFS_ERR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+    if (lfs_file_close(&g_fs, &s_statefile) != LFS_ERR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    return STATUS_OK;
+}
+
+Status nand_flash_flush() {
+    if (lfs_file_sync(&g_fs, &s_datfile) != LFS_ERR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+    if (lfs_file_sync(&g_fs, &s_gpsfile) != LFS_ERR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+    if (lfs_file_sync(&g_fs, &s_statefile) != LFS_ERR_OK) {
+        return STATUS_HARDWARE_ERROR;
     }
 
     return STATUS_OK;

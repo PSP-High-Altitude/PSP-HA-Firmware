@@ -260,6 +260,6 @@ __attribute__((unused)) static uint32_t GPIO_PIN_TO_MODEPOS[] = {
 #define PIN_GREEN PIN_PA2
 #define PIN_BLUE PIN_PA3
 #define PIN_BUZZER PIN_PE0
-#define PIN_PAUSE PIN_PB7  // SDA4
+#define PIN_PAUSE PIN_PB7  // SCL4
 
 #endif

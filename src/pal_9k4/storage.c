@@ -101,45 +101,45 @@ void storage_task() {
         SensorFrame sensor_frame;
         while (xQueueReceive(s_sensor_queue_handle, &sensor_frame, 1) ==
                pdPASS) {
-            if (sd_write_sensor_data(&sensor_frame) != STATUS_OK) {
-                break;
-            }
+            sd_write_sensor_data(&sensor_frame);
+            // nand_flash_write_sensor_data(&sensor_frame);
         }
 
         // Empty the state queue
         StateFrame state_frame;
         while (xQueueReceive(s_state_queue_handle, &state_frame, 1) == pdPASS) {
-            if (sd_write_state_data(&state_frame) != STATUS_OK) {
-                break;
-            }
+            sd_write_state_data(&state_frame);
+            // nand_flash_write_state_data(&state_frame);
         }
 
         // Empty the GPS queue
         GpsFrame gps_frame;
         while (xQueueReceive(s_gps_queue_handle, &gps_frame, 1) == pdPASS) {
-            if (sd_write_gps_data(&gps_frame) != STATUS_OK) {
-                break;
-            }
+            sd_write_gps_data(&gps_frame);
+            // nand_flash_write_gps_data(&gps_frame);
         }
 
         // Flush everything to SD card
         Status flush_status = EXPECT_OK(sd_flush(), "SD flush");
+        // flush_status |= EXPECT_OK(nand_flash_flush(), "NAND flush");
         gpio_write(PIN_GREEN, flush_status == STATUS_OK);
 
         // Unset disk activity warning LED
         gpio_write(PIN_YELLOW, GPIO_LOW);
 
         // Check if the pause flag is set
-        if (s_pause_store) {
+        if (!gpio_read(PIN_PAUSE)) {
             // Gather and dump stats
             char prf_buf[1024];  // 40 bytes per task
             printf("Dumping prf stats\n");
             vTaskGetRunTimeStats(prf_buf);
             sd_dump_prf_stats(prf_buf);
+            // nand_flash_dump_prf_stats(prf_buf);
             printf(prf_buf);
 
             // Unmount SD card
             sd_deinit();
+            // nand_flash_deinit();
             printf("SD safe to remove\n");
 
             // Record sleep entry time
@@ -160,12 +160,14 @@ void storage_task() {
             // Remount SD card
             printf("Remounting SD\n");
             sd_reinit();
+            // nand_flash_reinit();
 
             // Store tickless idle stats
             sprintf(prf_buf, "Tickless idle percentage: %f\n\n",
                     100. * (float)tickless_idle_us /
                         (float)(sleep_exit_us - sleep_entry_us));
             sd_dump_prf_stats(prf_buf);
+            // nand_flash_dump_prf_stats(prf_buf);
         }
     }
 }

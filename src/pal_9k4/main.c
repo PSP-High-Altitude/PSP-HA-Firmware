@@ -150,8 +150,6 @@ void init_task() {
 
     printf("Initialization complete\n");
 
-    xTaskResumeAll();
-
     // Start tasks if we are in normal mode
     if (usb_mode == 1) {
         printf("Launching tasks\n");
@@ -163,6 +161,8 @@ void init_task() {
         TASK_CREATE(read_gps_task, +2);
         TASK_CREATE(storage_task, +1);
     }
+
+    xTaskResumeAll();
 
     while (1) {
         DELAY(0xFFFF);

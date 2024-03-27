@@ -74,6 +74,7 @@
                 "usbd_mtp_if.h": "c",
                 "lfs_util.h": "c",
                 "main.h": "c",
-                "usbd_mtp.h": "c"
+                "usbd_mtp.h": "c",
+                "pb_create.h": "c"
         }
 }

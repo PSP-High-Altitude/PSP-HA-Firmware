@@ -1,16 +1,12 @@
 #include "sd.h"
 
 #include "fatfs/ff.h"
-#include "pb_encode.h"
+#include "pb_create.h"
 #include "stdio.h"
 #include "timer.h"
 
 #define FNAME_LEN 16
 #define HEADER_LEN 64
-
-#define SENSOR_BUF_LEN 256
-#define GPS_BUF_LEN 256
-#define STATE_BUF_LEN 256
 
 #define SD_MOUNT_POINT "/SD"
 
@@ -24,10 +20,6 @@ static char s_prffname[FNAME_LEN] = SD_MOUNT_POINT "/prf_00.txt";
 static FIL s_datfile;
 static FIL s_gpsfile;
 static FIL s_statefile;
-
-static pb_byte_t s_sensor_buffer[SENSOR_BUF_LEN];
-static pb_byte_t s_gps_buffer[GPS_BUF_LEN];
-static pb_byte_t s_state_buffer[STATE_BUF_LEN];
 
 static const char s_header[HEADER_LEN] = FIRMWARE_SPECIFIER;
 
@@ -176,18 +168,15 @@ Status sd_init(SdDevice* dev) {
 }
 
 Status sd_write_sensor_data(SensorFrame* frame) {
-    pb_ostream_t sensor_ostream =
-        pb_ostream_from_buffer(s_sensor_buffer, SENSOR_BUF_LEN);
+    size_t buf_size;
+    pb_byte_t* buf = create_sensor_buffer(frame, &buf_size);
 
-    bool encode_success = pb_encode_ex(&sensor_ostream, &SensorFrame_msg, frame,
-                                       PB_ENCODE_DELIMITED);
-    if (!encode_success) {
+    if (buf == NULL) {
         return STATUS_ERROR;
     }
 
     UINT bw;
-    if (f_write(&s_datfile, s_sensor_buffer, sensor_ostream.bytes_written,
-                &bw) != FR_OK) {
+    if (f_write(&s_datfile, buf, buf_size, &bw) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -195,18 +184,15 @@ Status sd_write_sensor_data(SensorFrame* frame) {
 }
 
 Status sd_write_gps_data(GpsFrame* frame) {
-    pb_ostream_t gps_ostream =
-        pb_ostream_from_buffer(s_gps_buffer, GPS_BUF_LEN);
+    size_t buf_size;
+    pb_byte_t* buf = create_gps_buffer(frame, &buf_size);
 
-    bool encode_success =
-        pb_encode_ex(&gps_ostream, &GpsFrame_msg, frame, PB_ENCODE_DELIMITED);
-    if (!encode_success) {
+    if (buf == NULL) {
         return STATUS_ERROR;
     }
 
     UINT bw;
-    if (f_write(&s_gpsfile, s_gps_buffer, gps_ostream.bytes_written, &bw) !=
-        FR_OK) {
+    if (f_write(&s_gpsfile, buf, buf_size, &bw) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -214,18 +200,15 @@ Status sd_write_gps_data(GpsFrame* frame) {
 }
 
 Status sd_write_state_data(StateFrame* frame) {
-    pb_ostream_t state_ostream =
-        pb_ostream_from_buffer(s_state_buffer, STATE_BUF_LEN);
+    size_t buf_size;
+    pb_byte_t* buf = create_state_buffer(frame, &buf_size);
 
-    bool encode_success = pb_encode_ex(&state_ostream, &StateFrame_msg, frame,
-                                       PB_ENCODE_DELIMITED);
-    if (!encode_success) {
+    if (buf == NULL) {
         return STATUS_ERROR;
     }
 
     UINT bw;
-    if (f_write(&s_statefile, s_state_buffer, state_ostream.bytes_written,
-                &bw) != FR_OK) {
+    if (f_write(&s_statefile, buf, buf_size, &bw) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
