@@ -33,7 +33,6 @@ static FOLD_INFTypeDef FoldStruct;
 static FILE_INFTypeDef FileStruct;
 static SD_Object_TypeDef sd_object;
 */
-extern USBD_HandleTypeDef USBD_Device;
 
 #define MTP_MAX_OBJECT_NUM 50
 
@@ -62,7 +61,8 @@ uint32_t foldsize;
 static uint8_t USBD_MTP_Itf_Init(void);
 static uint8_t USBD_MTP_Itf_DeInit(void);
 static uint32_t USBD_MTP_Itf_ReadData(uint32_t Param1, uint8_t *buff,
-                                      MTP_DataLengthTypeDef *data_length);
+                                      MTP_DataLengthTypeDef *data_length,
+                                      USBD_HandleTypeDef *pdev);
 static uint16_t USBD_MTP_Itf_Create_NewObject(MTP_ObjectInfoTypeDef ObjectInfo,
                                               uint32_t objhandle);
 
@@ -138,13 +138,15 @@ static void traverse_fs(char path[LFS_NAME_MAX + 1], uint32_t parent) {
             memcpy(mtp_files[mtp_file_idx].Filename, info.name,
                    strlen(info.name) + 1);
             mtp_files[mtp_file_idx].Storage_id = mtp_file_idx + 1;
-            mtp_files[mtp_file_idx].ObjectFormat = MTP_OBJ_FORMAT_TEXT;
+            mtp_files[mtp_file_idx].ObjectFormat = MTP_OBJ_FORMAT_UNDEFINED;
             mtp_files[mtp_file_idx].ParentObject =
                 parent == 0xFFFFFFFF ? 0xFFFFFFFF : parent + 1;
             mtp_files[mtp_file_idx].AssociationType = 0;
             mtp_files[mtp_file_idx].AssociationDesc = 0;
             mtp_files[mtp_file_idx].ObjectCompressedSize = info.size;
-            mtp_files[parent].ObjectCompressedSize++;
+            if (parent != 0xFFFFFFFF) {
+                mtp_files[parent].ObjectCompressedSize++;
+            }
             mtp_file_idx++;
         } else {
             if (mtp_file_idx >= MTP_MAX_OBJECT_NUM) {
@@ -161,12 +163,8 @@ static void traverse_fs(char path[LFS_NAME_MAX + 1], uint32_t parent) {
             mtp_files[mtp_file_idx].AssociationDesc = 0;
             mtp_files[mtp_file_idx].ObjectCompressedSize = 0;
             mtp_file_idx++;
-            // lfs_dir_close(&g_fs, &dir);
+
             traverse_fs(info.name, mtp_file_idx - 1);
-            // int err = lfs_dir_open(&g_fs, &dir, path);
-            // if (err) {
-            //     return;
-            // }
         }
     }
     lfs_dir_close(&g_fs, &dir);
@@ -431,7 +429,8 @@ static uint16_t USBD_MTP_Itf_DeleteObject(uint32_t Param1) {
  * @retval necessary information for next read/finish reading
  */
 static uint32_t USBD_MTP_Itf_ReadData(uint32_t Param1, uint8_t *buff,
-                                      MTP_DataLengthTypeDef *data_length) {
+                                      MTP_DataLengthTypeDef *data_length,
+                                      USBD_HandleTypeDef *pdev) {
     if (g_fs.cfg) {
         // Open file
         lfs_file_t file;
@@ -458,12 +457,15 @@ static uint32_t USBD_MTP_Itf_ReadData(uint32_t Param1, uint8_t *buff,
             return 0;
         }
 
+        USBD_MTP_HandleTypeDef *hmtp =
+            (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+
         // Read data
-        lfs_ssize_t read =
-            lfs_file_read(&g_fs, &file, buff,
-                          MTP_DATA_MAX_HS_PACKET_SIZE - MTP_CONT_HEADER_SIZE);
+        lfs_ssize_t read;
+        read = lfs_file_read(&g_fs, &file, buff, (uint32_t)hmtp->MaxPcktLen);
         if (read < 0) {
             lfs_file_close(&g_fs, &file);
+            data_length->readbytes = 0;
             return 0;
         }
 
@@ -473,9 +475,6 @@ static uint32_t USBD_MTP_Itf_ReadData(uint32_t Param1, uint8_t *buff,
 
         // Close file
         lfs_file_close(&g_fs, &file);
-
-    } else {
-        return 0;
     }
 
     return 0U;

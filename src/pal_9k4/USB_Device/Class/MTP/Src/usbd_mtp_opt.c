@@ -346,6 +346,7 @@ void USBD_MTP_OPT_GetObject(USBD_HandleTypeDef  *pdev)
   USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
   USBD_MTP_ItfTypeDef     *hmtpif = (USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId];
 
+  hmtp->GenericContainer.code = MTP_OP_GET_OBJECT;
   hmtp->GenericContainer.length = hmtpif->GetContainerLength(hmtp->OperationsContainer.Param1);
   hmtp->GenericContainer.trans_id = hmtp->OperationsContainer.trans_id;
   hmtp->GenericContainer.type = MTP_CONT_TYPE_DATA;

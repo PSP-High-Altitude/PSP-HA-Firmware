@@ -127,9 +127,9 @@ void init_task() {
     }
 
     MX_USB_DEVICE_Init(usb_mode);
-    usb_initialized = 1;
 
     DELAY(4700);
+    usb_initialized = 1;
 
     // One beep for initialization complete
     gpio_write(PIN_RED, GPIO_LOW);

@@ -77,6 +77,7 @@ void SystemClock_Config() {
     PeriphClkInitStruct.Usart234578ClockSelection =
         RCC_USART234578CLKSOURCE_HSI;
     PeriphClkInitStruct.SdmmcClockSelection = RCC_SDMMCCLKSOURCE_PLL;
+    PeriphClkInitStruct.UsbClockSelection = RCC_USBCLKSOURCE_HSI48;
 
     HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
 

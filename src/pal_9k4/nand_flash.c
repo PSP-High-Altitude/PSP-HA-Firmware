@@ -213,14 +213,15 @@ static Status nand_flash_open_files() {
 }
 
 Status nand_flash_write_sensor_data(SensorFrame* frame) {
-    size_t buf_size;
+    size_t buf_size = 0;
     pb_byte_t* buf = create_sensor_buffer(frame, &buf_size);
 
     if (buf == NULL) {
         return STATUS_ERROR;
     }
 
-    if (lfs_file_write(&g_fs, &s_datfile, buf, buf_size) != LFS_ERR_OK) {
+    if (lfs_file_write(&g_fs, &s_datfile, (uint8_t*)buf, buf_size) !=
+        LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -235,7 +236,8 @@ Status nand_flash_write_gps_data(GpsFrame* frame) {
         return STATUS_ERROR;
     }
 
-    if (lfs_file_write(&g_fs, &s_gpsfile, buf, buf_size) != LFS_ERR_OK) {
+    if (lfs_file_write(&g_fs, &s_gpsfile, (uint8_t*)buf, buf_size) !=
+        LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -250,7 +252,8 @@ Status nand_flash_write_state_data(StateFrame* frame) {
         return STATUS_ERROR;
     }
 
-    if (lfs_file_write(&g_fs, &s_statefile, buf, buf_size) != LFS_ERR_OK) {
+    if (lfs_file_write(&g_fs, &s_statefile, (uint8_t*)buf, buf_size) !=
+        LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -263,7 +266,8 @@ Status nand_flash_dump_prf_stats(char stats[]) {
 
     // Create performance dump file
     if (lfs_file_open(&g_fs, &prffile, s_prffname,
-                      LFS_O_APPEND | LFS_O_CREAT) != LFS_ERR_OK) {
+                      LFS_O_APPEND | LFS_O_CREAT | LFS_O_WRONLY) !=
+        LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -275,7 +279,8 @@ Status nand_flash_dump_prf_stats(char stats[]) {
     }
 
     // Write the stats
-    bw += lfs_file_write(&g_fs, &prffile, stats, strlen(stats));
+    size = strlen(stats);
+    bw += lfs_file_write(&g_fs, &prffile, stats, size);
 
     // Check that something was written
     if (bw == 0) {

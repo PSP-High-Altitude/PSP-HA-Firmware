@@ -14,6 +14,8 @@ pb_byte_t* create_sensor_buffer(SensorFrame* frame, size_t* size) {
         return NULL;
     }
 
+    *size = sensor_ostream.bytes_written;
+
     return s_sensor_buffer;
 }
 
@@ -27,6 +29,8 @@ pb_byte_t* create_gps_buffer(GpsFrame* frame, size_t* size) {
         return NULL;
     }
 
+    *size = gps_ostream.bytes_written;
+
     return s_gps_buffer;
 }
 
@@ -39,6 +43,8 @@ pb_byte_t* create_state_buffer(StateFrame* frame, size_t* size) {
     if (!encode_success) {
         return NULL;
     }
+
+    *size = state_ostream.bytes_written;
 
     return s_state_buffer;
 }

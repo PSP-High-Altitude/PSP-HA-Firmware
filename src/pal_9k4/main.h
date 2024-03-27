@@ -23,7 +23,9 @@
 #define PIN_USB_MODE PIN_PB7
 
 // Storage
+#ifdef DEBUG
 #define NAND_ALLOW_REFORMAT
+#endif
 #define NAND_MAX_FLIGHTS 10
 
 #endif  // MAIN_H
