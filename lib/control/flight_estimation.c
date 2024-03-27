@@ -1,6 +1,7 @@
 #include "flight_estimation.h"
 
 #include "accel_est.h"
+#include "backup.h"
 #include "pressure_altitude.h"
 #include "pyros.h"
 #include "timer.h"
@@ -8,11 +9,17 @@
 #define BUFFER_AVERAGE(buffer) (buffer->sum / buffer->count)
 #define BUFFER_FULL(buffer) (buffer->count == buffer->size)
 
-void fp_init(FlightPhase* s_flight_phase, StateEst* current_state,
-             Vector* imu_up, Vector* high_g_up, AverageBuffer* acc_buffer,
+void fp_init(FlightPhase* flight_phase, StateEst* current_state, Vector* imu_up,
+             Vector* high_g_up, AverageBuffer* acc_buffer,
              AverageBuffer* baro_buffer) {
-    *s_flight_phase = FP_INIT;
-    *current_state = zeroState();
+    Backup* backup = get_backup_ptr();
+    if (backup->flight_state_valid) {
+        *flight_phase = backup->flight_phase;
+        *current_state = backup->state_est;
+    } else {
+        *flight_phase = FP_INIT;
+        *current_state = zeroState();
+    }
     switch (IMU_UP) {
         case -1:
             *imu_up = newVec(-1, 0, 0);
@@ -68,7 +75,7 @@ void fp_init(FlightPhase* s_flight_phase, StateEst* current_state,
 }
 
 void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
-               FlightPhase* s_flight_phase, StateEst* current_state,
+               FlightPhase* flight_phase, StateEst* current_state,
                Vector* imu_up, Vector* high_g_up, AverageBuffer* acc_buffer,
                AverageBuffer* baro_buffer) {
     Vector new_accel;
@@ -135,13 +142,13 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
         push_to_average(pressureToAltitude(data->pressure), baro_buffer);
     }
 
-    switch (*s_flight_phase) {
+    switch (*flight_phase) {
         case FP_INIT:
-            // s_flight_phase = fp_init();
+            // flight_phase = fp_init();
             // z is up!!!
             // adjust for gravity
             if (current_state->time > 0) {
-                *s_flight_phase = FP_READY;
+                *flight_phase = FP_READY;
             }
             break;
         case FP_READY:
@@ -157,7 +164,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             }
             t0 = MILLIS();
             if (BUFFER_FULL(acc_buffer) && a_up_avg > ACC_BOOST) {
-                *s_flight_phase = FP_BOOST;
+                *flight_phase = FP_BOOST;
                 launch_warning(1);  // turn on launch warning
                 printf("BOOST at %.2fs\n", data->timestamp / 1000000.0);
             }
@@ -170,10 +177,10 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             }
             if ((current_state->velNED.z * -1 > VEL_FAST) ||
                 (valid_gps && (gps->vel_down * -1 > VEL_FAST))) {
-                *s_flight_phase = FP_FAST;
+                *flight_phase = FP_FAST;
                 printf("FAST at %.2fs\n", data->timestamp / 1000000.0);
             } else if (a_up_avg < ACC_COAST) {
-                *s_flight_phase = FP_COAST;
+                *flight_phase = FP_COAST;
                 printf("COAST at %.2fs\n", data->timestamp / 1000000.0);
             }
             break;
@@ -181,8 +188,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             update_accel_est(current_state, dt);
             if ((current_state->velNED.z * -1 < VEL_FAST) ||
                 (valid_gps && (gps->vel_down * -1 < VEL_FAST))) {
-                *s_flight_phase =
-                    FP_COAST;  // We are slow enough to be in coast
+                *flight_phase = FP_COAST;  // We are slow enough to be in coast
                 printf("COAST at %.2fs\n", data->timestamp / 1000000.0);
             }
             break;
@@ -191,7 +197,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             if (MILLIS() - t0 > DROGUE_LOCKOUT_MS &&
                 ((current_state->velNED.z * -1 < VEL_DROGUE) ||
                  (valid_gps && (gps->vel_down * -1 < VEL_DROGUE)))) {
-                *s_flight_phase = FP_DROGUE;
+                *flight_phase = FP_DROGUE;
                 launch_warning(0);    // turn off launch warning
                 fire_pyro(PYRO_DRG);  // fire drogue
                 printf("DROGUE at %.2fs\n", data->timestamp / 1000000.0);
@@ -216,7 +222,7 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             x_up_avg = BUFFER_AVERAGE(baro_buffer) - h0;
             if ((x_up_avg < HEIGHT_MAIN && BUFFER_FULL(baro_buffer)) ||
                 (valid_gps && gps->height_msl - gps_h0 < HEIGHT_MAIN)) {
-                *s_flight_phase = FP_MAIN;
+                *flight_phase = FP_MAIN;
                 fire_pyro(PYRO_MAIN);  // fire main
                 printf("MAIN at %.2fs\n", data->timestamp / 1000000.0);
             }
@@ -228,16 +234,21 @@ void fp_update(SensorFrame* data, GPS_Fix_TypeDef* gps,
             if (fabs(x_up_avg) < HEIGHT_LANDED ||
                 (valid_gps && fabs(gps->height_msl - gps_h0) < HEIGHT_LANDED) ||
                 (valid_gps && fabs(gps->vel_down * -1) < VEL_LANDED)) {
-                *s_flight_phase = FP_LANDED;
+                *flight_phase = FP_LANDED;
                 printf("LANDED at %.2fs\n", data->timestamp / 1000000.0);
             }
             break;
         case FP_LANDED:
             break;
         default:
-            *s_flight_phase = FP_INIT;
+            *flight_phase = FP_INIT;
             break;
     }
+
+    Backup* backup = get_backup_ptr();
+    backup->state_est = *current_state;
+    backup->flight_phase = *flight_phase;
+    backup->flight_state_valid = 1;
 }
 
 SensorData sensorFrame2SensorData(SensorFrame frame) {

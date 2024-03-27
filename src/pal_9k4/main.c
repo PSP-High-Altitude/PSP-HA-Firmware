@@ -5,6 +5,7 @@
 
 #include "USB_Device/App/usb_device.h"
 #include "USB_Device/App/usbd_cdc_if.h"
+#include "backup.h"
 #include "clocks.h"
 #include "data.h"
 #include "gpio/gpio.h"
@@ -88,13 +89,13 @@ int main(void) {
     HAL_Init();
     SystemClock_Config();
     init_timers();
+    init_backup();
     MX_USB_DEVICE_Init();
     gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLUP);
     gpio_write(PIN_RED, GPIO_HIGH);
 
     uint32_t init_error = 0;  // Set if error occurs during initialization
 
-    DELAY(4700);
     printf("Starting initialization...\n");
     init_error |= (EXPECT_OK(init_storage(), "init storage") != STATUS_OK) << 0;
     init_error |= (EXPECT_OK(init_sensors(), "init sensors") != STATUS_OK) << 1;
