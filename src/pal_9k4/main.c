@@ -88,8 +88,8 @@ void handle_pause() {
 int main(void) {
     HAL_Init();
     SystemClock_Config();
-    init_timers();
     init_backup();
+    init_timers();
     MX_USB_DEVICE_Init();
     gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLUP);
     gpio_write(PIN_RED, GPIO_HIGH);
@@ -159,6 +159,11 @@ void SysTick_Handler(void) {
 
     // Detect pause condition
     handle_pause();
+
+    // Update backed up timestamp
+    Backup *backup = get_backup_ptr();
+    backup->timestamp = MICROS();
+    backup->timestamp_valid = 1;
 
     if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
         /* Call tick handler */

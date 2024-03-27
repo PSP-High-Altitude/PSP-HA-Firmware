@@ -11,6 +11,9 @@
 #define BKPSRAM_SIZE 4096  // bytes
 
 typedef struct {
+    uint32_t timestamp_valid;
+    uint64_t timestamp;
+
     uint32_t flight_state_valid;
     FlightPhase flight_phase;
     StateEst state_est;

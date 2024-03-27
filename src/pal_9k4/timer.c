@@ -1,6 +1,7 @@
 #include "timer.h"
 
 #include "FreeRTOS.h"
+#include "backup.h"
 #include "stm32h7xx_hal.h"
 #include "task.h"
 
@@ -48,6 +49,16 @@ void init_timers(uint32_t sensor_interval_ms) {
     };
     HAL_TIM_Base_Init(&tim3_handle);
     HAL_TIM_SlaveConfigSynchro(&tim3_handle, &tim3_slave_conf);
+
+    // If we have a valid backed up timestamp value, set the counters to that
+    Backup* backup = get_backup_ptr();
+    if (backup->timestamp_valid) {
+        uint64_t tim2_count = (backup->timestamp & 0xFFFFFFFF);
+        uint64_t tim3_count = (backup->timestamp >> 32);
+
+        __HAL_TIM_SET_COUNTER(&tim2_handle, tim2_count);
+        __HAL_TIM_SET_COUNTER(&tim3_handle, tim3_count);
+    }
 
     HAL_TIM_Base_Start(&tim3_handle);
     HAL_TIM_Base_Start(&tim2_handle);

@@ -12,6 +12,7 @@ void init_backup() {
 
     // If pause is asserted, invalidate all the backups
     if (!gpio_read(PIN_PAUSE)) {
+        get_backup_ptr()->timestamp_valid = 0;
         get_backup_ptr()->flight_state_valid = 0;
     }
 }
