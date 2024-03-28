@@ -710,11 +710,14 @@ static lfs_stag_t lfs_dir_getslice(lfs_t *lfs, const lfs_mdir_t *dir,
     lfs_tag_t ntag = dir->etag;
     lfs_stag_t gdiff = 0;
 
+    // synthetic moves
     if (lfs_gstate_hasmovehere(&lfs->gdisk, dir->pair) &&
-            lfs_tag_id(gmask) != 0 &&
-            lfs_tag_id(lfs->gdisk.tag) <= lfs_tag_id(gtag)) {
-        // synthetic moves
-        gdiff -= LFS_MKTAG(0, 1, 0);
+            lfs_tag_id(gmask) != 0) {
+        if (lfs_tag_id(lfs->gdisk.tag) == lfs_tag_id(gtag)) {
+            return LFS_ERR_NOENT;
+        } else if (lfs_tag_id(lfs->gdisk.tag) < lfs_tag_id(gtag)) {
+            gdiff -= LFS_MKTAG(0, 1, 0);
+        }
     }
 
     // iterate over dir block backwards (for faster lookups)
@@ -3401,6 +3404,15 @@ static int lfs_file_sync_(lfs_t *lfs, lfs_file_t *file) {
 
     if ((file->flags & LFS_F_DIRTY) &&
             !lfs_pair_isnull(file->m.pair)) {
+        // before we commit metadata, we need sync the disk to make sure
+        // data writes don't complete after metadata writes
+        if (!(file->flags & LFS_F_INLINE)) {
+            err = lfs_bd_sync(lfs, &lfs->pcache, &lfs->rcache, false);
+            if (err) {
+                return err;
+            }
+        }
+
         // update dir entry
         uint16_t type;
         const void *buffer;
@@ -6443,54 +6455,3 @@ int lfs_migrate(lfs_t *lfs, const struct lfs_config *cfg) {
 }
 #endif
 
-// From user geky on github
-int lfs_ls(lfs_t *lfs, const char *path) {
-    lfs_dir_t dir;
-    int err = lfs_dir_open(lfs, &dir, path);
-    if (err) {
-        return err;
-    }
-
-    struct lfs_info info;
-    while (true) {
-        int res = lfs_dir_read(lfs, &dir, &info);
-        if (res < 0) {
-            lfs_dir_close(lfs, &dir);
-            return res;
-        }
-
-        if (res == 0) {
-            break;
-        }
-
-        switch (info.type) {
-            case LFS_TYPE_REG:
-                printf("reg ");
-                break;
-            case LFS_TYPE_DIR:
-                printf("dir ");
-                break;
-            default:
-                printf("?   ");
-                break;
-        }
-
-        static const char *prefixes[] = {"", "K", "M", "G"};
-        for (int i = sizeof(prefixes) / sizeof(prefixes[0]) - 1; i >= 0; i--) {
-            if (info.size >= (1 << 10 * i) - 1) {
-                printf("%*lu%sB ", 4 - (i != 0), info.size >> 10 * i,
-                       prefixes[i]);
-                break;
-            }
-        }
-
-        printf("%s\n", info.name);
-    }
-
-    err = lfs_dir_close(lfs, &dir);
-    if (err) {
-        return err;
-    }
-
-    return 0;
-}

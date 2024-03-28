@@ -97,6 +97,9 @@ void storage_task() {
         // Set disk activity warning LED
         gpio_write(PIN_YELLOW, GPIO_HIGH);
 
+        // Attempt to reinit nand if files are closed
+        nand_flash_reinit();
+
         // Empty the sensor queue
         SensorFrame sensor_frame;
         while (xQueueReceive(s_sensor_queue_handle, &sensor_frame, 1) ==
