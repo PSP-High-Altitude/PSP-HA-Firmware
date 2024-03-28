@@ -353,9 +353,10 @@ static uint8_t USBD_MTP_Setup(USBD_HandleTypeDef *pdev, USBD_SetupReqTypedef *re
       switch (req->bRequest)
       {
         case  MTP_REQ_CANCEL:
-          len = MIN(hmtp->MaxPcktLen, req->wLength);
-          (void)USBD_CtlPrepareRx(pdev, (uint8_t *)(hmtp->rx_buff), len);
-          break;
+            USBD_MTP_STORAGE_Cancel(pdev, MTP_PHASE_IDLE);
+            len = MIN(hmtp->MaxPcktLen, req->wLength);
+            (void)USBD_CtlPrepareRx(pdev, (uint8_t *)(hmtp->rx_buff), len);
+            break;
 
         case MTP_REQ_GET_EXT_EVENT_DATA:
           break;

@@ -437,7 +437,8 @@ static const uint16_t SuppOP[] = { MTP_OP_GET_DEVICE_INFO, MTP_OP_OPEN_SESSION, 
                                    MTP_OP_GET_OBJECT_PROP_DESC, MTP_OP_GET_OBJECT_PROP_REFERENCES
                                  };
 
-static const uint16_t SuppEvents[] = {MTP_EVENT_OBJECTADDED};
+static const uint16_t SuppEvents[] = {MTP_EVENT_CANCELTRANSACTION,
+                                      MTP_EVENT_OBJECTADDED};
 static const uint16_t SuppImgFormat[] = {MTP_OBJ_FORMAT_UNDEFINED, MTP_OBJ_FORMAT_TEXT, MTP_OBJ_FORMAT_ASSOCIATION,
                                          MTP_OBJ_FORMAT_EXECUTABLE, MTP_OBJ_FORMAT_WAV, MTP_OBJ_FORMAT_MP3,
                                          MTP_OBJ_FORMAT_EXIF_JPEG, MTP_OBJ_FORMAT_MPEG, MTP_OBJ_FORMAT_MP4_CONTAINER,

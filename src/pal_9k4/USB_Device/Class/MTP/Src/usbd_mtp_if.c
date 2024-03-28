@@ -20,6 +20,7 @@
 #include "usbd_mtp_if.h"
 
 #include "nand_flash.h"
+#include "timer.h"
 #include "usbd_mtp_opt.h"
 
 /* Private typedef -----------------------------------------------------------*/
@@ -54,6 +55,8 @@ uint32_t sc_buff[MTP_IF_SCRATCH_BUFF_SZE / 4U];
 uint32_t sc_len = 0U;
 uint32_t pckt_cnt = 1U;
 uint32_t foldsize;
+
+lfs_file_t curr_file;
 
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
@@ -371,7 +374,7 @@ static void USBD_MTP_Itf_WriteData(uint16_t len, uint8_t *buff) {
 static uint32_t USBD_MTP_Itf_GetContainerLength(uint32_t Param1) {
     uint32_t idx = Param1 - 1;
 
-    return mtp_files[idx].ObjectCompressedSize;
+    return mtp_files[idx].ObjectCompressedSize + MTP_CONT_HEADER_SIZE;
 }
 
 /**
@@ -432,28 +435,22 @@ static uint32_t USBD_MTP_Itf_ReadData(uint32_t Param1, uint8_t *buff,
                                       MTP_DataLengthTypeDef *data_length,
                                       USBD_HandleTypeDef *pdev) {
     if (g_fs.cfg) {
-        // Open file
-        lfs_file_t file;
-        lfs_ssize_t res = lfs_file_open(
-            &g_fs, &file, (char *)mtp_files[Param1 - 1].Filename, LFS_O_RDONLY);
-        if (res < 0) {
-            return 0;
-        }
-
-        // Get file size if not already done
         if (data_length->temp_length == 0) {
-            lfs_soff_t size = lfs_file_size(&g_fs, &file);
-            if (size < 0) {
-                lfs_file_close(&g_fs, &file);
+            // Open file on first read
+            lfs_ssize_t res = lfs_file_open(
+                &g_fs, &curr_file, (char *)mtp_files[Param1 - 1].Filename,
+                LFS_O_RDONLY);
+            if (res < 0) {
+                data_length->totallen = 0;
                 return 0;
             }
-            data_length->totallen = size;
         }
 
         // Go to last read position
-        if (lfs_file_seek(&g_fs, &file, data_length->temp_length,
+        if (lfs_file_seek(&g_fs, &curr_file, data_length->temp_length,
                           LFS_SEEK_SET) < 0) {
-            lfs_file_close(&g_fs, &file);
+            lfs_file_close(&g_fs, &curr_file);
+            data_length->readbytes = 0;
             return 0;
         }
 
@@ -462,9 +459,16 @@ static uint32_t USBD_MTP_Itf_ReadData(uint32_t Param1, uint8_t *buff,
 
         // Read data
         lfs_ssize_t read;
-        read = lfs_file_read(&g_fs, &file, buff, (uint32_t)hmtp->MaxPcktLen);
+        if (data_length->temp_length == 0) {
+            read = lfs_file_read(
+                &g_fs, &curr_file, buff,
+                (uint32_t)hmtp->MaxPcktLen - MTP_CONT_HEADER_SIZE);
+        } else {
+            read = lfs_file_read(&g_fs, &curr_file, buff,
+                                 (uint32_t)hmtp->MaxPcktLen);
+        }
         if (read < 0) {
-            lfs_file_close(&g_fs, &file);
+            lfs_file_close(&g_fs, &curr_file);
             data_length->readbytes = 0;
             return 0;
         }
@@ -473,8 +477,11 @@ static uint32_t USBD_MTP_Itf_ReadData(uint32_t Param1, uint8_t *buff,
         data_length->temp_length += read;
         data_length->readbytes = read;
 
-        // Close file
-        lfs_file_close(&g_fs, &file);
+        // Check if all data read
+        if (data_length->temp_length == data_length->totallen) {
+            lfs_file_close(&g_fs, &curr_file);
+            return 0;
+        }
     }
 
     return 0U;
@@ -487,9 +494,12 @@ static uint32_t USBD_MTP_Itf_ReadData(uint32_t Param1, uint8_t *buff,
  * @retval None
  */
 static void USBD_MTP_Itf_Cancel(uint32_t Phase) {
-    UNUSED(Phase);
-
     /* Make sure to close open file while canceling transaction */
+    if (Phase == 0) {
+        if (g_fs.cfg) {
+            lfs_file_close(&g_fs, &curr_file);
+        }
+    }
 
     return;
 }

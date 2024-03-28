@@ -19,6 +19,8 @@
 /* Includes ------------------------------------------------------------------*/
 #include "usbd_mtp_storage.h"
 
+#include "timer.h"
+
 /* Private typedef -----------------------------------------------------------*/
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
@@ -104,19 +106,23 @@ uint8_t USBD_MTP_STORAGE_ReadData(USBD_HandleTypeDef  *pdev)
     case READ_FIRST_DATA:
       /* Reset the data length */
       MTP_DataLength.temp_length = 0U;
+      MTP_DataLength.totallen =
+          hmtp->GenericContainer.length - MTP_CONT_HEADER_SIZE;
+      MTP_DataLength.readbytes = 0U;
 
       /* Perform the low layer read operation on the scratch buffer */
-      //(void)((USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId])
-      //    ->ReadData(hmtp->OperationsContainer.Param1,
-      //               (uint8_t *)data_buff + MTP_CONT_HEADER_SIZE,
-      //               &MTP_DataLength, pdev);
+      (void)((USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId])
+          ->ReadData(hmtp->OperationsContainer.Param1,
+                     (uint8_t *)data_buff + MTP_CONT_HEADER_SIZE,
+                     &MTP_DataLength, pdev);
 
       /* Add the container header to the data buffer */
       (void)USBD_memcpy((uint8_t *)data_buff, (uint8_t *)&hmtp->GenericContainer, MTP_CONT_HEADER_SIZE);
 
       /* Start USB data transmission to the host */
-      (void)USBD_MTP_STORAGE_SendData(pdev, (uint8_t *)data_buff,
-                                      MTP_CONT_HEADER_SIZE);
+      (void)USBD_MTP_STORAGE_SendData(
+          pdev, (uint8_t *)data_buff,
+          MTP_DataLength.readbytes + MTP_CONT_HEADER_SIZE);
 
       /* Continue to the next packets sending */
       ReadDataStatus = READ_REST_OF_DATA;
