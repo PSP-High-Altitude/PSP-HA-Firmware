@@ -27,10 +27,11 @@ typedef struct {
 } OSpiDevice;
 
 Status ospi_auto_poll_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
-                          OSPI_AutoPollingTypeDef* cfg);
+                          OSPI_AutoPollingTypeDef* cfg, uint64_t timeout);
 Status ospi_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd);
-Status ospi_write(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
-                  uint8_t* tx_buf);
-Status ospi_read(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd, uint8_t* rx_buf);
+Status ospi_write(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd, uint8_t* tx_buf,
+                  uint64_t timeout);
+Status ospi_read(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd, uint8_t* rx_buf,
+                 uint64_t timeout);
 
 #endif

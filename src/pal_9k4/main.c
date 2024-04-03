@@ -26,7 +26,7 @@ extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
 uint8_t usb_initialized = 0;
 char usb_serial_buffer[SERIAL_BUFFER_SIZE];
 uint32_t usb_serial_buffer_idx = 0;
-uint8_t usb_mode = 1;
+uint8_t usb_mode = 1;  // 0 = MTP, 1 = Normal
 
 // Sorry about preprocessor abuse, but this really does make the code cleaner
 #define TASK_STACK_SIZE 2048
@@ -115,7 +115,8 @@ void init_task() {
     uint32_t init_error = 0;  // Set if error occurs during initialization
 
     printf("Starting initialization...\n");
-    init_error |= (EXPECT_OK(init_storage(), "init storage") != STATUS_OK) << 0;
+    init_error |=
+        (EXPECT_OK(init_storage(usb_mode), "init storage") != STATUS_OK) << 0;
     if (usb_mode == 1) {
         init_error |= (EXPECT_OK(init_sensors(), "init sensors") != STATUS_OK)
                       << 1;

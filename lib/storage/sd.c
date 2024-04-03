@@ -167,48 +167,39 @@ Status sd_init(SdDevice* dev) {
     return STATUS_OK;
 }
 
-Status sd_write_sensor_data(SensorFrame* frame) {
-    size_t buf_size;
-    pb_byte_t* buf = create_sensor_buffer(frame, &buf_size);
-
-    if (buf == NULL) {
+Status sd_write_sensor_data(pb_byte_t* frame, size_t size) {
+    if (frame == NULL) {
         return STATUS_ERROR;
     }
 
     UINT bw;
-    if (f_write(&s_datfile, buf, buf_size, &bw) != FR_OK) {
+    if (f_write(&s_datfile, frame, size, &bw) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
     return STATUS_OK;
 }
 
-Status sd_write_gps_data(GpsFrame* frame) {
-    size_t buf_size;
-    pb_byte_t* buf = create_gps_buffer(frame, &buf_size);
-
-    if (buf == NULL) {
+Status sd_write_gps_data(pb_byte_t* frame, size_t size) {
+    if (frame == NULL) {
         return STATUS_ERROR;
     }
 
     UINT bw;
-    if (f_write(&s_gpsfile, buf, buf_size, &bw) != FR_OK) {
+    if (f_write(&s_gpsfile, frame, size, &bw) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
     return STATUS_OK;
 }
 
-Status sd_write_state_data(StateFrame* frame) {
-    size_t buf_size;
-    pb_byte_t* buf = create_state_buffer(frame, &buf_size);
-
-    if (buf == NULL) {
+Status sd_write_state_data(pb_byte_t* frame, size_t size) {
+    if (frame == NULL) {
         return STATUS_ERROR;
     }
 
     UINT bw;
-    if (f_write(&s_statefile, buf, buf_size, &bw) != FR_OK) {
+    if (f_write(&s_statefile, frame, size, &bw) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 

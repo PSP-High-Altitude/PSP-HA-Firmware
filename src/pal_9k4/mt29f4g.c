@@ -22,7 +22,7 @@ static Status poll_oip() {
     OSPI_AutoPollingTypeDef auto_conf = mt29f4g_default_auto;
     auto_conf.Mask = MT29F4G_STATUS_OIP;
     auto_conf.Match = 0U;
-    return ospi_auto_poll_cmd(&dev, &cmd, &auto_conf);
+    return ospi_auto_poll_cmd(&dev, &cmd, &auto_conf, 100);
 }
 
 /*
@@ -99,7 +99,7 @@ static Status read_cache_x4(uint32_t col_addr, uint32_t plane, uint8_t *buffer,
     cmd.Instruction = MT29F4G_CMD_READ_FROM_CACHE_X4.op_code;
     cmd.NbData = size;
     cmd.DataMode = HAL_OSPI_DATA_4_LINES;
-    return (ospi_read(&dev, &cmd, buffer));
+    return (ospi_read(&dev, &cmd, buffer, 100));
 }
 
 static Status write_enable() {
@@ -131,7 +131,7 @@ static Status program_load_x4(uint32_t col_addr, uint32_t plane,
     cmd.Instruction = MT29F4G_CMD_PROGRAM_LOAD_X4.op_code;
     cmd.NbData = size;
     cmd.DataMode = HAL_OSPI_DATA_4_LINES;
-    return (ospi_write(&dev, &cmd, buffer));
+    return (ospi_write(&dev, &cmd, buffer, 100));
 }
 
 static Status program_execute(uint32_t row_addr) {
@@ -176,7 +176,7 @@ Status mt29f4g_init() {
     cmd.NbData = MT29F4G_CMD_SET_FEATURES.n_data;
     cmd.Instruction = MT29F4G_CMD_SET_FEATURES.op_code;
     cmd.DataMode = HAL_OSPI_DATA_1_LINE;
-    if (ospi_write(&dev, &cmd, tx_buf) != STATUS_OK) {
+    if (ospi_write(&dev, &cmd, tx_buf, 100) != STATUS_OK) {
         return STATUS_ERROR;
     }
 
@@ -189,7 +189,7 @@ Status mt29f4g_init() {
     cmd.NbData = MT29F4G_CMD_SET_FEATURES.n_data;
     cmd.Instruction = MT29F4G_CMD_SET_FEATURES.op_code;
     cmd.DataMode = HAL_OSPI_DATA_1_LINE;
-    if (ospi_write(&dev, &cmd, tx_buf) != STATUS_OK) {
+    if (ospi_write(&dev, &cmd, tx_buf, 100) != STATUS_OK) {
         return STATUS_ERROR;
     }
 
@@ -221,7 +221,7 @@ Status mt29f4g_init() {
     cmd.NbData = MT29F4G_CMD_SET_FEATURES.n_data;
     cmd.Instruction = MT29F4G_CMD_SET_FEATURES.op_code;
     cmd.DataMode = HAL_OSPI_DATA_1_LINE;
-    if (ospi_write(&dev, &cmd, tx_buf) != STATUS_OK) {
+    if (ospi_write(&dev, &cmd, tx_buf, 100) != STATUS_OK) {
         return STATUS_ERROR;
     }
 
@@ -234,7 +234,7 @@ Status mt29f4g_init() {
     cmd.NbData = MT29F4G_CMD_SET_FEATURES.n_data;
     cmd.Instruction = MT29F4G_CMD_SET_FEATURES.op_code;
     cmd.DataMode = HAL_OSPI_DATA_1_LINE;
-    if (ospi_write(&dev, &cmd, tx_buf) != STATUS_OK) {
+    if (ospi_write(&dev, &cmd, tx_buf, 100) != STATUS_OK) {
         return STATUS_ERROR;
     }
 

@@ -218,11 +218,8 @@ static Status nand_flash_open_files() {
     return STATUS_OK;
 }
 
-Status nand_flash_write_sensor_data(SensorFrame* frame) {
-    size_t buf_size = 0;
-    pb_byte_t* buf = create_sensor_buffer(frame, &buf_size);
-
-    if (buf == NULL) {
+Status nand_flash_write_sensor_data(pb_byte_t* frame, size_t size) {
+    if (frame == NULL) {
         return STATUS_ERROR;
     }
 
@@ -230,7 +227,7 @@ Status nand_flash_write_sensor_data(SensorFrame* frame) {
         return STATUS_ERROR;
     }
 
-    if (lfs_file_write(&g_fs, &s_datfile, (uint8_t*)buf, buf_size) !=
+    if (lfs_file_write(&g_fs, &s_datfile, (uint8_t*)frame, size) !=
         LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
@@ -238,11 +235,8 @@ Status nand_flash_write_sensor_data(SensorFrame* frame) {
     return STATUS_OK;
 }
 
-Status nand_flash_write_gps_data(GpsFrame* frame) {
-    size_t buf_size;
-    pb_byte_t* buf = create_gps_buffer(frame, &buf_size);
-
-    if (buf == NULL) {
+Status nand_flash_write_gps_data(pb_byte_t* frame, size_t size) {
+    if (frame == NULL) {
         return STATUS_ERROR;
     }
 
@@ -250,7 +244,7 @@ Status nand_flash_write_gps_data(GpsFrame* frame) {
         return STATUS_ERROR;
     }
 
-    if (lfs_file_write(&g_fs, &s_gpsfile, (uint8_t*)buf, buf_size) !=
+    if (lfs_file_write(&g_fs, &s_gpsfile, (uint8_t*)frame, size) !=
         LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
@@ -258,11 +252,8 @@ Status nand_flash_write_gps_data(GpsFrame* frame) {
     return STATUS_OK;
 }
 
-Status nand_flash_write_state_data(StateFrame* frame) {
-    size_t buf_size;
-    pb_byte_t* buf = create_state_buffer(frame, &buf_size);
-
-    if (buf == NULL) {
+Status nand_flash_write_state_data(pb_byte_t* frame, size_t size) {
+    if (frame == NULL) {
         return STATUS_ERROR;
     }
 
@@ -270,7 +261,7 @@ Status nand_flash_write_state_data(StateFrame* frame) {
         return STATUS_ERROR;
     }
 
-    if (lfs_file_write(&g_fs, &s_statefile, (uint8_t*)buf, buf_size) !=
+    if (lfs_file_write(&g_fs, &s_statefile, (uint8_t*)frame, size) !=
         LFS_ERR_OK) {
         return STATUS_HARDWARE_ERROR;
     }

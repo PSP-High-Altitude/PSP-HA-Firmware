@@ -49,6 +49,7 @@ typedef struct {
 
 mtp_object_info mtp_files[MTP_MAX_OBJECT_NUM];
 uint32_t mtp_file_idx = 0;
+uint32_t mtp_fs_size = 0;
 
 uint32_t parent = 0;
 uint32_t sc_buff[MTP_IF_SCRATCH_BUFF_SZE / 4U];
@@ -117,6 +118,10 @@ USBD_MTP_ItfTypeDef USBD_MTP_fops = {
  * @retval status value
  */
 static void traverse_fs(char path[LFS_NAME_MAX + 1], uint32_t parent) {
+    if (g_fs.cfg == NULL) {
+        return;
+    }
+
     lfs_dir_t dir;
     int err = lfs_dir_open(&g_fs, &dir, path);
     if (err) {
@@ -147,6 +152,7 @@ static void traverse_fs(char path[LFS_NAME_MAX + 1], uint32_t parent) {
             mtp_files[mtp_file_idx].AssociationType = 0;
             mtp_files[mtp_file_idx].AssociationDesc = 0;
             mtp_files[mtp_file_idx].ObjectCompressedSize = info.size;
+            mtp_fs_size += info.size;
             if (parent != 0xFFFFFFFF) {
                 mtp_files[parent].ObjectCompressedSize++;
             }
@@ -182,14 +188,6 @@ static uint8_t USBD_MTP_Itf_Init(void) {
     mtp_files[0].AssociationDesc = 0;
     mtp_files[0].ObjectCompressedSize = 0;
     traverse_fs("/", 0xFFFFFFFF);
-    for (int i = 0; i < mtp_file_idx; i++) {
-        printf(
-            "File %u\nStorage ID: %lu\nObject Format: %u\nParent Object: "
-            "%lu\nAssociation: %lu,%lu\nObject Size: %lu\n",
-            i, mtp_files[i].Storage_id, mtp_files[i].ObjectFormat,
-            mtp_files[i].ParentObject, mtp_files[i].AssociationType,
-            mtp_files[i].AssociationDesc, mtp_files[i].ObjectCompressedSize);
-    }
     return 0;
 }
 
@@ -331,9 +329,8 @@ static uint64_t USBD_MTP_Itf_GetMaxCapability(void) {
  */
 static uint64_t USBD_MTP_Itf_GetFreeSpaceInBytes(void) {
     if (g_fs.cfg) {
-        lfs_ssize_t fs_size = lfs_fs_size(&g_fs);
         lfs_size_t fs_free =
-            (g_lfs_cfg->block_count * g_lfs_cfg->block_size) - fs_size;
+            (g_lfs_cfg->block_count * g_lfs_cfg->block_size) - mtp_fs_size;
 
         return (uint64_t)fs_free;
     } else {

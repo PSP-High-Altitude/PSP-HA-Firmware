@@ -17,11 +17,11 @@ Status nand_flash_deinit();
 
 Status nand_flash_flush();
 
-Status nand_flash_write_sensor_data(SensorFrame* sensor_frame);
+Status nand_flash_write_sensor_data(pb_byte_t* sensor_frame, size_t size);
 
-Status nand_flash_write_gps_data(GpsFrame* gps_frame);
+Status nand_flash_write_gps_data(pb_byte_t* gps_frame, size_t size);
 
-Status nand_flash_write_state_data(StateFrame* state_frame);
+Status nand_flash_write_state_data(pb_byte_t* state_frame, size_t size);
 
 Status nand_flash_dump_prf_stats(char stats[]);
 

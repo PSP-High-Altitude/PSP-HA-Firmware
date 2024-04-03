@@ -4,6 +4,7 @@
 
 #include "board.h"
 #include "nand_flash.h"
+#include "pb_create.h"
 #include "sd.h"
 #include "sdmmc/sdmmc.h"
 #include "timer.h"
@@ -39,23 +40,33 @@ static bool s_pause_store;
 uint64_t g_last_tickless_idle_entry_us;
 uint64_t g_total_tickless_idle_us;
 
+uint8_t g_usb_mode;
+
 /*****************/
 /* API FUNCTIONS */
 /*****************/
-Status init_storage() {
+Status init_storage(uint8_t usb_mode) {
+    // Set USB mode
+    g_usb_mode = usb_mode;
+
     // For some reason SD init CANNOT go after queue creation
-    Status sd_status = EXPECT_OK(sd_init(&s_sd_conf), "SD init");
-    sd_status |= EXPECT_OK(nand_flash_init(), "NAND init");
+    Status sd_status = EXPECT_OK(nand_flash_init(), "NAND init");
+    if (g_usb_mode) {
+        sd_status |= EXPECT_OK(sd_init(&s_sd_conf), "SD init");
+    }
 
     // Initialize pause flag
     s_pause_store = false;
 
-    // Create the queues
-    s_sensor_queue_handle =
-        xQueueCreate(SENSOR_QUEUE_LENGTH, SENSOR_QUEUE_ITEM_SIZE);
-    s_state_queue_handle =
-        xQueueCreate(STATE_QUEUE_LENGTH, STATE_QUEUE_ITEM_SIZE);
-    s_gps_queue_handle = xQueueCreate(GPS_QUEUE_LENGTH, GPS_QUEUE_ITEM_SIZE);
+    if (g_usb_mode) {
+        // Create the queues
+        s_sensor_queue_handle =
+            xQueueCreate(SENSOR_QUEUE_LENGTH, SENSOR_QUEUE_ITEM_SIZE);
+        s_state_queue_handle =
+            xQueueCreate(STATE_QUEUE_LENGTH, STATE_QUEUE_ITEM_SIZE);
+        s_gps_queue_handle =
+            xQueueCreate(GPS_QUEUE_LENGTH, GPS_QUEUE_ITEM_SIZE);
+    }
 
     return sd_status;
 }
@@ -104,22 +115,28 @@ void storage_task() {
         SensorFrame sensor_frame;
         while (xQueueReceive(s_sensor_queue_handle, &sensor_frame, 1) ==
                pdPASS) {
-            sd_write_sensor_data(&sensor_frame);
-            nand_flash_write_sensor_data(&sensor_frame);
+            size_t size;
+            pb_byte_t* buf = create_sensor_buffer(&sensor_frame, &size);
+            sd_write_sensor_data(buf, size);
+            nand_flash_write_sensor_data(buf, size);
         }
 
         // Empty the state queue
         StateFrame state_frame;
         while (xQueueReceive(s_state_queue_handle, &state_frame, 1) == pdPASS) {
-            sd_write_state_data(&state_frame);
-            nand_flash_write_state_data(&state_frame);
+            size_t size;
+            pb_byte_t* buf = create_sensor_buffer(&sensor_frame, &size);
+            sd_write_state_data(buf, size);
+            nand_flash_write_state_data(buf, size);
         }
 
         // Empty the GPS queue
         GpsFrame gps_frame;
         while (xQueueReceive(s_gps_queue_handle, &gps_frame, 1) == pdPASS) {
-            sd_write_gps_data(&gps_frame);
-            nand_flash_write_gps_data(&gps_frame);
+            size_t size;
+            pb_byte_t* buf = create_sensor_buffer(&sensor_frame, &size);
+            sd_write_gps_data(buf, size);
+            nand_flash_write_gps_data(buf, size);
         }
 
         // Flush everything to SD card

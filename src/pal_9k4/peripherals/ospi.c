@@ -131,63 +131,84 @@ Status ospi_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd) {
         return STATUS_PARAMETER_ERROR;
     }
     if (HAL_OSPI_Command(&ospi1_handle, cmd, 100) != HAL_OK) {
-        return STATUS_ERROR;
+        return STATUS_HARDWARE_ERROR;
     }
     return STATUS_OK;
 }
 
 Status ospi_auto_poll_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
-                          OSPI_AutoPollingTypeDef* cfg) {
+                          OSPI_AutoPollingTypeDef* cfg, uint64_t timeout) {
     if (ospi_setup(dev) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
     }
-    if (HAL_OSPI_Command(&ospi1_handle, cmd, 100) != HAL_OK) {
-        return STATUS_ERROR;
+    if (cmd->NbData != 1) {
+        return STATUS_PARAMETER_ERROR;
     }
-    if (HAL_OSPI_AutoPolling(&ospi1_handle, cfg, 100) != HAL_OK) {
-        return STATUS_ERROR;
+
+    uint64_t start_time = MILLIS();
+    while (MILLIS() - start_time < timeout) {
+        // Poll the device
+        uint32_t rx_buf;
+        if (HAL_OSPI_Command(&ospi1_handle, cmd, 10) != HAL_OK) {
+            return STATUS_HARDWARE_ERROR;
+        }
+        if (HAL_OSPI_Receive_DMA(&ospi1_handle, (uint8_t*)&rx_buf) != HAL_OK) {
+            return STATUS_HARDWARE_ERROR;
+        }
+
+        // Wait for the data to come
+        while (HAL_OSPI_GetState(&ospi1_handle) != HAL_OSPI_STATE_READY) {
+            MILLIS(1);
+        }
+
+        // Check if the data matches
+        rx_buf = cfg->MatchMode == HAL_OSPI_MATCH_MODE_AND ? rx_buf & cfg->Mask
+                                                           : rx_buf | cfg->Mask;
+        if (rx_buf == cfg->Match) {
+            return STATUS_OK;
+        }
     }
-    return STATUS_OK;
+    return STATUS_TIMEOUT_ERROR;
 }
 
-Status ospi_write(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
-                  uint8_t* tx_buf) {
+Status ospi_write(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd, uint8_t* tx_buf,
+                  uint64_t timeout) {
     if (ospi_setup(dev) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
     }
-    if (HAL_OSPI_Command(&ospi1_handle, cmd, 100) != HAL_OK) {
-        return STATUS_ERROR;
+    if (HAL_OSPI_Command(&ospi1_handle, cmd, 10) != HAL_OK) {
+        return STATUS_HARDWARE_ERROR;
     }
     if (HAL_OSPI_Transmit_DMA(&ospi1_handle, tx_buf) != HAL_OK) {
-        return STATUS_ERROR;
+        return STATUS_HARDWARE_ERROR;
     }
     uint64_t start_time = MILLIS();
     while (HAL_OSPI_GetState(&ospi1_handle) != HAL_OSPI_STATE_READY) {
-        if (MILLIS() - start_time > 500) {
-            return STATUS_ERROR;
+        if (MILLIS() - start_time > timeout) {
+            return STATUS_TIMEOUT_ERROR;
         }
-        DELAY_MICROS(100);
+        MILLIS(1);
     }
     return STATUS_OK;
 }
 
-Status ospi_read(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
-                 uint8_t* rx_buf) {
+Status ospi_read(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd, uint8_t* rx_buf,
+                 uint64_t timeout) {
     if (ospi_setup(dev) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
     }
-    if (HAL_OSPI_Command(&ospi1_handle, cmd, 100) != HAL_OK) {
-        return STATUS_ERROR;
+    if (HAL_OSPI_Command(&ospi1_handle, cmd, 10) != HAL_OK) {
+        return STATUS_HARDWARE_ERROR;
     }
     if (HAL_OSPI_Receive_DMA(&ospi1_handle, rx_buf) != HAL_OK) {
-        return STATUS_ERROR;
+        return STATUS_HARDWARE_ERROR;
     }
     uint64_t start_time = MILLIS();
     while (HAL_OSPI_GetState(&ospi1_handle) != HAL_OSPI_STATE_READY) {
-        if (MILLIS() - start_time > 500) {
-            return STATUS_ERROR;
+        if (MILLIS() - start_time > timeout) {
+            return STATUS_TIMEOUT_ERROR;
         }
-        DELAY_MICROS(100);
+        MILLIS(1);
     }
     return STATUS_OK;
 }
