@@ -291,7 +291,7 @@ Status nand_flash_dump_prf_stats(char stats[]) {
 
     // Write a timestamp
     char timestamp[32];
-    int size = snprintf(timestamp, 32, "%lu ms: ", (uint32_t)MILLIS());
+    int size = snprintf(timestamp, 32, "%lu ms:\n", (uint32_t)MILLIS());
     if (size > 0) {
         bw += lfs_file_write(&g_fs, &prffile, timestamp, size);
     }

@@ -56,3 +56,6 @@ Thumbs.db
 
 # STM32WL build
 stm32wle5/Debug
+
+# Logs
+logs

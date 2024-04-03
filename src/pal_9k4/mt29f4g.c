@@ -326,7 +326,7 @@ Status mt29f4g_erase_blocks(uint32_t block_start, uint32_t block_end) {
         if (write_enable() != STATUS_OK) {
             return STATUS_ERROR;
         }
-        if (block_erase(block_start) != STATUS_OK) {
+        if (block_erase(block_start << 6) != STATUS_OK) {
             return STATUS_ERROR;
         }
         if (poll_oip() != STATUS_OK) {
