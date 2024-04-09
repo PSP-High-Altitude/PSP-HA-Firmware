@@ -6,7 +6,7 @@
 #include "sensor.pb.h"
 #include "status.h"
 
-#define SENSOR_NORMAL_READ_INTERVAL_MS 20
+#define SENSOR_NORMAL_READ_INTERVAL_MS 10
 #define SENSOR_SLEEP_READ_INTERVAL_MS 1000
 
 #define GPS_NORMAL_READ_INTERVAL_MS 100

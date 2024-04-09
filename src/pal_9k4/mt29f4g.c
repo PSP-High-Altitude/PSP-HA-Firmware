@@ -25,7 +25,6 @@ static Status poll_oip() {
     return ospi_auto_poll_cmd(&dev, &cmd, &auto_conf, 100);
 }
 
-/*
 static uint8_t read_status() {
     OSPI_RegularCmdTypeDef cmd = mt29f4g_default_cmd;
     cmd.Address = MT29F4G_FEATURE_STATUS;
@@ -35,10 +34,9 @@ static uint8_t read_status() {
     cmd.Instruction = MT29F4G_CMD_GET_FEATURES.op_code;
     cmd.DataMode = HAL_OSPI_DATA_1_LINE;
     uint8_t status = 0xFF;
-    ospi_read(&dev, &cmd, &status);
+    ospi_read(&dev, &cmd, &status, 100);
     return status;
 }
-*/
 
 /*
 static Status poll_crbsy() {
@@ -347,6 +345,8 @@ Status mt29f4g_sync() {
     }
     return STATUS_OK;
 }
+
+uint8_t mt29f4g_status() { return read_status(); }
 
 int lfs_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
              void *buffer, lfs_size_t size) {

@@ -8,6 +8,8 @@
 #include "stm32h7xx_hal.h"
 
 #define MT29F4G_PAGE_SIZE 4096
+#define MT29F4G_SPARE_SIZE 64        // Metadata I
+#define MT29F4G_SPARE_OFFSET 0x1040  // Metadata I
 #define MT29F4G_PAGE_PER_BLOCK 64
 #define MT29F4G_BLOCK_COUNT 2048
 
@@ -38,6 +40,8 @@ Status mt29f4g_erase_blocks(uint32_t block_start, uint32_t block_end);
 Status mt29f4g_erase_chip();
 
 Status mt29f4g_sync();
+
+uint8_t mt29f4g_status();
 
 struct lfs_config *mt29f4g_get_lfs_config();
 

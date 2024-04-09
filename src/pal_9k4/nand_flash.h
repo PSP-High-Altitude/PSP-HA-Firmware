@@ -27,6 +27,6 @@ Status nand_flash_dump_prf_stats(char stats[]);
 
 // Prints the files and directories at the specified path
 // Returns an error code on failure
-int lfs_ls(lfs_t* lfs, const char* path);
+int yaffs_ls(const char* path);
 
 #endif  // NAND_FLASH_H

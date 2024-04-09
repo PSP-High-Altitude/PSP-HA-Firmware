@@ -95,71 +95,72 @@ uint8_t USBD_MTP_STORAGE_DeInit(USBD_HandleTypeDef  *pdev)
   */
 uint8_t USBD_MTP_STORAGE_ReadData(USBD_HandleTypeDef  *pdev)
 {
-  USBD_MTP_HandleTypeDef  *hmtp = (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
-  uint32_t *data_buff;
+    USBD_MTP_HandleTypeDef *hmtp =
+        (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+    uint32_t *data_buff;
 
-  /* Get the data buffer pointer from the low layer interface */
-  data_buff = ((USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId])->ScratchBuff;
+    /* Get the data buffer pointer from the low layer interface */
+    data_buff =
+        ((USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId])->ScratchBuff;
 
-  switch (ReadDataStatus)
-  {
-    case READ_FIRST_DATA:
-      /* Reset the data length */
-      MTP_DataLength.temp_length = 0U;
-      MTP_DataLength.totallen =
-          hmtp->GenericContainer.length - MTP_CONT_HEADER_SIZE;
-      MTP_DataLength.readbytes = 0U;
+    switch (ReadDataStatus) {
+        case READ_FIRST_DATA:
+            /* Reset the data length */
+            MTP_DataLength.temp_length = 0U;
+            MTP_DataLength.totallen =
+                hmtp->GenericContainer.length - MTP_CONT_HEADER_SIZE;
+            MTP_DataLength.readbytes = 0U;
 
-      /* Perform the low layer read operation on the scratch buffer */
-      (void)((USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId])
-          ->ReadData(hmtp->OperationsContainer.Param1,
-                     (uint8_t *)data_buff + MTP_CONT_HEADER_SIZE,
-                     &MTP_DataLength, pdev);
+            /* Perform the low layer read operation on the scratch buffer */
+            (void)((USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId])
+                ->ReadData(hmtp->OperationsContainer.Param1,
+                           (uint8_t *)data_buff + MTP_CONT_HEADER_SIZE,
+                           &MTP_DataLength, pdev);
 
-      /* Add the container header to the data buffer */
-      (void)USBD_memcpy((uint8_t *)data_buff, (uint8_t *)&hmtp->GenericContainer, MTP_CONT_HEADER_SIZE);
+            /* Add the container header to the data buffer */
+            (void)USBD_memcpy((uint8_t *)data_buff,
+                              (uint8_t *)&hmtp->GenericContainer,
+                              MTP_CONT_HEADER_SIZE);
 
-      /* Start USB data transmission to the host */
-      (void)USBD_MTP_STORAGE_SendData(
-          pdev, (uint8_t *)data_buff,
-          MTP_DataLength.readbytes + MTP_CONT_HEADER_SIZE);
+            /* Start USB data transmission to the host */
+            (void)USBD_MTP_STORAGE_SendData(
+                pdev, (uint8_t *)data_buff,
+                MTP_DataLength.readbytes + MTP_CONT_HEADER_SIZE);
 
-      /* Continue to the next packets sending */
-      ReadDataStatus = READ_REST_OF_DATA;
-      break;
+            /* Continue to the next packets sending */
+            ReadDataStatus = READ_REST_OF_DATA;
+            break;
 
-    case READ_REST_OF_DATA:
-      /* Perform the low layer read operation on the scratch buffer */
-      (void)((USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId])
-          ->ReadData(hmtp->OperationsContainer.Param1, (uint8_t *)data_buff,
-                     &MTP_DataLength, pdev);
+        case READ_REST_OF_DATA:
+            /* Perform the low layer read operation on the scratch buffer */
+            (void)((USBD_MTP_ItfTypeDef *)pdev->pUserData[pdev->classId])
+                ->ReadData(hmtp->OperationsContainer.Param1,
+                           (uint8_t *)data_buff, &MTP_DataLength, pdev);
 
-      /* Check if more data need to be sent */
-      if (MTP_DataLength.temp_length == MTP_DataLength.totallen)
-      {
-        /* Start USB data transmission to the host */
-        (void)USBD_MTP_STORAGE_SendData(pdev, (uint8_t *)data_buff,
-                                        MTP_DataLength.readbytes);
+            /* Check if more data need to be sent */
+            if (MTP_DataLength.temp_length == MTP_DataLength.totallen) {
+                /* Start USB data transmission to the host */
+                (void)USBD_MTP_STORAGE_SendData(pdev, (uint8_t *)data_buff,
+                                                MTP_DataLength.readbytes);
 
-        /* Move to response phase */
-        hmtp->MTP_ResponsePhase = MTP_RESPONSE_PHASE;
+                /* Move to response phase */
+                hmtp->MTP_ResponsePhase = MTP_RESPONSE_PHASE;
 
-        /* Reset the stat machine */
-        ReadDataStatus = READ_FIRST_DATA;
-      }
-      else
-      {
-        /* Start USB data transmission to the host */
-        (void)USBD_MTP_STORAGE_SendData(pdev, (uint8_t *)data_buff, MTP_DataLength.readbytes);
+                /* Reset the stat machine */
+                ReadDataStatus = READ_FIRST_DATA;
+            } else {
+                /* Start USB data transmission to the host */
+                (void)USBD_MTP_STORAGE_SendData(pdev, (uint8_t *)data_buff,
+                                                MTP_DataLength.readbytes);
 
-        /* Keep the state machine into sending next packet of data */
-        ReadDataStatus = READ_REST_OF_DATA;
-      }
-      break;
+                /* Keep the state machine into sending next packet of data */
+                ReadDataStatus = READ_REST_OF_DATA;
+            }
+            break;
 
-    default:
-      break;
-  }
+        default:
+            break;
+    }
 
   return (uint8_t)USBD_OK;
 }

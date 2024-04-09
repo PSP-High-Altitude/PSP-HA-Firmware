@@ -25,15 +25,6 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
-/*
-static FILE MyFile;
-static FATFS SDFatFs;
-static char SDPath[4];
-static FolderLevel Fold_Lvl;
-static FOLD_INFTypeDef FoldStruct;
-static FILE_INFTypeDef FileStruct;
-static SD_Object_TypeDef sd_object;
-*/
 
 #define MTP_MAX_OBJECT_NUM 50
 
@@ -57,7 +48,7 @@ uint32_t sc_len = 0U;
 uint32_t pckt_cnt = 1U;
 uint32_t foldsize;
 
-lfs_file_t curr_file;
+int curr_file;
 
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
@@ -118,52 +109,60 @@ USBD_MTP_ItfTypeDef USBD_MTP_fops = {
  * @retval status value
  */
 static void traverse_fs(char path[LFS_NAME_MAX + 1], uint32_t parent) {
-    if (g_fs.cfg == NULL) {
+    yaffs_DIR *dir;
+    dir = yaffs_opendir(path);
+    if (dir == NULL) {
         return;
     }
 
-    lfs_dir_t dir;
-    int err = lfs_dir_open(&g_fs, &dir, path);
-    if (err) {
-        return;
-    }
-
-    struct lfs_info info;
+    struct yaffs_dirent *info;
     while (1) {
-        int res = lfs_dir_read(&g_fs, &dir, &info);
-        if (res <= 0) {
-            lfs_dir_close(&g_fs, &dir);
+        info = yaffs_readdir(dir);
+        if (info == NULL) {
+            yaffs_closedir(dir);
             return;
         }
-        if (strcmp(info.name, ".") == 0 || strcmp(info.name, "..") == 0) {
+        if (strcmp(info->d_name, ".") == 0 || strcmp(info->d_name, "..") == 0) {
             continue;
         }
-        if (info.type == LFS_TYPE_REG) {
+
+        struct yaffs_stat stat;
+        char str[128];
+        if (snprintf(str, 128, "%s%s", path, info->d_name) < 0) {
+            yaffs_closedir(dir);
+            return;
+        }
+        if (yaffs_lstat(str, &stat) != 0) {
+            yaffs_closedir(dir);
+            return;
+        }
+
+        if ((stat.st_mode & S_IFMT) == S_IFREG) {
             if (mtp_file_idx >= MTP_MAX_OBJECT_NUM) {
-                lfs_dir_close(&g_fs, &dir);
+                yaffs_closedir(dir);
                 return;
             }
-            memcpy(mtp_files[mtp_file_idx].Filename, info.name,
-                   strlen(info.name) + 1);
+            memcpy(mtp_files[mtp_file_idx].Filename, info->d_name,
+                   strlen(info->d_name) + 1);
             mtp_files[mtp_file_idx].Storage_id = mtp_file_idx + 1;
             mtp_files[mtp_file_idx].ObjectFormat = MTP_OBJ_FORMAT_UNDEFINED;
             mtp_files[mtp_file_idx].ParentObject =
                 parent == 0xFFFFFFFF ? 0xFFFFFFFF : parent + 1;
             mtp_files[mtp_file_idx].AssociationType = 0;
             mtp_files[mtp_file_idx].AssociationDesc = 0;
-            mtp_files[mtp_file_idx].ObjectCompressedSize = info.size;
-            mtp_fs_size += info.size;
+            mtp_files[mtp_file_idx].ObjectCompressedSize = stat.st_size;
+            mtp_fs_size += stat.st_size;
             if (parent != 0xFFFFFFFF) {
                 mtp_files[parent].ObjectCompressedSize++;
             }
             mtp_file_idx++;
         } else {
             if (mtp_file_idx >= MTP_MAX_OBJECT_NUM) {
-                lfs_dir_close(&g_fs, &dir);
+                yaffs_closedir(dir);
                 return;
             }
-            memcpy(mtp_files[mtp_file_idx].Filename, info.name,
-                   strlen(info.name) + 1);
+            memcpy(mtp_files[mtp_file_idx].Filename, info->d_name,
+                   strlen(info->d_name) + 1);
             mtp_files[mtp_file_idx].Storage_id = mtp_file_idx + 1;
             mtp_files[mtp_file_idx].ObjectFormat = MTP_OBJ_FORMAT_ASSOCIATION;
             mtp_files[mtp_file_idx].ParentObject =
@@ -173,10 +172,10 @@ static void traverse_fs(char path[LFS_NAME_MAX + 1], uint32_t parent) {
             mtp_files[mtp_file_idx].ObjectCompressedSize = 0;
             mtp_file_idx++;
 
-            traverse_fs(info.name, mtp_file_idx - 1);
+            traverse_fs(info->d_name, mtp_file_idx - 1);
         }
     }
-    lfs_dir_close(&g_fs, &dir);
+    yaffs_closedir(dir);
 }
 
 static uint8_t USBD_MTP_Itf_Init(void) {
@@ -316,7 +315,8 @@ static uint16_t USBD_MTP_Itf_Create_NewObject(MTP_ObjectInfoTypeDef ObjectInfo,
  * @retval max capability
  */
 static uint64_t USBD_MTP_Itf_GetMaxCapability(void) {
-    uint64_t max_cap = g_lfs_cfg->block_count * g_lfs_cfg->block_size;
+    uint64_t max_cap =
+        MT29F4G_BLOCK_COUNT * MT29F4G_PAGE_PER_BLOCK * MT29F4G_PAGE_SIZE;
 
     return max_cap;
 }
@@ -328,14 +328,11 @@ static uint64_t USBD_MTP_Itf_GetMaxCapability(void) {
  * @retval free space in bytes
  */
 static uint64_t USBD_MTP_Itf_GetFreeSpaceInBytes(void) {
-    if (g_fs.cfg) {
-        lfs_size_t fs_free =
-            (g_lfs_cfg->block_count * g_lfs_cfg->block_size) - mtp_fs_size;
+    uint64_t fs_free =
+        (MT29F4G_BLOCK_COUNT * MT29F4G_PAGE_PER_BLOCK * MT29F4G_PAGE_SIZE) -
+        mtp_fs_size;
 
-        return (uint64_t)fs_free;
-    } else {
-        return 0;
-    }
+    return fs_free;
 }
 
 /**
@@ -390,12 +387,12 @@ static uint16_t USBD_MTP_Itf_DeleteObject(uint32_t Param1) {
                 }
             }
         }
-        int ret = lfs_remove(&g_fs, (char *)mtp_files[idx].Filename);
+        int ret = yaffs_unlink((char *)mtp_files[idx].Filename);
         if (ret < 0) {
             return 0x2002;
         }
     } else {
-        int ret = lfs_remove(&g_fs, (char *)mtp_files[idx].Filename);
+        int ret = yaffs_unlink((char *)mtp_files[idx].Filename);
         if (ret < 0) {
             return 0x2002;
         }
@@ -431,57 +428,51 @@ static uint16_t USBD_MTP_Itf_DeleteObject(uint32_t Param1) {
 static uint32_t USBD_MTP_Itf_ReadData(uint32_t Param1, uint8_t *buff,
                                       MTP_DataLengthTypeDef *data_length,
                                       USBD_HandleTypeDef *pdev) {
-    if (g_fs.cfg) {
-        if (data_length->temp_length == 0) {
-            // Open file on first read
-            lfs_ssize_t res = lfs_file_open(
-                &g_fs, &curr_file, (char *)mtp_files[Param1 - 1].Filename,
-                LFS_O_RDONLY);
-            if (res < 0) {
-                data_length->totallen = 0;
-                return 0;
-            }
-        }
-
-        // Go to last read position
-        if (lfs_file_seek(&g_fs, &curr_file, data_length->temp_length,
-                          LFS_SEEK_SET) < 0) {
-            lfs_file_close(&g_fs, &curr_file);
-            data_length->readbytes = 0;
-            return 0;
-        }
-
-        USBD_MTP_HandleTypeDef *hmtp =
-            (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
-
-        // Read data
-        lfs_ssize_t read;
-        if (data_length->temp_length == 0) {
-            read = lfs_file_read(
-                &g_fs, &curr_file, buff,
-                (uint32_t)hmtp->MaxPcktLen - MTP_CONT_HEADER_SIZE);
-        } else {
-            read = lfs_file_read(&g_fs, &curr_file, buff,
-                                 (uint32_t)hmtp->MaxPcktLen);
-        }
-        if (read < 0) {
-            lfs_file_close(&g_fs, &curr_file);
-            data_length->readbytes = 0;
-            return 0;
-        }
-
-        // Increment read position
-        data_length->temp_length += read;
-        data_length->readbytes = read;
-
-        // Check if all data read
-        if (data_length->temp_length == data_length->totallen) {
-            lfs_file_close(&g_fs, &curr_file);
+    if (data_length->temp_length == 0) {
+        // Open file on first read
+        curr_file = yaffs_open((char *)mtp_files[Param1 - 1].Filename, O_RDONLY,
+                               S_IREAD | S_IWRITE);
+        if (curr_file < 0) {
+            data_length->totallen = 0;
             return 0;
         }
     }
 
-    return 0U;
+    // Go to last read position
+    if (yaffs_lseek(curr_file, data_length->temp_length, SEEK_SET) < 0) {
+        yaffs_close(curr_file);
+        data_length->readbytes = 0;
+        return 0;
+    }
+
+    USBD_MTP_HandleTypeDef *hmtp =
+        (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
+
+    // Read data
+    int read;
+    if (data_length->temp_length == 0) {
+        read = yaffs_read(curr_file, buff,
+                          (uint32_t)hmtp->MaxPcktLen - MTP_CONT_HEADER_SIZE);
+    } else {
+        read = yaffs_read(curr_file, buff, (uint32_t)hmtp->MaxPcktLen);
+    }
+    if (read < 0) {
+        yaffs_close(curr_file);
+        data_length->readbytes = 0;
+        return 0;
+    }
+
+    // Increment read position
+    data_length->temp_length += read;
+    data_length->readbytes = read;
+
+    // Check if all data read
+    if (data_length->temp_length == data_length->totallen) {
+        yaffs_close(curr_file);
+        return 0;
+    }
+
+    return 0;
 }
 
 /**
@@ -493,9 +484,7 @@ static uint32_t USBD_MTP_Itf_ReadData(uint32_t Param1, uint8_t *buff,
 static void USBD_MTP_Itf_Cancel(uint32_t Phase) {
     /* Make sure to close open file while canceling transaction */
     if (Phase == 0) {
-        if (g_fs.cfg) {
-            lfs_file_close(&g_fs, &curr_file);
-        }
+        yaffs_close(curr_file);
     }
 
     return;

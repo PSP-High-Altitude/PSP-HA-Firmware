@@ -75,6 +75,19 @@
                 "lfs_util.h": "c",
                 "main.h": "c",
                 "usbd_mtp.h": "c",
-                "pb_create.h": "c"
+                "pb_create.h": "c",
+                "yaffs_trace.h": "c",
+                "yaffs_packedtags2.h": "c",
+                "yaffs_allocator.h": "c",
+                "yaffs_nand_drv.h": "c",
+                "nand_store.h": "c",
+                "yaffs_flashif.h": "c",
+                "yaffs_guts.h": "c",
+                "yaffs_driver.h": "c",
+                "yaffsfs.h": "c",
+                "yaffscfg.h": "c",
+                "yportenv.h": "c",
+                "yaffs_nandsim_file.h": "c",
+                "semphr.h": "c"
         }
 }
