@@ -8,8 +8,8 @@
 #include "stm32h7xx_hal.h"
 
 #define MT29F4G_PAGE_SIZE 4096
-#define MT29F4G_SPARE_SIZE 64        // Metadata I
-#define MT29F4G_SPARE_OFFSET 0x1040  // Metadata I
+#define MT29F4G_SPARE_SIZE 256
+#define MT29F4G_SPARE_OFFSET 0x1000
 #define MT29F4G_PAGE_PER_BLOCK 64
 #define MT29F4G_BLOCK_COUNT 2048
 
@@ -30,6 +30,10 @@ Status mt29f4g_read_within_page(uint8_t *buffer, uint32_t page, uint32_t offset,
 Status mt29f4g_read_page_spare(uint8_t *buffer, uint32_t page);
 
 Status mt29f4g_write_pages(uint8_t *buffer, uint32_t page, uint32_t num_pages);
+
+Status mt29f4g_write_page_and_spare(uint8_t *buffer, uint32_t data_len,
+                                    uint8_t *spare, uint32_t spare_len,
+                                    uint32_t page);
 
 // Only 4 partial programs are allowed per page
 Status mt29f4g_write_partial_page(uint8_t *buffer, uint32_t page,

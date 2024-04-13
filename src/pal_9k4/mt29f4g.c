@@ -301,6 +301,42 @@ Status mt29f4g_write_pages(uint8_t *buffer, uint32_t page, uint32_t num_pages) {
     return STATUS_OK;
 }
 
+Status mt29f4g_write_page_and_spare(uint8_t *buffer, uint32_t data_len,
+                                    uint8_t *spare, uint32_t spare_len,
+                                    uint32_t page) {
+    if (buffer && data_len > 0) {
+        if (write_enable() != STATUS_OK) {
+            return STATUS_ERROR;
+        }
+        if (program_load_x4(0, 0, buffer, data_len) != STATUS_OK) {
+            return STATUS_ERROR;
+        }
+        if (program_execute(page) != STATUS_OK) {
+            return STATUS_ERROR;
+        }
+        if (poll_oip() != STATUS_OK) {
+            return STATUS_ERROR;
+        }
+    }
+    if (spare && spare_len > 0) {
+        if (write_enable() != STATUS_OK) {
+            return STATUS_ERROR;
+        }
+        if (program_load_x4(MT29F4G_SPARE_OFFSET, 0, spare, spare_len) !=
+            STATUS_OK) {
+            return STATUS_ERROR;
+        }
+        if (program_execute(page) != STATUS_OK) {
+            return STATUS_ERROR;
+        }
+        if (poll_oip() != STATUS_OK) {
+            return STATUS_ERROR;
+        }
+    }
+
+    return STATUS_OK;
+}
+
 Status mt29f4g_write_partial_page(uint8_t *buffer, uint32_t page,
                                   uint32_t offset, uint32_t size) {
     if (write_enable() != STATUS_OK) {
@@ -319,83 +355,83 @@ Status mt29f4g_write_partial_page(uint8_t *buffer, uint32_t page,
     return STATUS_OK;
 }
 
-Status mt29f4g_erase_blocks(uint32_t block_start, uint32_t block_end) {
-    while (block_start <= block_end) {
-        if (write_enable() != STATUS_OK) {
-            return STATUS_ERROR;
+    Status mt29f4g_erase_blocks(uint32_t block_start, uint32_t block_end) {
+        while (block_start <= block_end) {
+            if (write_enable() != STATUS_OK) {
+                return STATUS_ERROR;
+            }
+            if (block_erase(block_start << 6) != STATUS_OK) {
+                return STATUS_ERROR;
+            }
+            if (poll_oip() != STATUS_OK) {
+                return STATUS_ERROR;
+            }
+            block_start++;
         }
-        if (block_erase(block_start << 6) != STATUS_OK) {
-            return STATUS_ERROR;
-        }
+        return STATUS_OK;
+    }
+
+    Status mt29f4g_erase_chip() {
+        return mt29f4g_erase_blocks(0, MT29F4G_BLOCK_COUNT - 1);
+    }
+
+    Status mt29f4g_sync() {
         if (poll_oip() != STATUS_OK) {
             return STATUS_ERROR;
         }
-        block_start++;
+        return STATUS_OK;
     }
-    return STATUS_OK;
-}
 
-Status mt29f4g_erase_chip() {
-    return mt29f4g_erase_blocks(0, MT29F4G_BLOCK_COUNT - 1);
-}
+    uint8_t mt29f4g_status() { return read_status(); }
 
-Status mt29f4g_sync() {
-    if (poll_oip() != STATUS_OK) {
-        return STATUS_ERROR;
-    }
-    return STATUS_OK;
-}
+    int lfs_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
+                 void *buffer, lfs_size_t size) {
+        uint32_t row_addr = (block << 6) + (off / MT29F4G_PAGE_SIZE);
+        uint32_t col_addr = off % MT29F4G_PAGE_SIZE;
 
-uint8_t mt29f4g_status() { return read_status(); }
+        while (size > 0) {
+            uint32_t read_size = size > MT29F4G_PAGE_SIZE - col_addr
+                                     ? MT29F4G_PAGE_SIZE - col_addr
+                                     : size;
+            if (mt29f4g_read_within_page(buffer, row_addr, col_addr,
+                                         read_size) != STATUS_OK) {
+                return LFS_ERR_IO;
+            }
 
-int lfs_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
-             void *buffer, lfs_size_t size) {
-    uint32_t row_addr = (block << 6) + (off / MT29F4G_PAGE_SIZE);
-    uint32_t col_addr = off % MT29F4G_PAGE_SIZE;
-
-    while (size > 0) {
-        uint32_t read_size = size > MT29F4G_PAGE_SIZE - col_addr
-                                 ? MT29F4G_PAGE_SIZE - col_addr
-                                 : size;
-        if (mt29f4g_read_within_page(buffer, row_addr, col_addr, read_size) !=
-            STATUS_OK) {
-            return LFS_ERR_IO;
+            size -= read_size;
+            buffer += read_size;
+            col_addr = 0;
+            row_addr++;
         }
 
-        size -= read_size;
-        buffer += read_size;
-        col_addr = 0;
-        row_addr++;
+        return LFS_ERR_OK;
     }
 
-    return LFS_ERR_OK;
-}
+    int lfs_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
+                 const void *buffer, lfs_size_t size) {
+        uint32_t row_addr = (block << 6) + (off / MT29F4G_PAGE_SIZE);
+        uint32_t col_addr = off % MT29F4G_PAGE_SIZE;
 
-int lfs_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
-             const void *buffer, lfs_size_t size) {
-    uint32_t row_addr = (block << 6) + (off / MT29F4G_PAGE_SIZE);
-    uint32_t col_addr = off % MT29F4G_PAGE_SIZE;
-
-    while (size > 0) {
-        uint32_t write_size = size > MT29F4G_PAGE_SIZE - col_addr
-                                  ? MT29F4G_PAGE_SIZE - col_addr
-                                  : size;
+        while (size > 0) {
+            uint32_t write_size = size > MT29F4G_PAGE_SIZE - col_addr
+                                      ? MT29F4G_PAGE_SIZE - col_addr
+                                      : size;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
-        if (mt29f4g_write_partial_page(buffer, row_addr, col_addr,
-                                       write_size) != STATUS_OK) {
-            return LFS_ERR_IO;
-        }
+            if (mt29f4g_write_partial_page(buffer, row_addr, col_addr,
+                                           write_size) != STATUS_OK) {
+                return LFS_ERR_IO;
+            }
 #pragma GCC diagnostic pop
 
         size -= write_size;
         buffer += write_size;
         col_addr = 0;
         row_addr++;
-    }
+        }
 
     return LFS_ERR_OK;
-}
+    }
 
 int lfs_erase(const struct lfs_config *c, lfs_block_t block) {
     if (mt29f4g_erase_blocks(block, block) != STATUS_OK) {
