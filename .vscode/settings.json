@@ -88,6 +88,7 @@
                 "yaffscfg.h": "c",
                 "yportenv.h": "c",
                 "yaffs_nandsim_file.h": "c",
-                "semphr.h": "c"
+                "semphr.h": "c",
+                "stm32h7xx_hal_tim.h": "c"
         }
 }

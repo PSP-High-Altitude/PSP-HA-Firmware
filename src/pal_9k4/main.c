@@ -5,6 +5,7 @@
 
 #include "clocks.h"
 #include "data.h"
+#include "debug_tasks.h"
 #include "gpio/gpio.h"
 #include "nand_flash.h"
 #include "pspcom.h"
@@ -162,6 +163,9 @@ void init_task() {
         TASK_CREATE(read_gps_task, +2);
         TASK_CREATE(storage_task, +1);
     }
+#ifdef DEBUG_MEMORY_USAGE
+    TASK_CREATE(debug_memory_usage_task, +1);
+#endif
 
     xTaskResumeAll();
 

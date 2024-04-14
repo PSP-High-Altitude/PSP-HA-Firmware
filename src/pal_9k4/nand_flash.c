@@ -36,7 +36,6 @@ struct yaffs_dev dev;
 
 static const char s_header[HEADER_LEN] = FIRMWARE_SPECIFIER;
 
-extern char mtp_file_names[128][LFS_NAME_MAX + 1];  // 128 files
 extern uint32_t mtp_file_idx;
 
 static Status nand_flash_create_sensor_file() {
@@ -48,7 +47,7 @@ static Status nand_flash_create_sensor_file() {
     s_datfile_open = 1;
 
     // Write the header
-    lfs_ssize_t bw = yaffs_write(s_datfile, s_header, HEADER_LEN);
+    int bw = yaffs_write(s_datfile, s_header, HEADER_LEN);
 
     // Check the correct number of bytes was written
     if (bw != HEADER_LEN) {
@@ -77,7 +76,7 @@ static Status nand_flash_create_gps_file() {
     s_gpsfile_open = 1;
 
     // Write the header
-    lfs_ssize_t bw = yaffs_write(s_gpsfile, s_header, HEADER_LEN);
+    int bw = yaffs_write(s_gpsfile, s_header, HEADER_LEN);
 
     // Check the correct number of bytes was written
     if (bw != HEADER_LEN) {
@@ -106,7 +105,7 @@ static Status nand_flash_create_state_file() {
     s_statefile_open = 1;
 
     // Write the header
-    lfs_ssize_t bw = yaffs_write(s_statefile, s_header, HEADER_LEN);
+    int bw = yaffs_write(s_statefile, s_header, HEADER_LEN);
 
     // Check the correct number of bytes was written
     if (bw != HEADER_LEN) {
@@ -114,7 +113,7 @@ static Status nand_flash_create_state_file() {
     }
 
     // Flush the header to disk
-    if (yaffs_sync(s_statefname) != LFS_ERR_OK) {
+    if (yaffs_sync(s_statefname) != 0) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -439,17 +438,17 @@ Status nand_flash_deinit() {
 
 Status nand_flash_flush() {
     if (s_datfile_open) {
-        if (yaffs_sync(s_filename) != LFS_ERR_OK) {
+        if (yaffs_sync(s_filename) != 0) {
             return STATUS_HARDWARE_ERROR;
         }
     }
     if (s_gpsfile_open) {
-        if (yaffs_sync(s_gpsfname) != LFS_ERR_OK) {
+        if (yaffs_sync(s_gpsfname) != 0) {
             return STATUS_HARDWARE_ERROR;
         }
     }
     if (s_statefile_open) {
-        if (yaffs_sync(s_statefname) != LFS_ERR_OK) {
+        if (yaffs_sync(s_statefname) != 0) {
             return STATUS_HARDWARE_ERROR;
         }
     }

@@ -6,9 +6,6 @@
 #include "sensor.pb.h"
 #include "state.pb.h"
 
-extern lfs_t g_fs;
-extern struct lfs_config* g_lfs_cfg;
-
 Status nand_flash_init();
 
 Status nand_flash_reinit();

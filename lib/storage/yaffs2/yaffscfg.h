@@ -28,8 +28,8 @@
 #define YAFFSFS_N_HANDLES	10
 #define YAFFSFS_N_DSC		2
 #else
-#define YAFFSFS_N_HANDLES	100
-#define YAFFSFS_N_DSC		20
+#define YAFFSFS_N_HANDLES 20
+#define YAFFSFS_N_DSC 5
 #endif
 
 

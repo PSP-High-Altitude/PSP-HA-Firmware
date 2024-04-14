@@ -108,7 +108,7 @@ USBD_MTP_ItfTypeDef USBD_MTP_fops = {
  * @param  None
  * @retval status value
  */
-static void traverse_fs(char path[LFS_NAME_MAX + 1], uint32_t parent) {
+static void traverse_fs(char path[256], uint32_t parent) {
     yaffs_DIR *dir;
     dir = yaffs_opendir(path);
     if (dir == NULL) {

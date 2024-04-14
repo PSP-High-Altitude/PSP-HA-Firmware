@@ -355,111 +355,31 @@ Status mt29f4g_write_partial_page(uint8_t *buffer, uint32_t page,
     return STATUS_OK;
 }
 
-    Status mt29f4g_erase_blocks(uint32_t block_start, uint32_t block_end) {
-        while (block_start <= block_end) {
-            if (write_enable() != STATUS_OK) {
-                return STATUS_ERROR;
-            }
-            if (block_erase(block_start << 6) != STATUS_OK) {
-                return STATUS_ERROR;
-            }
-            if (poll_oip() != STATUS_OK) {
-                return STATUS_ERROR;
-            }
-            block_start++;
+Status mt29f4g_erase_blocks(uint32_t block_start, uint32_t block_end) {
+    while (block_start <= block_end) {
+        if (write_enable() != STATUS_OK) {
+            return STATUS_ERROR;
         }
-        return STATUS_OK;
-    }
-
-    Status mt29f4g_erase_chip() {
-        return mt29f4g_erase_blocks(0, MT29F4G_BLOCK_COUNT - 1);
-    }
-
-    Status mt29f4g_sync() {
+        if (block_erase(block_start << 6) != STATUS_OK) {
+            return STATUS_ERROR;
+        }
         if (poll_oip() != STATUS_OK) {
             return STATUS_ERROR;
         }
-        return STATUS_OK;
+        block_start++;
     }
-
-    uint8_t mt29f4g_status() { return read_status(); }
-
-    int lfs_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
-                 void *buffer, lfs_size_t size) {
-        uint32_t row_addr = (block << 6) + (off / MT29F4G_PAGE_SIZE);
-        uint32_t col_addr = off % MT29F4G_PAGE_SIZE;
-
-        while (size > 0) {
-            uint32_t read_size = size > MT29F4G_PAGE_SIZE - col_addr
-                                     ? MT29F4G_PAGE_SIZE - col_addr
-                                     : size;
-            if (mt29f4g_read_within_page(buffer, row_addr, col_addr,
-                                         read_size) != STATUS_OK) {
-                return LFS_ERR_IO;
-            }
-
-            size -= read_size;
-            buffer += read_size;
-            col_addr = 0;
-            row_addr++;
-        }
-
-        return LFS_ERR_OK;
-    }
-
-    int lfs_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
-                 const void *buffer, lfs_size_t size) {
-        uint32_t row_addr = (block << 6) + (off / MT29F4G_PAGE_SIZE);
-        uint32_t col_addr = off % MT29F4G_PAGE_SIZE;
-
-        while (size > 0) {
-            uint32_t write_size = size > MT29F4G_PAGE_SIZE - col_addr
-                                      ? MT29F4G_PAGE_SIZE - col_addr
-                                      : size;
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
-            if (mt29f4g_write_partial_page(buffer, row_addr, col_addr,
-                                           write_size) != STATUS_OK) {
-                return LFS_ERR_IO;
-            }
-#pragma GCC diagnostic pop
-
-        size -= write_size;
-        buffer += write_size;
-        col_addr = 0;
-        row_addr++;
-        }
-
-    return LFS_ERR_OK;
-    }
-
-int lfs_erase(const struct lfs_config *c, lfs_block_t block) {
-    if (mt29f4g_erase_blocks(block, block) != STATUS_OK) {
-        return LFS_ERR_IO;
-    }
-    return LFS_ERR_OK;
+    return STATUS_OK;
 }
 
-int lfs_sync(const struct lfs_config *c) {
-    if (mt29f4g_sync() != STATUS_OK) {
-        return LFS_ERR_IO;
+Status mt29f4g_erase_chip() {
+    return mt29f4g_erase_blocks(0, MT29F4G_BLOCK_COUNT - 1);
+}
+
+Status mt29f4g_sync() {
+    if (poll_oip() != STATUS_OK) {
+        return STATUS_ERROR;
     }
-    return LFS_ERR_OK;
+    return STATUS_OK;
 }
 
-struct lfs_config *mt29f4g_get_lfs_config() {
-    static struct lfs_config lfs_cfg;
-    lfs_cfg.read = lfs_read;
-    lfs_cfg.prog = lfs_prog;
-    lfs_cfg.erase = lfs_erase;
-    lfs_cfg.sync = lfs_sync;
-    lfs_cfg.read_size = MT29F4G_PAGE_SIZE / 4;
-    lfs_cfg.prog_size = MT29F4G_PAGE_SIZE / 4;
-    lfs_cfg.block_size = MT29F4G_PAGE_SIZE * MT29F4G_PAGE_PER_BLOCK;
-    lfs_cfg.block_count = MT29F4G_BLOCK_COUNT;
-    lfs_cfg.cache_size = MT29F4G_PAGE_SIZE / 4;
-    lfs_cfg.lookahead_size = MT29F4G_PAGE_SIZE / 4;
-    lfs_cfg.block_cycles = 500;
-
-    return &lfs_cfg;
-}
+uint8_t mt29f4g_status() { return read_status(); }

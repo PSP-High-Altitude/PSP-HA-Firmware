@@ -1,7 +1,6 @@
 #ifndef MT29F4G_H
 #define MT29F4G_H
 
-#include "littlefs/lfs.h"
 #include "ospi.h"
 #include "status.h"
 #include "stdint.h"
@@ -46,18 +45,6 @@ Status mt29f4g_erase_chip();
 Status mt29f4g_sync();
 
 uint8_t mt29f4g_status();
-
-struct lfs_config *mt29f4g_get_lfs_config();
-
-int lfs_read(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
-             void *buffer, lfs_size_t size);
-
-int lfs_prog(const struct lfs_config *c, lfs_block_t block, lfs_off_t off,
-             const void *buffer, lfs_size_t size);
-
-int lfs_erase(const struct lfs_config *c, lfs_block_t block);
-
-int lfs_sync(const struct lfs_config *c);
 
 static const OSPI_RegularCmdTypeDef mt29f4g_default_cmd = {
     .OperationType = HAL_OSPI_OPTYPE_COMMON_CFG,

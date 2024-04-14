@@ -28,4 +28,7 @@
 #endif
 #define NAND_MAX_FLIGHTS 10
 
+// Extra debugging
+#define DEBUG_MEMORY_USAGE
+
 #endif  // MAIN_H
