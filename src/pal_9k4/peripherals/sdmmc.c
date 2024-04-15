@@ -30,7 +30,7 @@ Status sdmmc_setup(SdmmcDevice* dev) {
     };
     switch (dev->periph) {
         case P_SD1:
-            HAL_NVIC_SetPriority(SDMMC1_IRQn, 3, 0);
+            HAL_NVIC_SetPriority(SDMMC1_IRQn, 5, 0);
             HAL_NVIC_EnableIRQ(SDMMC1_IRQn);
             base = SDMMC1;
             // Disable SPI first
@@ -114,8 +114,10 @@ Status sdmmc_init_card(SdmmcDevice* dev) {
 
 Status sdmmc_write_blocks(SdmmcDevice* dev, uint8_t* tx_buf,
                           uint32_t block_start, uint32_t num_blocks) {
-    if (HAL_SD_WriteBlocks_IT(sdmmc_handles[dev->periph], tx_buf, block_start,
-                              num_blocks) != HAL_OK) {
+    uint8_t tx_buf_new[512 * num_blocks];
+    memcpy(tx_buf_new, tx_buf, 512 * num_blocks);
+    if (HAL_SD_WriteBlocks_DMA(sdmmc_handles[dev->periph], tx_buf_new,
+                               block_start, num_blocks) != HAL_OK) {
         return STATUS_ERROR;
     }
     uint64_t start = MILLIS();
@@ -132,8 +134,9 @@ Status sdmmc_write_blocks(SdmmcDevice* dev, uint8_t* tx_buf,
 
 Status sdmmc_read_blocks(SdmmcDevice* dev, uint8_t* rx_buf,
                          uint32_t block_start, uint32_t num_blocks) {
-    if (HAL_SD_ReadBlocks_IT(sdmmc_handles[dev->periph], rx_buf, block_start,
-                             num_blocks) != HAL_OK) {
+    uint8_t rx_buf_new[512 * num_blocks];
+    if (HAL_SD_ReadBlocks_DMA(sdmmc_handles[dev->periph], rx_buf_new,
+                              block_start, num_blocks) != HAL_OK) {
         return STATUS_ERROR;
     }
     uint64_t start = MILLIS();
@@ -145,6 +148,7 @@ Status sdmmc_read_blocks(SdmmcDevice* dev, uint8_t* rx_buf,
         }
         DELAY(1);
     }
+    memcpy(rx_buf, rx_buf_new, 512 * num_blocks);
     return STATUS_OK;
 }
 

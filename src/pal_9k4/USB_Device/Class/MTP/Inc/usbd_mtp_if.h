@@ -25,6 +25,7 @@ extern "C" {
 #endif
 
 /* Includes ------------------------------------------------------------------*/
+#include "status.h"
 #include "usbd_mtp.h"
 #include "yaffs2/yaffsfs.h"
 
@@ -33,6 +34,9 @@ extern "C" {
 #define USBD_MTP_CAPTURE_FORMAT_SUPPORTED 1U
 #define USBD_MTP_VEND_EXT_DESC_SUPPORTED 1U
 #define USBD_MTP_EVENTS_SUPPORTED 1U
+
+#define MTP_FILE_FIFO_SIZE 4096U
+#define MTP_FILE_READ_SIZE MTP_FILE_FIFO_SIZE
 
 #if USBD_MTP_EVENTS_SUPPORTED == 1
 #define SUPP_EVENTS_LEN (uint8_t)((uint8_t)sizeof(SuppEvents) / 2U)
@@ -65,7 +69,10 @@ extern USBD_MTP_ItfTypeDef USBD_MTP_fops;
 
 /* Exported macros -----------------------------------------------------------*/
 /* Exported variables --------------------------------------------------------*/
+
 /* Exported functions ------------------------------------------------------- */
+void mtp_readwrite_file_task();
+void mtp_readwrite_file();
 
 static const uint16_t Manuf[] = {'P', 'S', 'P', 0}; /* last 2 bytes must be 0*/
 static const uint16_t Model[] = {'P', 'A', 'L', ' ',

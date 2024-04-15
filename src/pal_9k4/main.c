@@ -18,6 +18,7 @@
 #include "timer.h"
 #include "usb_device.h"
 #include "usbd_cdc_if.h"
+#include "usbd_mtp_if.h"
 
 // FreeRTOS
 #include "FreeRTOS.h"
@@ -162,6 +163,9 @@ void init_task() {
         TASK_CREATE(pspcom_send_standard, +2);
         TASK_CREATE(read_gps_task, +2);
         TASK_CREATE(storage_task, +1);
+    } else {
+        // MTP mode data queuing task
+        TASK_CREATE(mtp_readwrite_file_task, +1);
     }
 #ifdef DEBUG_MEMORY_USAGE
     TASK_CREATE(debug_memory_usage_task, +1);

@@ -19,7 +19,9 @@
 /* Includes ------------------------------------------------------------------*/
 #include "usbd_mtp_if.h"
 
+#include "FreeRTOS.h"
 #include "nand_flash.h"
+#include "task.h"
 #include "timer.h"
 #include "usbd_mtp_opt.h"
 
@@ -48,7 +50,16 @@ uint32_t sc_len = 0U;
 uint32_t pckt_cnt = 1U;
 uint32_t foldsize;
 
+struct {
+    uint8_t data[MTP_FILE_FIFO_SIZE];
+    uint32_t head;
+    uint32_t tail;
+} mtp_file_fifo;
+uint8_t mtp_current_operation = 0;  // 0: no operation, 1: read, 2: write
+
 int curr_file;
+
+int test_flag = 0;
 
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
@@ -102,12 +113,40 @@ USBD_MTP_ItfTypeDef USBD_MTP_fops = {
 
 /* Private functions ---------------------------------------------------------*/
 
-/**
- * @brief  USBD_MTP_Itf_Init
- *         Initialize the file system Layer
- * @param  None
- * @retval status value
- */
+static void push_to_fifo(uint8_t *data, uint32_t len) {
+    for (int i = 0; i < len; i++) {
+        if ((mtp_file_fifo.head + 1) % MTP_FILE_FIFO_SIZE ==
+            mtp_file_fifo.tail) {
+            // FIFO is full
+            return;
+        }
+        mtp_file_fifo.data[mtp_file_fifo.head] = data[i];
+        mtp_file_fifo.head = (mtp_file_fifo.head + 1) % MTP_FILE_FIFO_SIZE;
+    }
+}
+
+static uint32_t pop_from_fifo(uint8_t *data, uint32_t len) {
+    uint32_t bytes_read = 0;
+    for (int i = 0; i < len; i++) {
+        if (mtp_file_fifo.head == mtp_file_fifo.tail) {
+            // FIFO is empty
+            return bytes_read;
+        }
+        data[i] = mtp_file_fifo.data[mtp_file_fifo.tail];
+        mtp_file_fifo.tail = (mtp_file_fifo.tail + 1) % MTP_FILE_FIFO_SIZE;
+        bytes_read++;
+    }
+    return bytes_read;
+}
+
+static uint32_t get_fifo_size() {
+    if (mtp_file_fifo.head >= mtp_file_fifo.tail) {
+        return mtp_file_fifo.head - mtp_file_fifo.tail;
+    } else {
+        return MTP_FILE_FIFO_SIZE - mtp_file_fifo.tail + mtp_file_fifo.head;
+    }
+}
+
 static void traverse_fs(char path[256], uint32_t parent) {
     yaffs_DIR *dir;
     dir = yaffs_opendir(path);
@@ -178,6 +217,12 @@ static void traverse_fs(char path[256], uint32_t parent) {
     yaffs_closedir(dir);
 }
 
+/**
+ * @brief  USBD_MTP_Itf_Init
+ *         Initialize the file system Layer
+ * @param  None
+ * @retval status value
+ */
 static uint8_t USBD_MTP_Itf_Init(void) {
     memset(mtp_files, 0, sizeof(mtp_files));
     mtp_files[0].Storage_id = mtp_file_idx + 1;
@@ -187,6 +232,10 @@ static uint8_t USBD_MTP_Itf_Init(void) {
     mtp_files[0].AssociationDesc = 0;
     mtp_files[0].ObjectCompressedSize = 0;
     traverse_fs("/", 0xFFFFFFFF);
+
+    mtp_file_fifo.head = 0;
+    mtp_file_fifo.tail = 0;
+
     return 0;
 }
 
@@ -436,40 +485,45 @@ static uint32_t USBD_MTP_Itf_ReadData(uint32_t Param1, uint8_t *buff,
             data_length->totallen = 0;
             return 0;
         }
-    }
 
-    // Go to last read position
-    if (yaffs_lseek(curr_file, data_length->temp_length, SEEK_SET) < 0) {
-        yaffs_close(curr_file);
-        data_length->readbytes = 0;
-        return 0;
+        mtp_current_operation = 1;
     }
 
     USBD_MTP_HandleTypeDef *hmtp =
         (USBD_MTP_HandleTypeDef *)pdev->pClassDataCmsit[pdev->classId];
 
     // Read data
-    int read;
+    uint32_t read_len;
     if (data_length->temp_length == 0) {
-        read = yaffs_read(curr_file, buff,
-                          (uint32_t)hmtp->MaxPcktLen - MTP_CONT_HEADER_SIZE);
+        read_len = (uint32_t)hmtp->MaxPcktLen - MTP_CONT_HEADER_SIZE;
     } else {
-        read = yaffs_read(curr_file, buff, (uint32_t)hmtp->MaxPcktLen);
-    }
-    if (read < 0) {
-        yaffs_close(curr_file);
-        data_length->readbytes = 0;
-        return 0;
+        read_len = (uint32_t)hmtp->MaxPcktLen;
     }
 
-    // Increment read position
-    data_length->temp_length += read;
-    data_length->readbytes = read;
+    uint32_t fifo_size = get_fifo_size();
+    if (fifo_size < read_len) {
+        // Force a read
+        mtp_readwrite_file();
+        fifo_size = get_fifo_size();
+    }
+
+    // Failure in reading file or reached the end too early
+    if (fifo_size == 0) {
+        data_length->readbytes = 0;
+        return 1;
+    }
+
+    // Copy from the FIFO
+    read_len = pop_from_fifo(buff, read_len);
+
+    // Update data length
+    data_length->readbytes = read_len;
+    data_length->temp_length += read_len;
 
     // Check if all data read
     if (data_length->temp_length == data_length->totallen) {
+        mtp_current_operation = 0;
         yaffs_close(curr_file);
-        return 0;
     }
 
     return 0;
@@ -484,8 +538,40 @@ static uint32_t USBD_MTP_Itf_ReadData(uint32_t Param1, uint8_t *buff,
 static void USBD_MTP_Itf_Cancel(uint32_t Phase) {
     /* Make sure to close open file while canceling transaction */
     if (Phase == 0) {
+        mtp_current_operation = 0;
+        mtp_file_fifo.head = 0;
+        mtp_file_fifo.tail = 0;
         yaffs_close(curr_file);
     }
 
     return;
+}
+
+void mtp_readwrite_file_task() {
+    while (1) {
+        // Make sure MTP read cannot interrupt the read/write
+        __NVIC_DisableIRQ(OTG_HS_IRQn);
+        mtp_readwrite_file();
+        __NVIC_EnableIRQ(OTG_HS_IRQn);
+        DELAY(20);
+    }
+}
+
+void mtp_readwrite_file() {
+    uint32_t fifo_size = get_fifo_size();
+    if (mtp_current_operation == 1 && fifo_size < MTP_FILE_FIFO_SIZE) {
+        uint8_t temp[MIN(MTP_FILE_READ_SIZE, MTP_FILE_FIFO_SIZE - fifo_size)];
+        int read =
+            yaffs_read(curr_file, temp,
+                       MIN(MTP_FILE_READ_SIZE, MTP_FILE_FIFO_SIZE - fifo_size));
+        if (read < 0) {
+            mtp_current_operation = 0;
+            yaffs_close(curr_file);
+            mtp_file_fifo.head = 0;
+            mtp_file_fifo.tail = 0;
+            return;
+        }
+
+        push_to_fifo(temp, read);
+    }
 }
