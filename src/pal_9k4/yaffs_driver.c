@@ -14,7 +14,7 @@
 
 #include "mt29f4g.h"
 
-#define MT29F4G_PAGES_PER_VIRTUAL_PAGE 2
+#define MT29F4G_PAGES_PER_VIRTUAL_PAGE 1
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
@@ -43,8 +43,9 @@ int yaffs_driver_init(struct yaffs_dev *dev) {
     dev->param.n_caches = 0;
     dev->param.cache_bypass_aligned = 0;
     dev->param.use_nand_ecc = 0;
-    dev->param.no_tags_ecc = 1;
+    dev->param.no_tags_ecc = 0;
     dev->param.is_yaffs2 = 1;
+    dev->param.wide_tnodes_disabled = 0;
 
     dev->drv.drv_write_chunk_fn = drv_write_chunk_fn;
     dev->drv.drv_read_chunk_fn = drv_read_chunk_fn;

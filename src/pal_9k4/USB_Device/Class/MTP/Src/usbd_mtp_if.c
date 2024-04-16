@@ -559,11 +559,13 @@ void mtp_readwrite_file_task() {
 
 void mtp_readwrite_file() {
     uint32_t fifo_size = get_fifo_size();
-    if (mtp_current_operation == 1 && fifo_size < MTP_FILE_FIFO_SIZE) {
-        uint8_t temp[MIN(MTP_FILE_READ_SIZE, MTP_FILE_FIFO_SIZE - fifo_size)];
-        int read =
-            yaffs_read(curr_file, temp,
-                       MIN(MTP_FILE_READ_SIZE, MTP_FILE_FIFO_SIZE - fifo_size));
+
+    if (mtp_current_operation == 1 && fifo_size < MTP_FILE_FIFO_SIZE - 1) {
+        uint8_t
+            temp[MIN(MTP_FILE_READ_SIZE, MTP_FILE_FIFO_SIZE - fifo_size - 1)];
+        int read = yaffs_read(
+            curr_file, temp,
+            MIN(MTP_FILE_READ_SIZE, MTP_FILE_FIFO_SIZE - fifo_size - 1));
         if (read < 0) {
             mtp_current_operation = 0;
             yaffs_close(curr_file);
