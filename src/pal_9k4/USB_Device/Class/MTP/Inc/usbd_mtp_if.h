@@ -27,7 +27,6 @@ extern "C" {
 /* Includes ------------------------------------------------------------------*/
 #include "status.h"
 #include "usbd_mtp.h"
-#include "yaffs2/yaffsfs.h"
 
 /* Exported Define -----------------------------------------------------------*/
 #define USBD_MTP_DEVICE_PROP_SUPPORTED 1U

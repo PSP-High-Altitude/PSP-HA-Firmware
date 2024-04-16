@@ -6,6 +6,8 @@
 #include "sensor.pb.h"
 #include "state.pb.h"
 
+#define NAND_MOUNT_POINT "/NAND"
+
 Status nand_flash_init();
 
 Status nand_flash_reinit();
@@ -24,6 +26,6 @@ Status nand_flash_dump_prf_stats(char stats[]);
 
 // Prints the files and directories at the specified path
 // Returns an error code on failure
-int yaffs_ls(const char* path);
+int f_ls(const char* path);
 
 #endif  // NAND_FLASH_H

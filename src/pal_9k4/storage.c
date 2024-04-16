@@ -49,6 +49,11 @@ Status init_storage(uint8_t usb_mode) {
     // Set USB mode
     g_usb_mode = usb_mode;
 
+    // Initialize FATFS
+    if (diskio_init(&s_sd_conf) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
     // For some reason SD init CANNOT go after queue creation
     Status sd_status = EXPECT_OK(nand_flash_init(), "NAND init");
     if (g_usb_mode) {

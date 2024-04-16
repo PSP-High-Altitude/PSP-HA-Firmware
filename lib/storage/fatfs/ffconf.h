@@ -193,7 +193,7 @@
 
 
 #define FF_MIN_SS		512
-#define FF_MAX_SS		512
+#define FF_MAX_SS 4096
 /* This set of options configures the range of sector size to be supported. (512,
 /  1024, 2048 or 4096) Always set both 512 for most systems, generic memory card and
 /  harddisk, but a larger value may be required for on-board flash memory and some
@@ -249,8 +249,7 @@
 /  FF_NORTC_MDAY and FF_NORTC_YEAR have no effect.
 /  These options have no effect in read-only configuration (FF_FS_READONLY = 1). */
 
-
-#define FF_FS_NOFSINFO	0
+#define FF_FS_NOFSINFO 1
 /* If you need to know correct free space on the FAT32 volume, set bit 0 of this
 /  option, and f_getfree() function at the first time after volume mount will force
 /  a full FAT scan. Bit 1 controls the use of last allocated cluster number.

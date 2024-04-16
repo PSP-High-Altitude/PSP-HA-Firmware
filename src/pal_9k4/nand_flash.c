@@ -1,34 +1,32 @@
 #include "nand_flash.h"
 
+#include "fatfs/ff.h"
 #include "main.h"
 #include "pb_create.h"
 #include "stdio.h"
 #include "timer.h"
 #include "usbd_mtp_if.h"
-#include "yaffs2/yaffs_driver.h"
-#include "yaffs2/yaffsfs.h"
 
 #define FNAME_LEN 16
 #define FDIR_LEN 32
 #define HEADER_LEN 64
 
+static FATFS g_fs;
+
 extern uint8_t usb_mode;
-extern int yaffs_err;
 
-static char s_fltdata_dir[FDIR_LEN] = "/";
-static char s_filename[FNAME_LEN + FDIR_LEN] = "dat_00.pb3";
-static char s_gpsfname[FNAME_LEN + FDIR_LEN] = "gps_00.pb3";
-static char s_statefname[FNAME_LEN + FDIR_LEN] = "fsl_00.pb3";
-static char s_prffname[FNAME_LEN + FDIR_LEN] = "prf_00.txt";
+static char s_fltdata_dir[FDIR_LEN] = NAND_MOUNT_POINT;
+static char s_filename[FNAME_LEN + FDIR_LEN] = "/dat_00.pb3";
+static char s_gpsfname[FNAME_LEN + FDIR_LEN] = "/gps_00.pb3";
+static char s_statefname[FNAME_LEN + FDIR_LEN] = "/fsl_00.pb3";
+static char s_prffname[FNAME_LEN + FDIR_LEN] = "/prf_00.txt";
 
-static int s_datfile;
-static int s_gpsfile;
-static int s_statefile;
+static FIL s_datfile;
+static FIL s_gpsfile;
+static FIL s_statefile;
 static uint8_t s_datfile_open = 0;
 static uint8_t s_gpsfile_open = 0;
 static uint8_t s_statefile_open = 0;
-
-struct yaffs_dev dev;
 
 // static pb_byte_t s_sensor_buffer[SENSOR_BUF_LEN];
 // static pb_byte_t s_gps_buffer[GPS_BUF_LEN];
@@ -40,14 +38,16 @@ extern uint32_t mtp_file_idx;
 
 static Status nand_flash_create_sensor_file() {
     // Create sensor data file
-    if ((s_datfile = yaffs_open(s_filename, O_CREAT | O_WRONLY,
-                                S_IREAD | S_IWRITE)) < 0) {
+    if (f_open(&s_datfile, s_filename, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
     s_datfile_open = 1;
 
     // Write the header
-    int bw = yaffs_write(s_datfile, s_header, HEADER_LEN);
+    UINT bw = 0;
+    if (f_write(&s_datfile, s_header, HEADER_LEN, &bw) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
 
     // Check the correct number of bytes was written
     if (bw != HEADER_LEN) {
@@ -55,7 +55,7 @@ static Status nand_flash_create_sensor_file() {
     }
 
     // Flush the header to disk
-    if (yaffs_sync(s_filename) != 0) {
+    if (f_sync(&s_datfile) != 0) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -69,14 +69,16 @@ static Status nand_flash_create_sensor_file() {
 
 static Status nand_flash_create_gps_file() {
     // Create gps data file
-    if ((s_gpsfile = yaffs_open(s_gpsfname, O_CREAT | O_WRONLY,
-                                S_IREAD | S_IWRITE)) < 0) {
+    if (f_open(&s_gpsfile, s_gpsfname, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
     s_gpsfile_open = 1;
 
     // Write the header
-    int bw = yaffs_write(s_gpsfile, s_header, HEADER_LEN);
+    UINT bw = 0;
+    if (f_write(&s_gpsfile, s_header, HEADER_LEN, &bw) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
 
     // Check the correct number of bytes was written
     if (bw != HEADER_LEN) {
@@ -84,7 +86,7 @@ static Status nand_flash_create_gps_file() {
     }
 
     // Flush the header to disk
-    if (yaffs_sync(s_gpsfname) != 0) {
+    if (f_sync(&s_gpsfile) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -98,14 +100,17 @@ static Status nand_flash_create_gps_file() {
 
 static Status nand_flash_create_state_file() {
     // Create state data file
-    if ((s_statefile = yaffs_open(s_statefname, O_CREAT | O_WRONLY,
-                                  S_IREAD | S_IWRITE)) < 0) {
+    if (f_open(&s_statefile, s_statefname, FA_CREATE_ALWAYS | FA_WRITE) !=
+        FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
     s_statefile_open = 1;
 
     // Write the header
-    int bw = yaffs_write(s_statefile, s_header, HEADER_LEN);
+    UINT bw = 0;
+    if (f_write(&s_statefile, s_header, HEADER_LEN, &bw) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
 
     // Check the correct number of bytes was written
     if (bw != HEADER_LEN) {
@@ -113,7 +118,7 @@ static Status nand_flash_create_state_file() {
     }
 
     // Flush the header to disk
-    if (yaffs_sync(s_statefname) != 0) {
+    if (f_sync(&s_statefile) != 0) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -127,43 +132,30 @@ static Status nand_flash_create_state_file() {
 
 static Status nand_flash_open_files() {
     // Traverse the directory to find the oldest and newest files
-    yaffs_DIR* dir = yaffs_opendir(s_fltdata_dir);
-    if (dir == NULL) {
+    DIR dir;
+    if (f_opendir(&dir, s_fltdata_dir) != FR_OK) {
         return STATUS_ERROR;
     }
 
     int32_t min_file_suffix = 100;
     int32_t max_file_suffix = -1;
 
-    struct yaffs_dirent* info;
+    FILINFO info;
     while (true) {
-        info = yaffs_readdir(dir);
-        if (info == NULL && yaffs_err != 0) {
-            yaffs_closedir(dir);
+        if (f_readdir(&dir, &info) != FR_OK) {
+            f_closedir(&dir);
             return STATUS_ERROR;
         }
-
-        if (info == NULL) {
+        if (info.fname[0] == '\0') {
             break;
         }
 
-        struct yaffs_stat stat;
-        char str[128];
-        if (snprintf(str, 128, "%s%s", s_fltdata_dir, info->d_name) < 0) {
-            yaffs_closedir(dir);
-            return STATUS_ERROR;
-        }
-        if (yaffs_lstat(str, &stat) != 0) {
-            yaffs_closedir(dir);
-            return STATUS_ERROR;
-        }
-
-        if ((stat.st_mode & S_IFMT) != S_IFREG) {
+        if (info.fattrib & AM_DIR) {
             continue;
         }
 
-        if (strncmp(info->d_name, "dat_", 4) == 0) {
-            int32_t suffix = atoi(info->d_name + 4);
+        if (strncmp(info.fname, "dat_", 4) == 0) {
+            int32_t suffix = atoi(info.fname + 4);
             if (suffix > max_file_suffix) {
                 max_file_suffix = suffix;
             }
@@ -173,7 +165,7 @@ static Status nand_flash_open_files() {
         }
     }
 
-    yaffs_closedir(dir);
+    f_closedir(&dir);
 
     // Remove files if there are more than NAND_MAX_FLIGHTS
     while (max_file_suffix - min_file_suffix > NAND_MAX_FLIGHTS - 1) {
@@ -185,10 +177,10 @@ static Status nand_flash_open_files() {
                  s_fltdata_dir, min_file_suffix);
         snprintf(s_prffname, FNAME_LEN + FDIR_LEN, "%sprf_%02ld.txt",
                  s_fltdata_dir, min_file_suffix);
-        yaffs_unlink(s_filename);
-        yaffs_unlink(s_gpsfname);
-        yaffs_unlink(s_statefname);
-        yaffs_unlink(s_prffname);
+        f_unlink(s_filename);
+        f_unlink(s_gpsfname);
+        f_unlink(s_statefname);
+        f_unlink(s_prffname);
         min_file_suffix++;
     }
 
@@ -237,7 +229,8 @@ Status nand_flash_write_sensor_data(pb_byte_t* frame, size_t size) {
         return STATUS_ERROR;
     }
 
-    if (yaffs_write(s_datfile, (uint8_t*)frame, size) != 0) {
+    UINT bw;
+    if (f_write(&s_datfile, (uint8_t*)frame, size, &bw) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -253,7 +246,8 @@ Status nand_flash_write_gps_data(pb_byte_t* frame, size_t size) {
         return STATUS_ERROR;
     }
 
-    if (yaffs_write(s_gpsfile, (uint8_t*)frame, size) != 0) {
+    UINT bw;
+    if (f_write(&s_gpsfile, (uint8_t*)frame, size, &bw) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -269,7 +263,8 @@ Status nand_flash_write_state_data(pb_byte_t* frame, size_t size) {
         return STATUS_ERROR;
     }
 
-    if (yaffs_write(s_statefile, (uint8_t*)frame, size) != 0) {
+    UINT bw;
+    if (f_write(&s_statefile, (uint8_t*)frame, size, &bw) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -277,12 +272,11 @@ Status nand_flash_write_state_data(pb_byte_t* frame, size_t size) {
 }
 
 Status nand_flash_dump_prf_stats(char stats[]) {
-    int prffile;
-    size_t bw = 0;
+    FIL prffile;
+    UINT bw = 0;
 
     // Create performance dump file
-    if ((prffile = yaffs_open(s_prffname, O_APPEND | O_CREAT | O_WRONLY,
-                              S_IREAD | S_IWRITE)) < 0) {
+    if (f_open(&prffile, s_prffname, FA_OPEN_APPEND | FA_WRITE) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -290,12 +284,12 @@ Status nand_flash_dump_prf_stats(char stats[]) {
     char timestamp[32];
     int size = snprintf(timestamp, 32, "%lu ms:\n", (uint32_t)MILLIS());
     if (size > 0) {
-        bw += yaffs_write(prffile, timestamp, size);
+        bw += f_write(&prffile, timestamp, size, &bw);
     }
 
     // Write the stats
     size = strlen(stats);
-    bw += yaffs_write(prffile, stats, size);
+    bw += f_write(&prffile, stats, size, &bw);
 
     // Check that something was written
     if (bw == 0) {
@@ -303,7 +297,7 @@ Status nand_flash_dump_prf_stats(char stats[]) {
     }
 
     // Close the file
-    if (yaffs_close(prffile) != 0) {
+    if (f_close(&prffile) != 0) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -311,17 +305,11 @@ Status nand_flash_dump_prf_stats(char stats[]) {
 }
 
 Status nand_flash_init() {
-    if (mt29f4g_init() != STATUS_OK) {
-        printf("Failed to initialize NAND hardware\n");
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    yaffsfs_OSInitialisation();
-    yaffs_driver_init(&dev);
-
-    int status = yaffs_mount("/");
+    mt29f4g_erase_chip();
+    memset(&g_fs, 0, sizeof(g_fs));
+    int status = f_mount(&g_fs, NAND_MOUNT_POINT, 1);
 #ifdef NAND_ALLOW_REFORMAT
-    if (status != 0) {
+    if (status == FR_NO_FILESYSTEM) {
         printf("No file system found. Formatting...\n");
         // Fully erase the chip before formatting
         status = mt29f4g_erase_chip();
@@ -329,23 +317,23 @@ Status nand_flash_init() {
             printf("Failed to erase NAND: %d\n", status);
             return STATUS_HARDWARE_ERROR;
         }
-        status = yaffs_format("/", 0, 0, 0);
-        if (status != 0) {
+        BYTE work[FF_MAX_SS];
+        MKFS_PARM format_opts;
+        memset(&format_opts, 0, sizeof(format_opts));
+        format_opts.fmt = FM_FAT32;
+
+        status = f_mkfs(NAND_MOUNT_POINT, &format_opts, work, FF_MAX_SS);
+        if (status != FR_OK) {
             printf("Failed to format NAND: %d\n", status);
             return STATUS_HARDWARE_ERROR;
         }
-        status = yaffs_mount("/");
-        if (status != 0) {
-            printf("Failed to mount NAND: %d\n", status);
-            return STATUS_HARDWARE_ERROR;
-        }
+        status = f_mount(&g_fs, NAND_MOUNT_POINT, 1);
     }
-#else
-    if (status != 0) {
+#endif
+    if (status != FR_OK) {
         printf("Failed to mount NAND: %d\n", status);
         return STATUS_HARDWARE_ERROR;
     }
-#endif
     printf("NAND mounted successfully!\n");
 
     if (usb_mode == 1) {
@@ -357,53 +345,51 @@ Status nand_flash_init() {
     }
 
     // See the files in the root directory
-    if (yaffs_ls("/") != 0) {
+    if (f_ls(NAND_MOUNT_POINT) != 0) {
         printf("Failed to list files on flash\n");
         return STATUS_HARDWARE_ERROR;
     }
 
-    // See the space remaining
-    // lfs_ssize_t fs_size = lfs_fs_size(&g_fs);
-    // if (fs_size < 0) {
-    //    printf("Failed to get file system space\n");
-    //    return STATUS_HARDWARE_ERROR;
-    //} else {
-    //    lfs_size_t fs_free =
-    //        (g_lfs_cfg->block_count * g_lfs_cfg->block_size) - fs_size;
-    //    static const char *prefixes[] = {"", "K", "M", "G"};
-    //    for (int i = sizeof(prefixes) / sizeof(prefixes[0]) - 1; i >= 0; i--)
-    //    {
-    //        if (fs_free >= (1 << 10 * i) - 1) {
-    //            printf("Remaining space: %*lu%sB\n", 4 - (i != 0),
-    //                   fs_free >> 10 * i, prefixes[i]);
-    //            break;
-    //        }
-    //    }
-    //}
+    // Get free space
+    DWORD clusters;
+    FATFS* fs = &g_fs;
+    if (f_getfree(NAND_MOUNT_POINT, &clusters, &fs) != FR_OK) {
+        printf("Failed to get nand filesystem space\n");
+        return STATUS_HARDWARE_ERROR;
+    }
+    uint32_t fs_free = clusters * fs->csize * fs->ssize;
+    static const char* prefixes[] = {"", "K", "M", "G"};
+    for (int i = sizeof(prefixes) / sizeof(prefixes[0]) - 1; i >= 0; i--) {
+        if (fs_free >= (1 << 10 * i) - 1) {
+            printf("Remaining space: %*lu%sB\n", 4 - (i != 0),
+                   fs_free >> 10 * i, prefixes[i]);
+            break;
+        }
+    }
 
     return STATUS_OK;
 }
 
 Status nand_flash_reinit() {
     if (!s_datfile_open) {
-        if ((s_datfile = yaffs_open(s_filename, O_APPEND | O_WRONLY,
-                                    S_IWRITE | S_IREAD)) < 0) {
+        if (f_open(&s_datfile, s_filename, FA_CREATE_ALWAYS | FA_WRITE) !=
+            FR_OK) {
             return STATUS_HARDWARE_ERROR;
             s_datfile_open = 0;
         }
         s_datfile_open = 1;
     }
     if (!s_gpsfile_open) {
-        if ((s_gpsfile = yaffs_open(s_gpsfname, O_APPEND | O_WRONLY,
-                                    S_IWRITE | S_IREAD)) < 0) {
+        if (f_open(&s_gpsfile, s_gpsfname, FA_CREATE_ALWAYS | FA_WRITE) !=
+            FR_OK) {
             return STATUS_HARDWARE_ERROR;
             s_gpsfile_open = 0;
         }
         s_gpsfile_open = 1;
     }
     if (!s_statefile_open) {
-        if ((s_statefile = yaffs_open(s_statefname, O_APPEND | O_WRONLY,
-                                      S_IWRITE | S_IREAD)) < 0) {
+        if (f_open(&s_statefile, s_statefname, FA_CREATE_ALWAYS | FA_WRITE) !=
+            FR_OK) {
             return STATUS_HARDWARE_ERROR;
             s_statefile_open = 0;
         }
@@ -415,19 +401,19 @@ Status nand_flash_reinit() {
 
 Status nand_flash_deinit() {
     if (s_datfile_open) {
-        if (yaffs_close(s_datfile) != 0) {
+        if (f_close(&s_datfile) != 0) {
             return STATUS_HARDWARE_ERROR;
         }
         s_datfile_open = 0;
     }
     if (s_gpsfile_open) {
-        if (yaffs_close(s_gpsfile) != 0) {
+        if (f_close(&s_gpsfile) != 0) {
             return STATUS_HARDWARE_ERROR;
         }
         s_gpsfile_open = 0;
     }
     if (s_statefile_open) {
-        if (yaffs_close(s_statefile) != 0) {
+        if (f_close(&s_statefile) != 0) {
             return STATUS_HARDWARE_ERROR;
         }
         s_statefile_open = 0;
@@ -438,17 +424,17 @@ Status nand_flash_deinit() {
 
 Status nand_flash_flush() {
     if (s_datfile_open) {
-        if (yaffs_sync(s_filename) != 0) {
+        if (f_sync(&s_datfile) != 0) {
             return STATUS_HARDWARE_ERROR;
         }
     }
     if (s_gpsfile_open) {
-        if (yaffs_sync(s_gpsfname) != 0) {
+        if (f_sync(&s_gpsfile) != 0) {
             return STATUS_HARDWARE_ERROR;
         }
     }
     if (s_statefile_open) {
-        if (yaffs_sync(s_statefname) != 0) {
+        if (f_sync(&s_statefile) != 0) {
             return STATUS_HARDWARE_ERROR;
         }
     }
@@ -456,60 +442,45 @@ Status nand_flash_flush() {
     return STATUS_OK;
 }
 
-int yaffs_ls(const char* path) {
-    yaffs_DIR* dir = yaffs_opendir(path);
-    if (dir == NULL) {
+int f_ls(const char* path) {
+    DIR dir;
+    if (f_opendir(&dir, path) != FR_OK) {
         return STATUS_ERROR;
     }
 
-    struct yaffs_dirent* info;
+    FILINFO info;
     while (true) {
-        info = yaffs_readdir(dir);
-        if (info == NULL && yaffs_err != 0) {
-            yaffs_closedir(dir);
+        if (f_readdir(&dir, &info) != FR_OK) {
+            f_closedir(&dir);
             return STATUS_ERROR;
         }
 
-        if (info == NULL) {
+        if (info.fname[0] == '\0') {
             break;
         }
 
-        struct yaffs_stat stat;
-        char str[128];
-        if (snprintf(str, 128, "%s%s", path, info->d_name) < 0) {
-            yaffs_closedir(dir);
-            return STATUS_ERROR;
-        }
-        if (yaffs_lstat(str, &stat) != 0) {
-            yaffs_closedir(dir);
-            return STATUS_ERROR;
-        }
-
-        switch (stat.st_mode & S_IFMT) {
-            case S_IFREG:
+        switch (info.fattrib & AM_DIR) {
+            case 0:
                 printf("reg ");
                 break;
-            case S_IFDIR:
+            case AM_DIR:
                 printf("dir ");
-                break;
-            default:
-                printf("?   ");
                 break;
         }
 
         static const char* prefixes[] = {"", "K", "M", "G"};
         for (int i = sizeof(prefixes) / sizeof(prefixes[0]) - 1; i >= 0; i--) {
-            if (stat.st_size >= (1 << 10 * i) - 1) {
-                printf("%*lu%sB ", 4 - (i != 0), stat.st_size >> 10 * i,
+            if (info.fsize >= (1 << 10 * i) - 1) {
+                printf("%*lu%sB ", 4 - (i != 0), (uint32_t)info.fsize >> 10 * i,
                        prefixes[i]);
                 break;
             }
         }
 
-        printf("%s\n", info->d_name);
+        printf("%s\n", info.fname);
     }
 
-    if (yaffs_closedir(dir) != 0) {
+    if (f_closedir(&dir) != 0) {
         return STATUS_ERROR;
     }
 

@@ -115,7 +115,6 @@ static Status sd_create_state_file() {
 }
 
 Status sd_init(SdDevice* dev) {
-    diskio_init(dev);
     if (f_mount(&g_fs, SD_MOUNT_POINT, 1) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
