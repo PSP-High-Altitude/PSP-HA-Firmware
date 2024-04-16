@@ -158,6 +158,7 @@ Status ospi_auto_poll_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
 
         // Wait for the data to come
         while (HAL_OSPI_GetState(&ospi1_handle) != HAL_OSPI_STATE_READY) {
+            DELAY(0);
         }
 
         // Check if the data matches
@@ -184,6 +185,7 @@ Status ospi_write(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd, uint8_t* tx_buf,
     uint64_t start_time = MILLIS();
     while (HAL_OSPI_GetState(&ospi1_handle) != HAL_OSPI_STATE_READY) {
         if (MILLIS() - start_time > timeout) {
+            DELAY(0);
             return STATUS_TIMEOUT_ERROR;
         }
     }
@@ -204,6 +206,7 @@ Status ospi_read(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd, uint8_t* rx_buf,
     uint64_t start_time = MILLIS();
     while (HAL_OSPI_GetState(&ospi1_handle) != HAL_OSPI_STATE_READY) {
         if (MILLIS() - start_time > timeout) {
+            DELAY(0);
             return STATUS_TIMEOUT_ERROR;
         }
     }
