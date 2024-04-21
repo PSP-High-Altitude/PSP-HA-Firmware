@@ -4,6 +4,8 @@
 #include "board.h"
 #include "flight_estimation.h"
 
+volatile int uxTopUsedPriority;
+
 #define DEBUG
 // #define DEBUG_STORAGE
 // #define PSPCOM_SENSORS

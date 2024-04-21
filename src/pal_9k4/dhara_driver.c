@@ -77,7 +77,6 @@ int dhara_nand_prog(const struct dhara_nand *n, dhara_page_t p,
     int num_partial_pages = 1U << partial_page_shift;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
-    if (data[0] == 235) printf("prog: page: %lu, data[0]: %d\n", p, data[0]);
     if (mt29f4g_write_partial_page(data, p >> partial_page_shift,
                                    (p % num_partial_pages) * n->log2_page_size,
                                    1U << n->log2_page_size) != STATUS_OK) {

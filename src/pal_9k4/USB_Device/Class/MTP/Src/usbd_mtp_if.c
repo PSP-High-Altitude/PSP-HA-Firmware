@@ -20,11 +20,14 @@
 #include "usbd_mtp_if.h"
 
 #include "FreeRTOS.h"
+#include "dhara/map.h"
 #include "fatfs/ff.h"
 #include "nand_flash.h"
 #include "task.h"
 #include "timer.h"
 #include "usbd_mtp_opt.h"
+
+#define MTP_DRIVE_POINT NAND_MOUNT_POINT "/"
 
 /* Private typedef -----------------------------------------------------------*/
 /* Private variables ---------------------------------------------------------*/
@@ -58,8 +61,9 @@ struct {
 } mtp_file_fifo;
 uint8_t mtp_current_operation = 0;  // 0: no operation, 1: read, 2: write
 
+extern struct dhara_map s_map;
+extern struct dhara_nand s_nand;
 FIL curr_file;
-
 int test_flag = 0;
 
 /* Private define ------------------------------------------------------------*/
@@ -357,7 +361,7 @@ static uint16_t USBD_MTP_Itf_Create_NewObject(MTP_ObjectInfoTypeDef ObjectInfo,
  */
 static uint64_t USBD_MTP_Itf_GetMaxCapability(void) {
     uint64_t max_cap =
-        MT29F4G_BLOCK_COUNT * MT29F4G_PAGE_PER_BLOCK * MT29F4G_PAGE_SIZE;
+        dhara_map_capacity(&s_map) * (1U << s_nand.log2_page_size);
 
     return max_cap;
 }
@@ -370,7 +374,7 @@ static uint64_t USBD_MTP_Itf_GetMaxCapability(void) {
  */
 static uint64_t USBD_MTP_Itf_GetFreeSpaceInBytes(void) {
     uint64_t fs_free =
-        (MT29F4G_BLOCK_COUNT * MT29F4G_PAGE_PER_BLOCK * MT29F4G_PAGE_SIZE) -
+        dhara_map_capacity(&s_map) * (1U << s_nand.log2_page_size) -
         mtp_fs_size;
 
     return fs_free;
@@ -420,6 +424,9 @@ static uint32_t USBD_MTP_Itf_GetContainerLength(uint32_t Param1) {
  */
 static uint16_t USBD_MTP_Itf_DeleteObject(uint32_t Param1) {
     int idx = Param1 - 1;
+    char path[256];
+    snprintf(path, 256, "%s/%s", NAND_MOUNT_POINT,
+             (char *)mtp_files[idx].Filename);
     if (mtp_files[idx].ObjectFormat == MTP_OBJ_FORMAT_ASSOCIATION) {
         for (int i = idx; i < mtp_file_idx; i++) {
             if (mtp_files[i].ParentObject == Param1) {
@@ -428,12 +435,12 @@ static uint16_t USBD_MTP_Itf_DeleteObject(uint32_t Param1) {
                 }
             }
         }
-        int ret = f_unlink((char *)mtp_files[idx].Filename);
+        int ret = f_unlink(path);
         if (ret < 0) {
             return 0x2002;
         }
     } else {
-        int ret = f_unlink((char *)mtp_files[idx].Filename);
+        int ret = f_unlink(path);
         if (ret < 0) {
             return 0x2002;
         }
@@ -470,9 +477,11 @@ static uint32_t USBD_MTP_Itf_ReadData(uint32_t Param1, uint8_t *buff,
                                       MTP_DataLengthTypeDef *data_length,
                                       USBD_HandleTypeDef *pdev) {
     if (data_length->temp_length == 0) {
+        char path[256];
+        snprintf(path, 256, "%s/%s", NAND_MOUNT_POINT,
+                 (char *)mtp_files[Param1 - 1].Filename);
         // Open file on first read
-        if (f_open(&curr_file, (char *)mtp_files[Param1 - 1].Filename,
-                   FA_READ) != FR_OK) {
+        if (f_open(&curr_file, path, FA_READ) != FR_OK) {
             data_length->totallen = 0;
             return 0;
         }

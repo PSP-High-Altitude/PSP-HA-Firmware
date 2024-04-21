@@ -169,13 +169,13 @@ static Status nand_flash_open_files() {
 
     // Remove files if there are more than NAND_MAX_FLIGHTS
     while (max_file_suffix - min_file_suffix > NAND_MAX_FLIGHTS - 1) {
-        snprintf(s_filename, FNAME_LEN + FDIR_LEN, "%sdat_%02ld.pb3",
+        snprintf(s_filename, FNAME_LEN + FDIR_LEN, "%s/dat_%02ld.pb3",
                  s_fltdata_dir, min_file_suffix);
-        snprintf(s_gpsfname, FNAME_LEN + FDIR_LEN, "%sgps_%02ld.pb3",
+        snprintf(s_gpsfname, FNAME_LEN + FDIR_LEN, "%s/gps_%02ld.pb3",
                  s_fltdata_dir, min_file_suffix);
-        snprintf(s_statefname, FNAME_LEN + FDIR_LEN, "%sfsl_%02ld.pb3",
+        snprintf(s_statefname, FNAME_LEN + FDIR_LEN, "%s/fsl_%02ld.pb3",
                  s_fltdata_dir, min_file_suffix);
-        snprintf(s_prffname, FNAME_LEN + FDIR_LEN, "%sprf_%02ld.txt",
+        snprintf(s_prffname, FNAME_LEN + FDIR_LEN, "%s/prf_%02ld.txt",
                  s_fltdata_dir, min_file_suffix);
         f_unlink(s_filename);
         f_unlink(s_gpsfname);
@@ -190,14 +190,14 @@ static Status nand_flash_open_files() {
     }
 
     // Create new file names
-    snprintf(s_filename, FNAME_LEN + FDIR_LEN, "%sdat_%02ld.pb3", s_fltdata_dir,
-             max_file_suffix + 1);
-    snprintf(s_gpsfname, FNAME_LEN + FDIR_LEN, "%sgps_%02ld.pb3", s_fltdata_dir,
-             max_file_suffix + 1);
-    snprintf(s_statefname, FNAME_LEN + FDIR_LEN, "%sfsl_%02ld.pb3",
+    snprintf(s_filename, FNAME_LEN + FDIR_LEN, "%s/dat_%02ld.pb3",
              s_fltdata_dir, max_file_suffix + 1);
-    snprintf(s_prffname, FNAME_LEN + FDIR_LEN, "%sprf_%02ld.txt", s_fltdata_dir,
-             max_file_suffix + 1);
+    snprintf(s_gpsfname, FNAME_LEN + FDIR_LEN, "%s/gps_%02ld.pb3",
+             s_fltdata_dir, max_file_suffix + 1);
+    snprintf(s_statefname, FNAME_LEN + FDIR_LEN, "%s/fsl_%02ld.pb3",
+             s_fltdata_dir, max_file_suffix + 1);
+    snprintf(s_prffname, FNAME_LEN + FDIR_LEN, "%s/prf_%02ld.txt",
+             s_fltdata_dir, max_file_suffix + 1);
 
     // Initialize the sensor file and stream
     Status sensor_status = nand_flash_create_sensor_file();
@@ -305,7 +305,6 @@ Status nand_flash_dump_prf_stats(char stats[]) {
 }
 
 Status nand_flash_init() {
-    mt29f4g_erase_chip();
     memset(&g_fs, 0, sizeof(g_fs));
     int status = f_mount(&g_fs, NAND_MOUNT_POINT, 1);
 #ifdef NAND_ALLOW_REFORMAT
@@ -340,6 +339,7 @@ Status nand_flash_init() {
         // Open the files
         Status open_file_stat = nand_flash_open_files();
         if (open_file_stat != STATUS_OK) {
+            printf("Failed to open files on flash\n");
             return open_file_stat;
         }
     }

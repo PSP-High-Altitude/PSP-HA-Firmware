@@ -122,10 +122,10 @@ static uint8_t void_buf[512];                      // another SPI wrapper
 static SdmmcDevice s_sd_sdmmc_device;
 #endif
 
-static struct dhara_nand s_nand;
-static struct dhara_map s_map;
+struct dhara_nand s_nand;
+struct dhara_map s_map;
 // static uint8_t s_map_buffer[1U << (MT29F4G_PAGE_SIZE_LOG2 - 2)];
-static uint8_t s_map_buffer[1U << MT29F4G_PAGE_SIZE_LOG2];
+RAM_D2 static uint8_t s_map_buffer[1U << MT29F4G_PAGE_SIZE_LOG2];
 static dhara_error_t s_map_error;
 
 /* Initialize MMC and NAND interface */
@@ -516,12 +516,15 @@ DRESULT disk_read(
         return RES_OK;
 #endif
     } else if (drv == 1) {
-        for (int i = 0; i < count;
-             i++, sect++, buff += (1U << s_nand.log2_page_size)) {
+        unsigned int i = 0;
+        while (i < count) {
             if (dhara_map_read(&s_map, sect, (uint8_t *)buff, &s_map_error) !=
                 0) {
                 return RES_ERROR;
             }
+            i++;
+            sect++;
+            buff += (1U << s_nand.log2_page_size);
         }
         return RES_OK;
     }
@@ -576,12 +579,15 @@ DRESULT disk_write(BYTE drv,         /* Physical drive number (0) */
         return RES_OK;
 #endif
     } else if (drv == 1) {
-        for (int i = 0; i < count;
-             i++, sect++, buff += (1U << s_nand.log2_page_size)) {
+        unsigned int i = 0;
+        while (i < count) {
             if (dhara_map_write(&s_map, sect, (uint8_t *)buff, &s_map_error) !=
                 0) {
                 return RES_ERROR;
             }
+            i++;
+            sect++;
+            buff += (1U << s_nand.log2_page_size);
         }
         return RES_OK;
     }

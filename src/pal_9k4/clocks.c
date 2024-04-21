@@ -127,6 +127,10 @@ void SystemClock_Config() {
 
     // Initialize SDMMC
     __HAL_RCC_SDMMC1_CLK_ENABLE();
+
+    // Enable RAM D2
+    __HAL_RCC_D2SRAM1_CLK_ENABLE();
+    __HAL_RCC_D2SRAM2_CLK_ENABLE();
 }
 
 HAL_StatusTypeDef HAL_InitTick(uint32_t TickPriority) {

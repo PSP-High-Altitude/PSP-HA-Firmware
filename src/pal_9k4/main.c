@@ -31,13 +31,12 @@ uint32_t usb_serial_buffer_idx = 0;
 uint8_t usb_mode = 1;  // 0 = MTP, 1 = Normal
 
 // Sorry about preprocessor abuse, but this really does make the code cleaner
-#define TASK_STACK_SIZE 2048
-#define TASK_CREATE(func, pri)                                          \
+#define TASK_CREATE(func, pri, ss)                                      \
     do {                                                                \
         static TaskHandle_t s_##func##_handle;                          \
         if (xTaskCreate(func,                     /* Task function */   \
                         #func,                    /* Task name */       \
-                        TASK_STACK_SIZE,          /* Stack size */      \
+                        ss,                       /* Stack size */      \
                         NULL,                     /* Parameters */      \
                         tskIDLE_PRIORITY + (pri), /* Priority */        \
                         &s_##func##_handle        /* Task handle */     \
@@ -156,19 +155,19 @@ void init_task() {
     // Start tasks if we are in normal mode
     if (usb_mode == 1) {
         printf("Launching tasks\n");
-        TASK_CREATE(pyros_task, +5);
-        TASK_CREATE(read_sensors_task, +4);
-        TASK_CREATE(state_est_task, +3);
-        TASK_CREATE(pspcom_process_bytes, +3);
-        TASK_CREATE(pspcom_send_standard, +2);
-        TASK_CREATE(read_gps_task, +2);
-        TASK_CREATE(storage_task, +1);
+        TASK_CREATE(pyros_task, +5, 2048);
+        TASK_CREATE(read_sensors_task, +4, 2048);
+        TASK_CREATE(state_est_task, +3, 2048);
+        TASK_CREATE(pspcom_process_bytes, +3, 2048);
+        TASK_CREATE(pspcom_send_standard, +2, 2048);
+        TASK_CREATE(read_gps_task, +2, 2048);
+        TASK_CREATE(storage_task, +1, 2048);
     } else {
         // MTP mode data queuing task
-        TASK_CREATE(mtp_readwrite_file_task, +1);
+        TASK_CREATE(mtp_readwrite_file_task, +1, 2048);
     }
 #ifdef DEBUG_MEMORY_USAGE
-    TASK_CREATE(debug_memory_usage_task, +1);
+    TASK_CREATE(debug_memory_usage_task, +1, 512);
 #endif
 
     xTaskResumeAll();
@@ -179,6 +178,7 @@ void init_task() {
 }
 
 int main(void) {
+    uxTopUsedPriority = configMAX_PRIORITIES - 1;
     HAL_Init();
     SystemClock_Config();
     init_timers();
@@ -192,7 +192,7 @@ int main(void) {
     // https://www.freertos.org/RTOS-Cortex-M3-M4.html
     NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
 
-    TASK_CREATE(init_task, -1);
+    TASK_CREATE(init_task, -1, 8192);
 
     printf("Starting scheduler\n");
 
