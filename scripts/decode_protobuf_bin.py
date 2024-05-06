@@ -1,7 +1,7 @@
 import struct
 import time
 import sys
-
+import os
 import pandas as pd
 
 def decode_protobuf_file(file_path, protobuf_class):
@@ -102,8 +102,29 @@ if __name__ == "__main__":
         print("Usage: python decode_protobuf_bin.py [sensor | gps | state] input_bin output_csv")
         sys.exit(1)
 
+    # Copy the input file to avoid modifying the original
+    with open(input_bin_path, 'rb') as file:
+        with open(input_bin_path + '_copy', 'wb') as copy_file:
+            copy_file.write(file.read())
+            copy_file.close()
+        file.close()
+
     # Decode the protobuf messages
-    sensor_frames = decode_protobuf_file(input_bin_path, protobuf_class)
+    while True:
+        try:
+            # If successful, move on
+            sensor_frames = decode_protobuf_file(input_bin_path + '_copy', protobuf_class)
+            break
+        except:
+            # If failed, truncate the file by 1 byte and try again
+            print("Failed - Truncating...")
+            st_size = os.stat(input_bin_path + '_copy').st_size
+            with open(input_bin_path + '_copy', 'r+b') as copy_file:
+                copy_file.truncate(st_size-1)
+                copy_file.close()
+
+    # Remove the copied file
+    os.remove(input_bin_path + '_copy')
 
     # Do any required processing
     if frame_kind == "gps":

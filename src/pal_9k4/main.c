@@ -161,7 +161,7 @@ void init_task() {
         TASK_CREATE(pspcom_process_bytes, +3, 2048);
         TASK_CREATE(pspcom_send_standard, +2, 2048);
         TASK_CREATE(read_gps_task, +2, 2048);
-        TASK_CREATE(storage_task, +1, 2048);
+        TASK_CREATE(storage_task, +1, 4096);
     } else {
         // MTP mode data queuing task
         TASK_CREATE(mtp_readwrite_file_task, +1, 2048);
