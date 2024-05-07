@@ -1,8 +1,10 @@
 #ifndef DATA_H
 #define DATA_H
 
-#include <max_m10s.h>
 #include <stdint.h>
+
+#include "sensor.pb.h"
+#include "vector.h"
 
 // Barometer MS5637
 
@@ -38,11 +40,13 @@ typedef struct {
 
 typedef struct {
     uint64_t timestamp;
-    Accel acch;
-    Accel accel;
-    Gyro gyro;
-    Mag mag;
-    BaroData baro;
+    Vector acch;
+    Vector accel;
+    Vector gyro;
+    Vector mag;
+    // BaroData baro;
+    float pressure;
+    float temperature;
 } SensorData;
 
 #endif // DATA_H

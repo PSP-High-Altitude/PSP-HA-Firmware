@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+message GpsFrame {
+  // System timestamp (us since power on)
+  uint64 timestamp = 1;
+
+  // UTC time
+  uint32 year = 2;
+  uint32 month = 3;
+  uint32 day = 4;
+  uint32 hour = 5;
+  uint32 min = 6;
+  uint32 sec = 7;
+
+  // Packed validity flags
+  uint64 valid_flags = 8;
+
+  // Nav info
+  uint32 num_sats = 9;
+  float lon = 10;                // deg
+  float lat = 11;                // deg
+  float height = 12;             // m
+  float height_msl = 13;         // m
+  float accuracy_horiz = 14;     // m
+  float accuracy_vertical = 15;  // m
+  float vel_north = 16;          // m/s
+  float vel_east = 17;           // m/s
+  float vel_down = 18;           // m/s
+  float ground_speed = 19;       // m/s
+  float hdg = 20;                // deg
+  float accuracy_speed = 21;     // m/s
+  float accuracy_hdg = 22;       // deg
+}

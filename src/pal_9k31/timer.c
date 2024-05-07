@@ -1,6 +1,8 @@
 #include "timer.h"
 
+#include "FreeRTOS.h"
 #include "stm32g4xx_hal.h"
+#include "task.h"
 
 TIM_HandleTypeDef tim2_handle;
 TIM_HandleTypeDef tim3_handle;
@@ -60,8 +62,12 @@ uint64_t MICROS() {
 uint64_t MILLIS() { return MICROS() / 1000; }
 
 void DELAY(uint16_t mS) {
-    uint64_t start = MILLIS();
-    while (MILLIS() < start + mS) {
+    if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+        vTaskDelay(pdMS_TO_TICKS(mS));
+    } else {
+        uint64_t start = MILLIS();
+        while (MILLIS() < start + mS) {
+        }
     }
 }
 

@@ -7,7 +7,6 @@
 #include "board.h"
 #include "clocks.h"
 #include "data.h"
-#include "fatfs/sd.h"
 #include "gpio/gpio.h"
 #include "iis2mdc/iis2mdc.h"
 #include "lfs.h"
@@ -15,9 +14,17 @@
 #include "max_m10s.h"
 #include "ms5637/ms5637.h"
 #include "mt29f2g.h"
+#include "pb.h"
+#include "pspcom.h"
 #include "qspi/qspi.h"
+#include "sd.h"
 #include "status.h"
+#include "stm32g474xx.h"
 #include "timer.h"
+
+// FreeRTOS
+#include "FreeRTOS.h"
+#include "task.h"
 
 #ifdef USE_SPI_CRC
 #undef USE_SPI_CRC
@@ -31,28 +38,47 @@
 #define PIN_PROG PIN_PB8
 #define PIN_BUZZER PIN_PB9
 
-#define TARGET_INTERVAL 30  // ms
+#define TARGET_INTERVAL 40  // ms
 
 #define LOG_FIFO_LEN 256
 
 #define DEBUG
 
-TIM_HandleTypeDef tim6_handle;
-
-lfs_t lfs;
-lfs_file_t file;
-
-Status init_flash_fs();
-
 extern PCD_HandleTypeDef hpcd_USB_FS;
 
 volatile static struct {
-    SensorData queue[LOG_FIFO_LEN];
-    size_t ridx;  // Next index that will be read from
-    size_t widx;  // Next index that will be written to
+    SensorFrame queue[LOG_FIFO_LEN];
+    size_t head;  // Next index that will be read from
+    size_t tail;  // Next index that will be written to
+    size_t count;
     // ridx == widx -> FIFO is empty
     // (ridx == widx - 1) mod LOG_FIFO_LEN -> FIFO is full
 } fifo;
+
+void init_fifo() {
+    fifo.head = 0;
+    fifo.tail = 0;
+    fifo.count = 0;
+}
+
+SensorFrame read_fifo() {
+    SensorFrame ret = fifo.queue[fifo.head];
+    fifo.head = (fifo.head + 1) % LOG_FIFO_LEN;
+    fifo.count--;
+    return ret;
+}
+
+void write_fifo(SensorFrame data) {
+    if (fifo.count == LOG_FIFO_LEN) {
+        fifo.head = (fifo.head + 1) % LOG_FIFO_LEN;
+        fifo.count--;
+    }
+    fifo.queue[fifo.tail] = data;
+    fifo.tail = (fifo.tail + 1) % LOG_FIFO_LEN;
+    fifo.count++;
+}
+
+static SensorFrame s_last_sensor_data;
 
 static I2cDevice s_mag_conf = {
     .address = 0x1E,
@@ -76,12 +102,9 @@ static SpiDevice s_imu_conf = {
     .cs = 0,
     .periph = P_SPI1,
 };
-static SpiDevice s_sd_conf = {
-    .clk = SPI_SPEED_10MHz,
-    .cpol = 0,
-    .cpha = 0,
-    .cs = 0,
-    .periph = P_SPI4,
+static SdDevice s_sd_conf = {
+    .clk = SD_SPEED_10MHz,
+    .periph = P_SD4,
 };
 static SpiDevice s_acc_conf = {
     .clk = SPI_SPEED_1MHz,
@@ -90,8 +113,6 @@ static SpiDevice s_acc_conf = {
     .cs = 0,
     .periph = P_SPI2,
 };
-
-volatile uint32_t s_last_sensor_read_us;
 
 int _write(int file, char *data, int len) {
     if ((file != STDOUT_FILENO) && (file != STDERR_FILENO)) {
@@ -113,35 +134,188 @@ int _write(int file, char *data, int len) {
     return len;
 }
 
-void init_tim6() {
-    __HAL_RCC_TIM6_CLK_ENABLE();
+static TaskHandle_t s_read_sensors_handle;
+static TaskHandle_t s_read_gps_handle;
+static TaskHandle_t s_store_data_handle;
+static TaskHandle_t s_usb_telem_handle;
 
-    TIM_Base_InitTypeDef tim6_conf = {
-        .Prescaler = 16800,
-        .CounterMode = TIM_COUNTERMODE_UP,
-        .Period = TARGET_INTERVAL * 10,
-        .AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE,
-    };
-    tim6_handle.Init = tim6_conf;
-    tim6_handle.Instance = TIM6;
-    tim6_handle.Channel = TIM_CHANNEL_1;
-    TIM_MasterConfigTypeDef tim6_master_conf = {
-        .MasterOutputTrigger = TIM_TRGO_RESET,
-        .MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE,
-    };
+static TickType_t s_last_sensor_read_ticks;
 
-    HAL_TIM_Base_Init(&tim6_handle);
-    HAL_TIMEx_MasterConfigSynchronization(&tim6_handle, &tim6_master_conf);
+void read_sensors() {
+    s_last_sensor_read_ticks = xTaskGetTickCount();
+    while (1) {
+        BaroData baro =
+            ms5637_read(&s_baro_conf, OSR_256);    // Baro read takes longest
+        uint64_t timestamp = xTaskGetTickCount();  // So measure timestamp after
+        Accel acch = adxl372_read_accel(&s_acc_conf);
+        Accel accel = lsm6dsox_read_accel(&s_imu_conf);
+        Gyro gyro = lsm6dsox_read_gyro(&s_imu_conf);
+        Mag mag = iis2mdc_read(&s_mag_conf);
 
-    HAL_NVIC_SetPriority(TIM6_DAC_IRQn, 1, 0);
-    HAL_NVIC_EnableIRQ(TIM6_DAC_IRQn);
+        s_last_sensor_data.timestamp = timestamp;
+
+        s_last_sensor_data.acc_h_x = acch.accelX;
+        s_last_sensor_data.acc_h_y = acch.accelY;
+        s_last_sensor_data.acc_h_z = acch.accelZ;
+
+        s_last_sensor_data.acc_i_x = accel.accelX;
+        s_last_sensor_data.acc_i_y = accel.accelY;
+        s_last_sensor_data.acc_i_z = accel.accelZ;
+
+        s_last_sensor_data.rot_i_x = gyro.gyroX;
+        s_last_sensor_data.rot_i_y = gyro.gyroY;
+        s_last_sensor_data.rot_i_z = gyro.gyroZ;
+
+        s_last_sensor_data.mag_i_x = mag.magX;
+        s_last_sensor_data.mag_i_y = mag.magY;
+        s_last_sensor_data.mag_i_z = mag.magZ;
+
+        s_last_sensor_data.temperature = baro.temperature;
+        s_last_sensor_data.pressure = baro.pressure;
+
+        write_fifo(s_last_sensor_data);
+        xTaskNotifyGive(s_store_data_handle);
+        vTaskDelayUntil(&s_last_sensor_read_ticks,
+                        pdMS_TO_TICKS(TARGET_INTERVAL));
+    }
 }
 
-void set_tim6_it(uint8_t setting) {
-    if (setting) {
-        HAL_TIM_Base_Start_IT(&tim6_handle);
-    } else {
-        HAL_TIM_Base_Stop_IT(&tim6_handle);
+static GPS_Fix_TypeDef s_last_fix;
+volatile static int s_fix_avail = 0;
+
+void read_gps() {
+    while (1) {
+        while (s_fix_avail) {
+            vTaskDelay(1);
+        }
+        Status code = max_m10s_poll_fix(&s_gps_conf, &s_last_fix);
+        if (code == STATUS_OK) {
+            gpio_write(PIN_BLUE, GPIO_HIGH);
+            s_fix_avail = 1;
+        } else {
+            gpio_write(PIN_BLUE, GPIO_LOW);
+            printf("GPS read failed with code %d\n", code);
+        }
+    }
+}
+
+GpsFrame gps_fix_to_pb_frame(uint64_t timestamp,
+                             const GPS_Fix_TypeDef *gps_fix) {
+    GpsFrame gps_frame;
+
+    // Copy UTC Time
+    gps_frame.timestamp = timestamp;
+    gps_frame.year = gps_fix->year;
+    gps_frame.month = gps_fix->month;
+    gps_frame.day = gps_fix->day;
+    gps_frame.hour = gps_fix->hour;
+    gps_frame.min = gps_fix->min;
+    gps_frame.sec = gps_fix->sec;
+
+    // Pack validity flags into a single uint64_t
+    gps_frame.valid_flags = ((uint64_t)gps_fix->date_valid << 0) |
+                            ((uint64_t)gps_fix->time_valid << 1) |
+                            ((uint64_t)gps_fix->time_resolved << 2) |
+                            ((uint64_t)gps_fix->fix_type << 3) |
+                            ((uint64_t)gps_fix->fix_valid << 8) |
+                            ((uint64_t)gps_fix->diff_used << 9) |
+                            ((uint64_t)gps_fix->psm_state << 10) |
+                            ((uint64_t)gps_fix->hdg_veh_valid << 14) |
+                            ((uint64_t)gps_fix->carrier_phase << 15) |
+                            ((uint64_t)gps_fix->invalid_llh << 19);
+
+    // Copy Navigation info
+    gps_frame.num_sats = gps_fix->num_sats;
+    gps_frame.lon = gps_fix->lon;
+    gps_frame.lat = gps_fix->lat;
+    gps_frame.height = gps_fix->height;
+    gps_frame.height_msl = gps_fix->height_msl;
+    gps_frame.accuracy_horiz = gps_fix->accuracy_horiz;
+    gps_frame.accuracy_vertical = gps_fix->accuracy_vertical;
+    gps_frame.vel_north = gps_fix->vel_north;
+    gps_frame.vel_east = gps_fix->vel_east;
+    gps_frame.vel_down = gps_fix->vel_down;
+    gps_frame.ground_speed = gps_fix->ground_speed;
+    gps_frame.hdg = gps_fix->hdg;
+    gps_frame.accuracy_speed = gps_fix->accuracy_speed;
+    gps_frame.accuracy_hdg = gps_fix->accuracy_hdg;
+
+    return gps_frame;
+}
+
+void store_data() {
+    while (1) {
+        uint32_t notif_value;
+        xTaskNotifyWait(0, 0xffffffffUL, &notif_value, 100);
+
+        // If PROG switch is set, unmount SD card and wait
+        if (gpio_read(PIN_PROG)) {
+            sd_deinit();
+            printf("SD safe to remove\n");
+            gpio_write(PIN_BLUE, GPIO_LOW);
+            gpio_write(PIN_GREEN, GPIO_LOW);
+            while (gpio_read(PIN_PROG)) {
+                gpio_write(PIN_GREEN, GPIO_HIGH);
+                vTaskDelay(pdMS_TO_TICKS(500));
+                gpio_write(PIN_GREEN, GPIO_LOW);
+                vTaskDelay(pdMS_TO_TICKS(500));
+            }
+            printf("Remounting SD\n\n");
+            sd_reinit();
+            continue;
+        }
+
+        if (notif_value == 0) {
+            continue;
+        }
+
+        gpio_write(PIN_YELLOW, GPIO_HIGH);
+
+        TickType_t start_ticks = xTaskGetTickCount();
+
+        uint32_t entries_read = 0;
+        while (fifo.count > 0) {
+            SensorFrame log = read_fifo();
+            Status code = sd_write_sensor_data(&log);
+            if (code != STATUS_OK) {
+                printf("SD sensor write error %d\n", code);
+                gpio_write(PIN_GREEN, GPIO_LOW);
+                break;
+            }
+            gpio_write(PIN_GREEN, GPIO_HIGH);
+            entries_read += 1;
+            if (entries_read == LOG_FIFO_LEN) {
+                gpio_write(PIN_RED, GPIO_HIGH);
+                break;
+            }
+            gpio_write(PIN_RED, GPIO_LOW);
+        }
+
+        if (s_fix_avail) {
+            // This is an expensive copy but ideally we don't want to expose the
+            // raw GPS format to the SD HAL
+            GpsFrame gps_frame =
+                gps_fix_to_pb_frame(xTaskGetTickCount(), &s_last_fix);
+            Status code = sd_write_gps_data(&gps_frame);
+            if (code != STATUS_OK) {
+                printf("SD GPS write error %d\n", code);
+            }
+            s_fix_avail = 0;
+        }
+
+        sd_flush();
+
+        TickType_t elapsed_time = xTaskGetTickCount() - start_ticks;
+
+        gpio_write(PIN_YELLOW, GPIO_LOW);
+        printf("%lu entries read in %lu ticks\n", entries_read, elapsed_time);
+    }
+}
+
+void send_usb_telem() {
+    while (1) {
+        pspcom_send_sensor(&s_last_sensor_data);
+        vTaskDelay(200 / portTICK_PERIOD_MS);
     }
 }
 
@@ -149,7 +323,7 @@ int main(void) {
     HAL_Init();
     SystemClock_Config();
     init_timers();
-    init_tim6();
+    init_fifo();
     gpio_write(PIN_PA4, GPIO_HIGH);
     gpio_write(PIN_PB12, GPIO_HIGH);
     gpio_write(PIN_PE4, GPIO_HIGH);
@@ -157,27 +331,6 @@ int main(void) {
     MX_USB_Device_Init();
     DELAY(1000);
     printf("Starting initialization...\n");
-    if (mt29f2g_init() == STATUS_OK) {
-        printf("Flash chip initialization successful\n");
-    } else {
-        printf("Flash chip initialization failed\n");
-    }
-
-    /*
-    if (init_flash_fs() != STATUS_OK) {
-        printf("Flash filesystem initialization failed.\n");
-    } else {
-        uint32_t boot_count = 0;
-        lfs_file_open(&lfs, &file, "boot_count", LFS_O_RDWR | LFS_O_CREAT);
-        lfs_file_read(&lfs, &file, &boot_count, sizeof(boot_count));
-        boot_count += 1;
-        lfs_file_rewind(&lfs, &file);
-        lfs_file_write(&lfs, &file, &boot_count, sizeof(boot_count));
-        lfs_file_close(&lfs, &file);
-
-        printf("Welcome to PAL 9000, boot %lu\n", boot_count);
-    }
-    */
 
     // Initialize magnetometer
     if (iis2mdc_init(&s_mag_conf, IIS2MDC_ODR_50_HZ) == STATUS_OK) {
@@ -217,9 +370,9 @@ int main(void) {
     // Initialize accelerometer
     if (adxl372_init(&s_acc_conf, ADXL372_200_HZ, ADXL372_OUT_RATE_400_HZ,
                      ADXL372_MEASURE_MODE)) {
-        printf("Accelerometer initialization successful");
+        printf("Accelerometer initialization successful\n");
     } else {
-        printf("Accelrometer initialization failed");
+        printf("Accelerometer initialization failed\n");
     }
 
     // Initialize GPS
@@ -236,137 +389,70 @@ int main(void) {
         printf("SD card initialization failed\n");
     }
 
-    set_tim6_it(1);
-    printf("\n");
-
-    GPS_Fix_TypeDef fix;
-
-    fifo.ridx = 0;
-    fifo.widx = 0;
-
-    uint64_t start_time = MICROS();
+    // https://www.freertos.org/RTOS-Cortex-M3-M4.html
+    NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
 
     gpio_write(PIN_RED, GPIO_LOW);
 
+    xTaskCreate(store_data,            // Task function
+                "store_data",          // Task name
+                2048,                  // Stack size
+                NULL,                  // Parameters
+                tskIDLE_PRIORITY + 2,  // Priority
+                &s_store_data_handle   // Task handle
+    );
+
+    xTaskCreate(read_sensors,           // Task function
+                "read_sensors",         // Task name
+                2048,                   // Stack size
+                NULL,                   // Parameters
+                tskIDLE_PRIORITY + 3,   // Priority
+                &s_read_sensors_handle  // Task handle
+    );
+
+    xTaskCreate(read_gps,              // Task function
+                "read_gps",            // Task name
+                2048,                  // Stack size
+                NULL,                  // Parameters
+                tskIDLE_PRIORITY + 2,  // Priority
+                &s_read_gps_handle     // Task handle
+    );
+
+#ifdef DEBUG
+    xTaskCreate(send_usb_telem,        // Task function
+                "usb_telem",           // Task name
+                2048,                  // Stack size
+                NULL,                  // Parameters
+                tskIDLE_PRIORITY + 1,  // Priority
+                &s_usb_telem_handle    // Task handle
+    );
+#endif
+
+    vTaskStartScheduler();
+
     while (1) {
-        gpio_write(PIN_YELLOW, GPIO_HIGH);
-
-        // Empty the FIFO to the SD card
-        start_time = MICROS();
-        uint32_t entries_read = 0;
-        while (fifo.ridx != fifo.widx) {
-            sd_write_sensor_data(&fifo.queue[fifo.ridx]);
-            if (fifo.ridx == LOG_FIFO_LEN - 1) {
-                fifo.ridx = 0;
-            } else {
-                fifo.ridx += 1;
-            }
-            entries_read += 1;
-            if (entries_read == LOG_FIFO_LEN) {
-                break;
-            }
-        }
-        printf("%lu FIFO entries read in %lu ms\n", entries_read,
-               (uint32_t)(MICROS() - start_time) / 1000);
-        printf("Last sensor read took %lu us\n",
-               (uint32_t)s_last_sensor_read_us);
-
-        // Check if we have a GPS fix
-        start_time = MICROS();
-        if (max_m10s_poll_fix(&s_gps_conf, &fix) == STATUS_OK) {
-            printf("Sats: %d, Valid fix: %d\n", fix.num_sats, fix.fix_valid);
-            sd_write_gps_data(MILLIS(), &fix);
-        }
-        printf("GPS read in %lu ms\n",
-               (uint32_t)(MICROS() - start_time) / 1000);
-
-        // Flush I/O buffers
-        start_time = MICROS();
-        if (sd_flush() != STATUS_OK) {
-            printf("SD flush to disk failed\n");
-            gpio_write(PIN_GREEN, GPIO_LOW);
-            sd_deinit();
-            sd_reinit();
-        } else {
-            gpio_write(PIN_GREEN, GPIO_HIGH);
-        }
-        printf("SD flush in %lu ms\n\n",
-               (uint32_t)(MICROS() - start_time) / 1000);
-
-        gpio_write(PIN_YELLOW, GPIO_LOW);
-
-        if (fix.fix_valid) {
-            gpio_write(PIN_BLUE, GPIO_HIGH);
-        } else {
-            gpio_write(PIN_BLUE, GPIO_LOW);
-        }
-
-        // If PROG switch is set, unmount SD card and wait
-        if (gpio_read(PIN_PROG)) {
-            set_tim6_it(0);
-            sd_deinit();
-            printf("SD safe to remove\n");
-            while (gpio_read(PIN_PROG)) {
-                gpio_write(PIN_GREEN, GPIO_HIGH);
-                DELAY(500);
-                gpio_write(PIN_GREEN, GPIO_LOW);
-                DELAY(500);
-            }
-            printf("Remounting SD\n\n");
-            sd_reinit();
-            set_tim6_it(1);
-        }
+        printf("kernel exited\n");
     }
 }
 
-Status init_flash_fs() {
-    const struct lfs_config cfg = {
-        .read = &mt29f2g_read,
-        .prog = &mt29f2g_prog,
-        .erase = &mt29f2g_erase,
-        .sync = &mt29f2g_sync,
-
-        .read_size = 16,
-        .prog_size = 16,
-        .block_size = 139264,
-        .block_count = 2048,
-        .cache_size = 16,
-        .lookahead_size = 16,
-        .block_cycles = 750,
-    };
-    int err = lfs_mount(&lfs, &cfg);
-    if (err) {
-        if (lfs_format(&lfs, &cfg)) {
-            return STATUS_ERROR;
-        }
-        if (lfs_mount(&lfs, &cfg)) {
-            return STATUS_ERROR;
-        }
+void vApplicationStackOverflowHook(TaskHandle_t xTask,
+                                   signed char *pcTaskName) {
+    while (1) {
+        printf("stack overflow in task '%s'", pcTaskName);
     }
-    return STATUS_OK;
 }
 
-void TIM6_DAC_IRQHandler(void) {
-    HAL_TIM_IRQHandler(&tim6_handle);
-    if (!((fifo.widx == fifo.ridx - 1) ||
-          (fifo.ridx == 0 && fifo.widx == LOG_FIFO_LEN - 1))) {
-        // FIFO is not full
-        uint64_t start_time = MICROS();
-        SensorData log = {
-            .timestamp = MILLIS(),
-            .acch = adxl372_read_accel(&s_acc_conf),
-            .accel = lsm6dsox_read_accel(&s_imu_conf),
-            .gyro = lsm6dsox_read_gyro(&s_imu_conf),
-            .mag = iis2mdc_read(&s_mag_conf),
-            .baro = ms5637_read(&s_baro_conf, OSR_256),
-        };
-        s_last_sensor_read_us = MICROS() - start_time;
-        fifo.queue[fifo.widx] = log;
-        if (fifo.widx == LOG_FIFO_LEN - 1) {
-            fifo.widx = 0;
-        } else {
-            fifo.widx += 1;
-        }
+extern void xPortSysTickHandler(void);
+
+void SysTick_Handler(void) {
+    HAL_IncTick();
+
+    /* Clear overflow flag */
+    SysTick->CTRL;
+
+    if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
+        /* Call tick handler */
+        xPortSysTickHandler();
     }
 }
 
@@ -375,8 +461,6 @@ void Error_Handler(void) {
     while (1) {
     }
 }
-
-void SysTick_Handler(void) { HAL_IncTick(); }
 
 void NMI_Handler(void) {}
 
@@ -404,10 +488,6 @@ void UsageFault_Handler(void) {
     }
 }
 
-void SVC_Handler(void) {}
-
 void DebugMon_Handler(void) {}
-
-void PendSV_Handler(void) {}
 
 void USB_LP_IRQHandler(void) { HAL_PCD_IRQHandler(&hpcd_USB_FS); }
