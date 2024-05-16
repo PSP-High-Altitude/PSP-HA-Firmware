@@ -461,7 +461,7 @@ void USBD_MTP_OPT_SendObjectInfo(USBD_HandleTypeDef  *pdev, uint8_t *buff, uint3
       /* store object handle and storage id for future use */
       if (hmtp->OperationsContainer.Param2  == 0xFFFFFFFFU)
       {
-        objhandle = 0U;
+          objhandle = 0U;
       }
       else
       {
@@ -750,7 +750,7 @@ static void MTP_Get_StorageInfo(USBD_HandleTypeDef  *pdev)
 
   MTP_StorageInfo.StorageType = MTP_STORAGE_FIXED_RAM;
   MTP_StorageInfo.FilesystemType = MTP_FILESYSTEM_GENERIC_HIERARCH;
-  MTP_StorageInfo.AccessCapability = MTP_ACCESS_CAP_RO_WITH_DEL;
+  MTP_StorageInfo.AccessCapability = MTP_ACCESS_CAP_RW;
   MTP_StorageInfo.MaxCapability = hmtpif->GetMaxCapability();
   MTP_StorageInfo.FreeSpaceInBytes = hmtpif->GetFreeSpaceInBytes();
   MTP_StorageInfo.FreeSpaceInObjects = FREE_SPACE_IN_OBJ_NOT_USED; /* not used */

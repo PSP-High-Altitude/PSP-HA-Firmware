@@ -44,8 +44,21 @@ typedef struct {
     uint8_t Filename[255];
 } mtp_object_info;
 
-mtp_object_info mtp_files[MTP_MAX_OBJECT_NUM];
-uint32_t mtp_file_idx = 0;
+typedef struct mtp_fnode {
+    uint32_t handle;
+    mtp_object_info *data;
+    struct mtp_fnode *next;
+    struct mtp_fnode *prev;
+} mtp_file_node_t;
+
+typedef struct {
+    mtp_file_node_t *head;
+    mtp_file_node_t *tail;
+    uint32_t num_files;
+} mtp_file_list_t;
+
+mtp_file_list_t mtp_file_list = {.head = NULL, .tail = NULL, .num_files = 0};
+uint32_t mtp_file_new_idx = 1;
 uint32_t mtp_fs_size = 0;
 
 uint32_t parent = 0;
@@ -64,11 +77,82 @@ uint8_t mtp_current_operation = 0;  // 0: no operation, 1: read, 2: write
 extern struct dhara_map s_map;
 extern struct dhara_nand s_nand;
 FIL curr_file;
-int test_flag = 0;
 
 /* Private define ------------------------------------------------------------*/
 /* Private macro -------------------------------------------------------------*/
 /* Private function prototypes -----------------------------------------------*/
+static int add_file_node(mtp_file_list_t *list, uint32_t handle,
+                         mtp_object_info *data) {
+    if (list->num_files >= MTP_MAX_OBJECT_NUM) {
+        free(data);
+        return 1;
+    }
+    mtp_file_node_t *node = malloc(sizeof(mtp_file_node_t));
+    if (node == NULL) {
+        free(data);
+        return 1;
+    }
+    node->data = data;
+    node->next = NULL;
+    node->prev = list->tail;
+    if (list->tail != NULL) {
+        list->tail->next = node;
+    }
+    list->tail = node;
+    if (list->head == NULL) {
+        list->head = node;
+    }
+    list->num_files++;
+    return 0;
+}
+
+static void remove_file_node(mtp_file_list_t *list, uint32_t id) {
+    mtp_file_node_t *node = list->tail;
+    while (node != NULL) {
+        if (node->handle == id) {
+            if (node->prev != NULL) {
+                node->prev->next = node->next;
+            }
+            if (node->next != NULL) {
+                node->next->prev = node->prev;
+            }
+            if (list->head == node) {
+                list->head = node->next;
+            }
+            if (list->tail == node) {
+                list->tail = node->prev;
+            }
+            free(node->data);
+            free(node);
+            list->num_files--;
+            return;
+        }
+        node = node->prev;
+    }
+}
+
+static mtp_file_node_t *get_file_node(mtp_file_list_t *list, uint32_t id) {
+    mtp_file_node_t *node = list->tail;
+    while (node != NULL) {
+        if (node->handle == id) {
+            return node;
+        }
+        node = node->prev;
+    }
+    return NULL;
+}
+
+static void delete_file_list(mtp_file_list_t *list) {
+    mtp_file_node_t *node = list->tail;
+    while (node != NULL) {
+        mtp_file_node_t *next = node->prev;
+        free(node->data);
+        free(node);
+        node = next;
+    }
+    list->num_files = 0;
+}
+
 static uint8_t USBD_MTP_Itf_Init(void);
 static uint8_t USBD_MTP_Itf_DeInit(void);
 static uint32_t USBD_MTP_Itf_ReadData(uint32_t Param1, uint8_t *buff,
@@ -173,41 +257,46 @@ static void traverse_fs(char path[256], uint32_t parent) {
         }
 
         if ((info.fattrib & AM_DIR) == 0) {
-            if (mtp_file_idx >= MTP_MAX_OBJECT_NUM) {
-                f_closedir(&dir);
-                return;
-            }
-            memcpy(mtp_files[mtp_file_idx].Filename, info.fname,
-                   strlen(info.fname) + 1);
-            mtp_files[mtp_file_idx].Storage_id = mtp_file_idx + 1;
-            mtp_files[mtp_file_idx].ObjectFormat = MTP_OBJ_FORMAT_UNDEFINED;
-            mtp_files[mtp_file_idx].ParentObject =
-                parent == 0xFFFFFFFF ? 0xFFFFFFFF : parent + 1;
-            mtp_files[mtp_file_idx].AssociationType = 0;
-            mtp_files[mtp_file_idx].AssociationDesc = 0;
-            mtp_files[mtp_file_idx].ObjectCompressedSize = info.fsize;
+            mtp_object_info *obj_info =
+                (mtp_object_info *)malloc(sizeof(mtp_object_info));
+            memcpy(obj_info->Filename, info.fname, strlen(info.fname) + 1);
+            obj_info->Storage_id = MTP_STORAGE_ID;
+            obj_info->ObjectFormat = MTP_OBJ_FORMAT_UNDEFINED;
+            obj_info->ParentObject = parent == 0xFFFFFFFF ? 0xFFFFFFFF : parent;
+            obj_info->AssociationType = 0;
+            obj_info->AssociationDesc = 0;
+            obj_info->ObjectCompressedSize = info.fsize;
             mtp_fs_size += info.fsize;
             if (parent != 0xFFFFFFFF) {
-                mtp_files[parent].ObjectCompressedSize++;
+                mtp_object_info *parent_obj =
+                    get_file_node(&mtp_file_list, parent)->data;
+                if (parent_obj == NULL) {
+                    return;
+                }
+                parent_obj->ObjectCompressedSize += info.fsize;
             }
-            mtp_file_idx++;
-        } else {
-            if (mtp_file_idx >= MTP_MAX_OBJECT_NUM) {
+            if (add_file_node(&mtp_file_list, mtp_file_new_idx++, obj_info) !=
+                0) {
                 f_closedir(&dir);
                 return;
             }
-            memcpy(mtp_files[mtp_file_idx].Filename, info.fname,
-                   strlen(info.fname) + 1);
-            mtp_files[mtp_file_idx].Storage_id = mtp_file_idx + 1;
-            mtp_files[mtp_file_idx].ObjectFormat = MTP_OBJ_FORMAT_ASSOCIATION;
-            mtp_files[mtp_file_idx].ParentObject =
-                parent == 0xFFFFFFFF ? 0xFFFFFFFF : parent + 1;
-            mtp_files[mtp_file_idx].AssociationType = 1;
-            mtp_files[mtp_file_idx].AssociationDesc = 0;
-            mtp_files[mtp_file_idx].ObjectCompressedSize = 0;
-            mtp_file_idx++;
+        } else {
+            mtp_object_info *obj_info =
+                (mtp_object_info *)malloc(sizeof(mtp_object_info));
+            memcpy(obj_info->Filename, info.fname, strlen(info.fname) + 1);
+            obj_info->Storage_id = MTP_STORAGE_ID;
+            obj_info->ObjectFormat = MTP_OBJ_FORMAT_ASSOCIATION;
+            obj_info->ParentObject = parent == 0xFFFFFFFF ? 0xFFFFFFFF : parent;
+            obj_info->AssociationType = 1;
+            obj_info->AssociationDesc = 0;
+            obj_info->ObjectCompressedSize = 0;
+            if (add_file_node(&mtp_file_list, mtp_file_new_idx++, obj_info) !=
+                0) {
+                f_closedir(&dir);
+                return;
+            }
 
-            traverse_fs(info.fname, mtp_file_idx - 1);
+            traverse_fs(info.fname, obj_info->Storage_id);
         }
     }
     f_closedir(&dir);
@@ -220,13 +309,6 @@ static void traverse_fs(char path[256], uint32_t parent) {
  * @retval status value
  */
 static uint8_t USBD_MTP_Itf_Init(void) {
-    memset(mtp_files, 0, sizeof(mtp_files));
-    mtp_files[0].Storage_id = mtp_file_idx + 1;
-    mtp_files[0].ObjectFormat = MTP_OBJ_FORMAT_ASSOCIATION;
-    mtp_files[0].ParentObject = 0;
-    mtp_files[0].AssociationType = 1;
-    mtp_files[0].AssociationDesc = 0;
-    mtp_files[0].ObjectCompressedSize = 0;
     traverse_fs(NAND_MOUNT_POINT, 0xFFFFFFFF);
 
     mtp_file_fifo.head = 0;
@@ -241,7 +323,15 @@ static uint8_t USBD_MTP_Itf_Init(void) {
  * @param  None
  * @retval status value
  */
-static uint8_t USBD_MTP_Itf_DeInit(void) { return 0; }
+static uint8_t USBD_MTP_Itf_DeInit(void) {
+    delete_file_list(&mtp_file_list);
+    mtp_fs_size = 0;
+    mtp_file_new_idx = 1;
+    mtp_file_fifo.head = 0;
+    mtp_file_fifo.tail = 0;
+
+    return 0;
+}
 
 /**
  * @brief  USBD_MTP_Itf_GetIdx
@@ -252,11 +342,13 @@ static uint8_t USBD_MTP_Itf_DeInit(void) { return 0; }
  */
 static uint32_t USBD_MTP_Itf_GetIdx(uint32_t Param3, uint32_t *obj_handle) {
     uint32_t count = 0U;
-    for (int i = Param3; i < MTP_MAX_OBJECT_NUM; i++) {
-        if (mtp_files[i].ParentObject == Param3) {
-            obj_handle[count] = i + 1;
+    mtp_file_node_t *node = mtp_file_list.head;
+    while (node != NULL) {
+        if (node->data->ParentObject == Param3) {
+            obj_handle[count] = node->handle;
             count++;
         }
+        node = node->next;
     }
 
     return count;
@@ -269,9 +361,12 @@ static uint32_t USBD_MTP_Itf_GetIdx(uint32_t Param3, uint32_t *obj_handle) {
  * @retval parent object
  */
 static uint32_t USBD_MTP_Itf_GetParentObject(uint32_t Param) {
-    uint32_t idx = Param - 1;
+    mtp_object_info *obj = get_file_node(&mtp_file_list, Param)->data;
+    if (obj == NULL) {
+        return 0xFFFFFFFF;
+    }
 
-    return mtp_files[idx].ParentObject;
+    return obj->ParentObject;
 }
 /**
  * @brief  USBD_MTP_Itf_GetObjectFormat
@@ -280,18 +375,22 @@ static uint32_t USBD_MTP_Itf_GetParentObject(uint32_t Param) {
  * @retval object format
  */
 static MTP_ObjectInfoTypeDef USBD_MTP_Itf_GetObjectInfo(uint32_t Param) {
-    uint32_t idx = Param - 1;
+    mtp_object_info *obj = get_file_node(&mtp_file_list, Param)->data;
+    if (obj == NULL) {
+        MTP_ObjectInfoTypeDef ret = {0};
+        return ret;
+    }
 
     MTP_ObjectInfoTypeDef object_info = {
-        .Storage_id = mtp_files[idx].Storage_id,
-        .ObjectFormat = mtp_files[idx].ObjectFormat,
-        .ObjectCompressedSize = mtp_files[idx].ObjectCompressedSize,
-        .AssociationType = mtp_files[idx].AssociationType,
-        .AssociationDesc = mtp_files[idx].AssociationDesc,
-        .Filename_len = strlen((char *)mtp_files[idx].Filename),
+        .Storage_id = obj->Storage_id,
+        .ObjectFormat = obj->ObjectFormat,
+        .ObjectCompressedSize = obj->ObjectCompressedSize,
+        .AssociationType = obj->AssociationType,
+        .AssociationDesc = obj->AssociationDesc,
+        .Filename_len = strlen((char *)obj->Filename),
     };
     for (int i = 0; i < object_info.Filename_len; i++) {
-        object_info.Filename[i] = mtp_files[idx].Filename[i];
+        object_info.Filename[i] = obj->Filename[i];
     }
 
     return object_info;
@@ -304,9 +403,12 @@ static MTP_ObjectInfoTypeDef USBD_MTP_Itf_GetObjectInfo(uint32_t Param) {
  * @retval object name length
  */
 static uint8_t USBD_MTP_Itf_GetObjectName_len(uint32_t Param) {
-    uint32_t idx = Param - 1;
+    mtp_object_info *obj = get_file_node(&mtp_file_list, Param)->data;
+    if (obj == NULL) {
+        return 0;
+    }
 
-    return strlen((char *)mtp_files[idx].Filename) + 1;
+    return strlen((char *)obj->Filename) + 1;
 }
 
 /**
@@ -319,10 +421,13 @@ static uint8_t USBD_MTP_Itf_GetObjectName_len(uint32_t Param) {
  */
 static void USBD_MTP_Itf_GetObjectName(uint32_t Param, uint8_t obj_len,
                                        uint16_t *buf) {
-    uint32_t idx = Param - 1;
+    mtp_object_info *obj = get_file_node(&mtp_file_list, Param)->data;
+    if (obj == NULL) {
+        return;
+    }
 
     for (int i = 0; i < obj_len; i++) {
-        buf[i] = mtp_files[idx].Filename[i];
+        buf[i] = obj->Filename[i];
     }
 }
 
@@ -333,9 +438,12 @@ static void USBD_MTP_Itf_GetObjectName(uint32_t Param, uint8_t obj_len,
  * @retval object size in SD card
  */
 static uint32_t USBD_MTP_Itf_GetObjectSize(uint32_t Param) {
-    uint32_t idx = Param - 1;
+    mtp_object_info *obj = get_file_node(&mtp_file_list, Param)->data;
+    if (obj == NULL) {
+        return 0;
+    }
 
-    return mtp_files[idx].ObjectCompressedSize;
+    return obj->ObjectCompressedSize;
 }
 
 /**
@@ -348,9 +456,7 @@ static uint32_t USBD_MTP_Itf_GetObjectSize(uint32_t Param) {
  */
 static uint16_t USBD_MTP_Itf_Create_NewObject(MTP_ObjectInfoTypeDef ObjectInfo,
                                               uint32_t objhandle) {
-    uint16_t rep_code = 0U;  // Read-only
-
-    return rep_code;
+    return 0x2001;
 }
 
 /**
@@ -387,7 +493,8 @@ static uint64_t USBD_MTP_Itf_GetFreeSpaceInBytes(void) {
  * @retval object handle
  */
 static uint32_t USBD_MTP_Itf_GetNewIndex(uint16_t objformat) {
-    return mtp_file_idx + 1;
+    // New object handle
+    return mtp_file_new_idx++;
 }
 
 /**
@@ -397,12 +504,7 @@ static uint32_t USBD_MTP_Itf_GetNewIndex(uint16_t objformat) {
  * @param  buff: data to write in SD card
  * @retval None
  */
-static void USBD_MTP_Itf_WriteData(uint16_t len, uint8_t *buff) {
-    UNUSED(len);
-    UNUSED(buff);
-
-    return;
-}
+static void USBD_MTP_Itf_WriteData(uint16_t len, uint8_t *buff) {}
 
 /**
  * @brief  USBD_MTP_Itf_GetContainerLength
@@ -411,9 +513,12 @@ static void USBD_MTP_Itf_WriteData(uint16_t len, uint8_t *buff) {
  * @retval length of generic container
  */
 static uint32_t USBD_MTP_Itf_GetContainerLength(uint32_t Param1) {
-    uint32_t idx = Param1 - 1;
+    mtp_object_info *obj = get_file_node(&mtp_file_list, Param1)->data;
+    if (obj == NULL) {
+        return 0;
+    }
 
-    return mtp_files[idx].ObjectCompressedSize + MTP_CONT_HEADER_SIZE;
+    return obj->ObjectCompressedSize + MTP_CONT_HEADER_SIZE;
 }
 
 /**
@@ -423,24 +528,33 @@ static uint32_t USBD_MTP_Itf_GetContainerLength(uint32_t Param1) {
  * @retval response code
  */
 static uint16_t USBD_MTP_Itf_DeleteObject(uint32_t Param1) {
-    int idx = Param1 - 1;
+    mtp_object_info *obj = get_file_node(&mtp_file_list, Param1)->data;
+    if (obj == NULL) {
+        return 0x2002;
+    }
+
     char path[256];
-    snprintf(path, 256, "%s/%s", NAND_MOUNT_POINT,
-             (char *)mtp_files[idx].Filename);
-    if (mtp_files[idx].ObjectFormat == MTP_OBJ_FORMAT_ASSOCIATION) {
-        for (int i = idx; i < mtp_file_idx; i++) {
-            if (mtp_files[i].ParentObject == Param1) {
-                if (USBD_MTP_Itf_DeleteObject(i + 1) != 0x2001) {
+    snprintf(path, 256, "%s/%s", NAND_MOUNT_POINT, (char *)obj->Filename);
+
+    if (obj->ObjectFormat == MTP_OBJ_FORMAT_ASSOCIATION) {
+        mtp_file_node_t *node = mtp_file_list.head;
+        while (node != NULL) {
+            if (node->data->ParentObject == Param1) {
+                if (USBD_MTP_Itf_DeleteObject(node->data->Storage_id) !=
+                    0x2001) {
                     return 0x2002;
                 }
             }
+            node = node->next;
         }
         int ret = f_unlink(path);
+        remove_file_node(&mtp_file_list, Param1);
         if (ret < 0) {
             return 0x2002;
         }
     } else {
         int ret = f_unlink(path);
+        remove_file_node(&mtp_file_list, Param1);
         if (ret < 0) {
             return 0x2002;
         }
@@ -477,9 +591,14 @@ static uint32_t USBD_MTP_Itf_ReadData(uint32_t Param1, uint8_t *buff,
                                       MTP_DataLengthTypeDef *data_length,
                                       USBD_HandleTypeDef *pdev) {
     if (data_length->temp_length == 0) {
+        // Get file info
+        mtp_object_info *obj = get_file_node(&mtp_file_list, Param1)->data;
+        if (obj == NULL) {
+            return 0;
+        }
+
         char path[256];
-        snprintf(path, 256, "%s/%s", NAND_MOUNT_POINT,
-                 (char *)mtp_files[Param1 - 1].Filename);
+        snprintf(path, 256, "%s/%s", NAND_MOUNT_POINT, (char *)obj->Filename);
         // Open file on first read
         if (f_open(&curr_file, path, FA_READ) != FR_OK) {
             data_length->totallen = 0;
@@ -573,7 +692,6 @@ void mtp_readwrite_file() {
             mtp_file_fifo.tail = 0;
             return;
         }
-
         push_to_fifo(temp, read);
     }
 }
