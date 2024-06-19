@@ -5,7 +5,7 @@
 #include "stm32h7xx_hal.h"
 #include "timer.h"
 
-static OSPI_HandleTypeDef ospi1_handle = {.State = 0};
+static OSPI_HandleTypeDef ospi1_handle = {0};
 static MDMA_HandleTypeDef hmdma_octospi1_fifo_th;
 
 static Status ospi_setup(OSpiDevice* dev) {

@@ -40,7 +40,7 @@ uint8_t user_armed[3] = {0, 0, 0};
       ((DMA_Stream_TypeDef *)huart7.hdmarx->Instance)->NDTR) & \
      (UART_BUFFER_SIZE - 1))
 
-RAM_D2 struct {
+struct {
     uint8_t buffer[UART_BUFFER_SIZE];
     size_t rd_ptr;
 } cb;

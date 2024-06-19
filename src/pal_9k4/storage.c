@@ -146,7 +146,9 @@ void storage_task() {
 
         // Flush everything to SD card
         Status flush_status = EXPECT_OK(sd_flush(), "SD flush");
+        // uint64_t start = MICROS();
         flush_status |= EXPECT_OK(nand_flash_flush(), "NAND flush");
+        // printf("Flush time: %lu us\n", (uint32_t)(MICROS() - start));
         gpio_write(PIN_GREEN, flush_status == STATUS_OK);
 
         // Unset disk activity warning LED

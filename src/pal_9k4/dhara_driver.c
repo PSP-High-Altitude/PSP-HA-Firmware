@@ -77,9 +77,10 @@ int dhara_nand_prog(const struct dhara_nand *n, dhara_page_t p,
     int num_partial_pages = 1U << partial_page_shift;
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdiscarded-qualifiers"
-    if (mt29f4g_write_partial_page(data, p >> partial_page_shift,
-                                   (p % num_partial_pages) * n->log2_page_size,
-                                   1U << n->log2_page_size) != STATUS_OK) {
+    if (mt29f4g_write_partial_page(
+            data, p >> partial_page_shift,
+            (p % num_partial_pages) * (1U << n->log2_page_size),
+            1U << n->log2_page_size) != STATUS_OK) {
         dhara_set_error(err, DHARA_E_BAD_BLOCK);
         return -1;
     }
@@ -97,9 +98,10 @@ int dhara_nand_is_free(const struct dhara_nand *n, dhara_page_t p) {
     int partial_page_shift = MT29F4G_PAGE_SIZE_LOG2 - n->log2_page_size;
     int num_partial_pages = 1U << partial_page_shift;
     uint8_t buffer[1U << n->log2_page_size];
-    if (mt29f4g_read_within_page(buffer, p >> partial_page_shift,
-                                 (p % num_partial_pages) * n->log2_page_size,
-                                 1U << n->log2_page_size) != STATUS_OK) {
+    if (mt29f4g_read_within_page(
+            buffer, p >> partial_page_shift,
+            (p % num_partial_pages) * (1U << n->log2_page_size),
+            1U << n->log2_page_size) != STATUS_OK) {
         return 0;
     }
 
@@ -124,7 +126,7 @@ int dhara_nand_read(const struct dhara_nand *n, dhara_page_t p, size_t offset,
     int num_partial_pages = 1U << partial_page_shift;
     if (mt29f4g_read_within_page(
             data, p >> partial_page_shift,
-            (p % num_partial_pages) * n->log2_page_size + offset,
+            (p % num_partial_pages) * (1U << n->log2_page_size) + offset,
             length) != STATUS_OK) {
         return -1;
     }

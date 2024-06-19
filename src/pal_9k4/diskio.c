@@ -125,8 +125,8 @@ static SdmmcDevice s_sd_sdmmc_device;
 struct dhara_nand s_nand;
 struct dhara_map s_map;
 // static uint8_t s_map_buffer[1U << (MT29F4G_PAGE_SIZE_LOG2 - 2)];
-RAM_D2 static uint8_t s_map_buffer[1U << MT29F4G_PAGE_SIZE_LOG2];
-static dhara_error_t s_map_error;
+static uint8_t s_map_buffer[1U << MT29F4G_PAGE_SIZE_LOG2];
+static dhara_error_t s_map_error = DHARA_E_NONE;
 
 /* Initialize MMC and NAND interface */
 Status diskio_init(SdDevice *device) {
@@ -142,10 +142,16 @@ Status diskio_init(SdDevice *device) {
 
     // Initialize NAND
     memset(&s_map, 0, sizeof(s_map));
+    memset(&s_map_buffer, 0, sizeof(s_map_buffer));
+    memset(&s_nand, 0, sizeof(s_nand));
+
+    // Virtual pages
     // s_nand.log2_page_size = MT29F4G_PAGE_SIZE_LOG2 - 2;  // 4 partial pages
     // s_nand.log2_ppb =
-    //     MT29F4G_PAGE_PER_BLOCK_LOG2 + 2;  // 64*4 partial pages per block
+    //    MT29F4G_PAGE_PER_BLOCK_LOG2 + 2;  // 64*4 partial pages per block
     // s_nand.num_blocks = MT29F4G_BLOCK_COUNT;
+
+    // No virtual pages
     s_nand.log2_page_size = MT29F4G_PAGE_SIZE_LOG2;
     s_nand.log2_ppb = MT29F4G_PAGE_PER_BLOCK_LOG2;
     s_nand.num_blocks = MT29F4G_BLOCK_COUNT;

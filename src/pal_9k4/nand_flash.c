@@ -305,6 +305,8 @@ Status nand_flash_dump_prf_stats(char stats[]) {
 }
 
 Status nand_flash_init() {
+    // test
+    mt29f4g_erase_chip();
     memset(&g_fs, 0, sizeof(g_fs));
     int status = f_mount(&g_fs, NAND_MOUNT_POINT, 1);
 #ifdef NAND_ALLOW_REFORMAT
@@ -317,6 +319,7 @@ Status nand_flash_init() {
             return STATUS_HARDWARE_ERROR;
         }
         BYTE work[FF_MAX_SS];
+        memset(work, 0, sizeof(work));
         MKFS_PARM format_opts;
         memset(&format_opts, 0, sizeof(format_opts));
         format_opts.fmt = FM_FAT32;
