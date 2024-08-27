@@ -85,7 +85,8 @@ Status bmi088_init(I2cDevice* acc_device, I2cDevice* gyro_device,
                    Bmi088GyroRange gyro_range, Bmi088AccRange acc_range);
 
 // Read the acceleration registers
-Mag bmi088_read(I2cDevice* device);
+Accel bmi088_acc_read(I2cDevice* device);
+Gyro bmi088_gyro_read(I2cDevice* device);
 
 #endif  // BMI088_H
 

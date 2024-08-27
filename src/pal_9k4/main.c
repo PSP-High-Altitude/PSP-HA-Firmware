@@ -20,9 +20,8 @@
 #include "usbd_cdc_if.h"
 #include "usbd_mtp_if.h"
 
-// FreeRTOS
-#include "FreeRTOS.h"
-#include "task.h"
+I2cDevice acc_i2c_device = {
+    .address = 0x18, .clk = I2C_SPEED_FAST, .periph = P_I2C1};
 
 extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
 uint8_t usb_initialized = 0;
@@ -199,7 +198,11 @@ int main(void) {
     vTaskStartScheduler();
 
     while (1) {
-        printf("kernel exited\n");
+        Gyro gyr = bmi088_gyro_read(&gyro_i2c_device);
+        Accel acc = bmi088_acc_read(&acc_i2c_device);
+
+        printf("Gyro: %g %g %g\n", gyr.gyroX, gyr.gyroY, gyr.gyroZ);
+        printf("Acc: %g %g %g\n", acc.accelX, acc.accelY, acc.accelZ);
     }
 }
 
