@@ -2,12 +2,12 @@
 
 # -- Project information
 
-project = 'Lumache'
-copyright = '2021, Graziella'
-author = 'Graziella'
+project = 'PAL 9000 Firmware'
+copyright = '2024, Purdue Space Program'
+author = 'Purdue Space Program'
 
-release = '0.1'
-version = '0.1.0'
+release = '5.0'
+version = '0.0.1'
 
 # -- General configuration
 
