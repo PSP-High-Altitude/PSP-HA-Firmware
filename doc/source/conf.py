@@ -7,7 +7,7 @@ copyright = '2024, Purdue Space Program'
 author = 'Purdue Space Program'
 
 release = '5.0'
-version = '0.0.1'
+version = '5.0'
 
 # -- General configuration
 
