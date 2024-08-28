@@ -34,27 +34,27 @@ Macros
 .. c:function:: void init_task()
 
     This task initializes the board and peripherals and starts all other tasks. It first initializes every
-    subsystem. The :code:`EXPECT_OK` macro is used to check for and report any errors. All of the OS tasks are
+    subsystem. The :c:macro:`EXPECT_OK()` macro is used to check for and report any errors. All of the OS tasks are
     then initialized. If the MTP mode is selected, its tasks will be started instead. An infinitely looping
     delay then ensures that the task does not exit.
     
     The initializations performed are:
-        * :code:`init_storage`
-        * :code:`init_sensors`
-        * :code:`init_state_est`
-        * :code:`init_pyros`
-        * :code:`pspcom_init`
-        * :code:`MX_USB_DEVICE_Init`
+        * :c:func:`init_storage`
+        * :c:func:`init_sensors`
+        * :c:func:`init_state_est`
+        * :c:func:`init_pyros`
+        * :c:func:`pspcom_init`
+        * :c:func:`MX_USB_DEVICE_Init`
 
     The tasks started are:
-        * :code:`pyros_task`
-        * :code:`read_sensors_task`
-        * :code:`state_est_task`
-        * :code:`pspcom_process_bytes`
-        * :code:`pspcom_send_standard`
-        * :code:`read_gps_task`
-        * :code:`storage_task`
-        * :code:`mtp_readwrite_file_task` If MTP mode is selected
+        * :c:func:`pyros_task`
+        * :c:func:`read_sensors_task`
+        * :c:func:`state_est_task`
+        * :c:func:`pspcom_process_bytes`
+        * :c:func:`pspcom_send_standard`
+        * :c:func:`read_gps_task`
+        * :c:func:`storage_task`
+        * :c:func:`mtp_readwrite_file_task` If MTP mode is selected
 
 .. c:function:: int main(void)
 

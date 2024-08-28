@@ -32,4 +32,5 @@ Table of Contents
    :maxdepth: 2
 
    Usage <usage>
+   Contributing <contribute>
    Firmware Reference <code>
