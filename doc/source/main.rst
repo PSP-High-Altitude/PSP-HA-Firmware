@@ -16,6 +16,9 @@ Macros
     :param pri: The priority of the task.
     :param ss: The stack size of the task.
 
+Functions
+---------
+
 .. c:function:: int _write(int file, char *data, int len)
 
     This function redefines the C stdio write function to allow serial output. It is possible to try printing

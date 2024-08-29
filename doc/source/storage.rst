@@ -4,6 +4,9 @@ The Storage Driver
 The storage driver is responsible for reading and writing data to the flash memory on the PAL 9000.
 This code is contained within the :code:`storage.c` and :code:`storage.h` files.
 
+Functions
+---------
+
 .. c:function:: Status init_storage()
 
     This function initializes the flash memory. It initializes the filesystem diskio driver,

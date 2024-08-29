@@ -26,6 +26,8 @@ typedef struct {
     uint8_t address;
     I2cSpeed clk;
     I2cPeriph periph;
+    uint8_t scl;
+    uint8_t sda;
 } I2cDevice;
 
 Status i2c_write(I2cDevice *device, uint8_t *tx_buf, size_t len);

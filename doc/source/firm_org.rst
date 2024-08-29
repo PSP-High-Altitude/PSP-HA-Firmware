@@ -10,11 +10,15 @@ The :code:`environments` directory contains the PlatformIO environments for the 
 Each environment is a differnt version of the PAL hardware and contains a :code:`platformio.ini` file which specifies
 board specific settings for the environment.
 
+.. _lib_section:
+
 Lib
 ---
 
 The :code:`lib` directory contains libraries which can be shared between all the PlatformIO environments for the PAL 9000.
 These libraries are most often sensor drivers and headers for peripheral wrappers like I2C and SPI. 
+
+.. _src_section:
 
 Src
 ---
