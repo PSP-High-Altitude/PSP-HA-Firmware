@@ -185,6 +185,8 @@
 #define PIN_PK14 174
 #define PIN_PK15 175
 
+#define PIN_MAX PIN_PK15
+
 const GPIO_TypeDef* PAL_GPIO_PORT[] = {GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF,
                                        GPIOG, GPIOH, 0,     GPIOJ, GPIOK};
 

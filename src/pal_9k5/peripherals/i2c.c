@@ -122,6 +122,8 @@ static Status get_pin(uint8_t periph, uint8_t pin, uint8_t function,
             return STATUS_OK;
         }
     }
+
+    return STATUS_ERROR;
 }
 
 static Status i2c_setup(I2cDevice *dev) {

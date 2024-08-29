@@ -9,7 +9,7 @@ Status gpio_mode(uint8_t pin, GpioMode mode) {
     GPIO_InitTypeDef conf = {
         .Mode = GPIO_MODE_INPUT,
         .Pin = gpio_pin,
-        .Speed = GPIO_SPEED_FREQ_HIGH,
+        .Speed = GPIO_SPEED_FREQ_LOW,
     };
     if (GPIO_INPUT | GPIO_INPUT_PULLDOWN | GPIO_INPUT_PULLUP)
         conf.Mode = GPIO_MODE_INPUT;
@@ -34,7 +34,7 @@ Status gpio_write(uint8_t pin, GpioValue value) {
         .Mode = GPIO_MODE_OUTPUT_PP,
         .Pin = gpio_pin,
         .Pull = GPIO_NOPULL,
-        .Speed = GPIO_SPEED_FREQ_HIGH,
+        .Speed = GPIO_SPEED_FREQ_LOW,
     };
     uint32_t current_mode =
         (GPIO_PIN_TO_BASE[pin]->MODER & GPIO_PIN_TO_MODEMASK[pin]) >>
@@ -54,7 +54,7 @@ GpioValue gpio_read(uint8_t pin) {
         .Mode = GPIO_MODE_INPUT,
         .Pin = gpio_pin,
         .Pull = GPIO_NOPULL,
-        .Speed = GPIO_SPEED_FREQ_HIGH,
+        .Speed = GPIO_SPEED_FREQ_LOW,
     };
     if ((GPIO_PIN_TO_BASE[pin]->MODER & GPIO_PIN_TO_MODEMASK[pin]) >>
             GPIO_PIN_TO_MODEPOS[pin] !=

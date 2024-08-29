@@ -7,3 +7,4 @@ PAL 9000 utilizes several communication interfaces, each having a hardware-agnos
     :maxdepth: 1
 
     I2C <i2c>
+    SPI <spi>

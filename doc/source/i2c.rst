@@ -1,8 +1,9 @@
 I2C
 ===
 
-The I2C driver is contained within its header in :ref:`Lib <lib_section>` and its board-specific source in :ref:`Src <src_section>`.
-The driver allows for new code to easily read and write to an I2C interface on the board.
+The I2C driver is contained within its header :code:`i2c.h` in :ref:`Lib <lib_section>` and its board-specific 
+source :code:`i2c.c` in :ref:`Src <src_section>`. The driver allows for new code to easily read and write to an 
+I2C interface on the board.
 
 Types
 -----
@@ -15,7 +16,7 @@ Types
 
     The desired speed of the I2C interface in Hz. The possible options are:
 
-    .. c:member:: I2C_SPEED_INVALID
+    .. c:macro:: I2C_SPEED_INVALID
 
         Invalid speed.
 

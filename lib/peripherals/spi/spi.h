@@ -16,6 +16,7 @@ typedef enum {
     P_SPI3 = 2,
     P_SPI4 = 3,
     P_SPI5 = 4,
+    P_SPI6 = 5,
 } SpiPeriph;
 
 typedef enum {
@@ -29,10 +30,13 @@ typedef enum {
 
 typedef struct {
     SpiSpeed clk;
+    SpiPeriph periph;
     bool cpol;
     bool cpha;
+    uint8_t mosi;
+    uint8_t miso;
+    uint8_t sck;
     uint8_t cs;
-    SpiPeriph periph;
 } SpiDevice;
 
 Status spi_setup(SpiDevice* dev);
