@@ -186,23 +186,21 @@ static Status ospi_setup(OSpiDevice* dev) {
 
     // Get the IO pins
     int port = 0;
-    for (; port < 2; port++) {
-        uint8_t io_pins[4] = {dev->io0, dev->io1, dev->io2, dev->io3};
-        for (int i = 0; i < 4; i++) {
-            // Get each pin AF, if one doesn't match, we will break and go to
-            // the higher port and try again.
-            if (get_pin(dev->periph, io_pins[i], OSPI_IO0 + i + (port * 4),
-                        &pin_conf.Alternate) != STATUS_OK) {
-                break;
-            }
-            pin_conf.Pin = PAL_GPIO_PIN(io_pins[i]);
-            HAL_GPIO_Init(PAL_GPIO_PORT(io_pins[i]), &pin_conf);
+    uint8_t io_pins[4] = {dev->io0, dev->io1, dev->io2, dev->io3};
+try_gpio_port:
+    for (int i = 0; i < 4; i++) {
+        // Get each pin AF, if one doesn't match, we will break and go to
+        // the higher port and try again.
+        if (get_pin(dev->periph, io_pins[i], OSPI_IO0 + i + (port * 4),
+                    &pin_conf.Alternate) != STATUS_OK) {
+            port++;
+            if (port < 2)
+                goto try_gpio_port;
+            else
+                return STATUS_PARAMETER_ERROR;
         }
-    }
-
-    // Neither port had the correct pins
-    if (port == 2) {
-        return STATUS_PARAMETER_ERROR;
+        pin_conf.Pin = PAL_GPIO_PIN(io_pins[i]);
+        HAL_GPIO_Init(PAL_GPIO_PORT(io_pins[i]), &pin_conf);
     }
 
     // Set clock speed
@@ -293,8 +291,9 @@ static Status ospi_setup(OSpiDevice* dev) {
 
     __HAL_LINKDMA(ospi_handles[dev->periph], hmdma, hmdma_octospi);
 
-    HAL_NVIC_SetPriority(P_OSPI1 ? OCTOSPI1_IRQn : OCTOSPI2_IRQn, 0, 0);
-    HAL_NVIC_EnableIRQ(P_OSPI1 ? OCTOSPI1_IRQn : OCTOSPI2_IRQn);
+    HAL_NVIC_SetPriority(dev->periph == P_OSPI1 ? OCTOSPI1_IRQn : OCTOSPI2_IRQn,
+                         0, 0);
+    HAL_NVIC_EnableIRQ(dev->periph == P_OSPI1 ? OCTOSPI1_IRQn : OCTOSPI2_IRQn);
     HAL_NVIC_SetPriority(MDMA_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(MDMA_IRQn);
 

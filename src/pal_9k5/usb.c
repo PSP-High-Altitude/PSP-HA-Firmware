@@ -12,6 +12,7 @@
 extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
 
 static bool s_usb_initialized = false;
+static uint32_t s_usb_initialized_time = 0;
 
 #ifdef DEBUG
 static char s_usb_serial_buffer[SERIAL_BUFFER_SIZE];
@@ -21,6 +22,10 @@ static size_t s_usb_serial_buffer_idx = 0;
 Status init_usb(bool mtp_mode) {
     MX_USB_DEVICE_Init(!mtp_mode);
     s_usb_initialized = true;
+
+    // Allows us to delay a little so the USB host can
+    // establish a connection before we start sending data.
+    s_usb_initialized_time = MILLIS();
 
     return STATUS_OK;
 }
@@ -35,7 +40,7 @@ int _write(int file, char *data, int len) {
 #ifdef DEBUG
     // If the USB isn't yet initialized, buffer the writes in an internal buffer
     // so that they can be output when the interface actually gets initialized.
-    if (!s_usb_initialized) {
+    if (!s_usb_initialized || (MILLIS() - s_usb_initialized_time < 500)) {
         int32_t copy_size = len;
         if (s_usb_serial_buffer_idx + copy_size >= SERIAL_BUFFER_SIZE) {
             copy_size = SERIAL_BUFFER_SIZE - s_usb_serial_buffer_idx;
