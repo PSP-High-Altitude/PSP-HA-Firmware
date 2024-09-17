@@ -22,7 +22,6 @@
 
 #include "usb_device.h"
 
-#include "gpio/gpio.h"
 #include "main.h"
 #include "usbd_cdc.h"
 #include "usbd_cdc_if.h"

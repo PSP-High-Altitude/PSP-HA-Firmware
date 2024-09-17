@@ -3,17 +3,26 @@
 #include <errno.h>
 #include <sys/unistd.h>
 
+#include "main.h"
+#include "timer.h"
 #include "usb_device.h"
 #include "usbd_cdc_if.h"
 #include "usbd_mtp_if.h"
 
+extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
+
 static bool s_usb_initialized = false;
+
+#ifdef DEBUG
 static char s_usb_serial_buffer[SERIAL_BUFFER_SIZE];
 static size_t s_usb_serial_buffer_idx = 0;
+#endif
 
 Status init_usb(bool mtp_mode) {
     MX_USB_DEVICE_Init(!mtp_mode);
     s_usb_initialized = true;
+
+    return STATUS_OK;
 }
 
 // Serial debug stuff -- used by printf
@@ -37,11 +46,11 @@ int _write(int file, char *data, int len) {
         return copy_size;
     }
 
+    uint64_t start_time = MILLIS();
+    USBD_StatusTypeDef rc = USBD_OK;
+
     // Empty the serial buffer if it has content.
     if (s_usb_serial_buffer_idx > 0) {
-        uint64_t start_time = MILLIS();
-        USBD_StatusTypeDef rc = USBD_OK;
-
         do {
             rc = CDC_Transmit_HS((uint8_t *)s_usb_serial_buffer,
                                  s_usb_serial_buffer_idx);
@@ -51,7 +60,7 @@ int _write(int file, char *data, int len) {
     }
 
     // Finally, transmit the newly provided data.
-    uint64_t start_time = MILLIS();
+    start_time = MILLIS();
 
     do {
         rc = CDC_Transmit_HS((uint8_t *)data, len);

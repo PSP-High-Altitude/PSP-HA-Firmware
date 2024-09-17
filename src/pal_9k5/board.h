@@ -187,13 +187,31 @@
 
 #define PIN_MAX PIN_PK15
 
-const GPIO_TypeDef* PAL_GPIO_PORT[] = {GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF,
-                                       GPIOG, GPIOH, 0,     GPIOJ, GPIOK};
+__attribute__((unused)) static GPIO_TypeDef* PAL_GPIO_PORT[] = {
+    GPIOA, GPIOB, GPIOC, GPIOD, GPIOE, GPIOF, GPIOG, GPIOH, 0, GPIOJ, GPIOK};
 
 // Pin to port
 #define PAL_GPIO_PORT(pin) PAL_GPIO_PORT[pin >> 4]
 
 // Pin to index
 #define PAL_GPIO_PIN(pin) (1 << (pin & 0xF))
+
+// Pin aliases
+#define PIN_FIREMAIN PIN_PE9
+#define PIN_FIREDRG PIN_PA6
+#define PIN_FIREA1 PIN_PA5
+#define PIN_FIREA2 PIN_PC1
+#define PIN_FIREA3 PIN_PD10
+#define PIN_CONTMAIN PIN_PE8
+#define PIN_CONTDRG PIN_PA2
+#define PIN_CONTA1 PIN_PA7
+#define PIN_CONTA2 PIN_PA4
+#define PIN_CONTA3 PIN_PB15
+#define PIN_RED PIN_PC10
+#define PIN_YELLOW PIN_PC12
+#define PIN_GREEN PIN_PD2
+#define PIN_BLUE PIN_PD3
+#define PIN_BUZZER PIN_PE5
+#define PIN_PAUSE PIN_PB5
 
 #endif  // BOARD_H

@@ -85,7 +85,7 @@ const I2cPinAf i2c_pin_af[5][I2C_PIN_AF_COUNT] = {
     },
 };
 
-const static I2C_TypeDef *i2c_base[5] = {I2C1, I2C2, I2C3, I2C4, I2C5};
+static I2C_TypeDef *i2c_base[5] = {I2C1, I2C2, I2C3, I2C4, I2C5};
 static I2C_HandleTypeDef i2c1_handle = {.State = 0};
 static I2C_HandleTypeDef i2c2_handle = {.State = 0};
 static I2C_HandleTypeDef i2c3_handle = {.State = 0};
@@ -108,7 +108,7 @@ static uint32_t get_timings(I2cDevice *dev) {
 }
 
 static Status get_pin(uint8_t periph, uint8_t pin, uint8_t function,
-                      uint8_t *af) {
+                      uint32_t *af) {
     for (int i = 0; i < I2C_PIN_AF_COUNT; i++) {
         // Invalid function means we ran out of pins
         if (i2c_pin_af[periph][i].function == 0) {

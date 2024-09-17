@@ -92,6 +92,7 @@
                 "stm32h7xx_hal_tim.h": "c",
                 "error.h": "c",
                 "nand.h": "c",
-                "ospi.h": "c"
+                "ospi.h": "c",
+                "usb.h": "c"
         }
 }

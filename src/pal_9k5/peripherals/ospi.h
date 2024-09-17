@@ -7,9 +7,9 @@
 #include "stm32h7xx_hal.h"
 
 typedef enum {
-    OSPI_PORT1_3_0 = 0,
-    OSPI_PORT1_7_4 = 1,
-} OSpiBank;
+    P_OSPI1 = 0,
+    P_OSPI2 = 1,
+} OSpiPeriph;
 
 typedef enum {
     OSPI_SPEED_INVALID = 0,
@@ -22,8 +22,19 @@ typedef enum {
 } OSpiSpeed;
 
 typedef struct {
+    OSpiPeriph periph;
     OSpiSpeed clk;
-    OSpiBank bank;
+    uint8_t sck;
+    uint8_t ncs;
+
+    // IO pins can be the actual [3:0] pins or the [7:4] pins
+    uint8_t io0;
+    uint8_t io1;
+    uint8_t io2;
+    uint8_t io3;
+
+    // 2^(device_size + 1) bytes
+    uint8_t device_size;
 } OSpiDevice;
 
 Status ospi_auto_poll_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,

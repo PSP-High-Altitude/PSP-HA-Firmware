@@ -1,13 +1,22 @@
 #include "mt29f4g.h"
 
 #include "ospi.h"
+#include "pal_9k5/board.h"
 #include "stdio.h"
 #include "stm32h7xx_hal.h"
 #include "timer.h"
 
 static OSpiDevice dev = {
-    .bank = OSPI_PORT1_7_4,
     .clk = OSPI_SPEED_80MHz,
+    .periph = P_OSPI1,
+    .sck = PIN_PB2,
+    .ncs = PIN_PB6,
+    .io0 = PIN_PB1,
+    .io1 = PIN_PB0,
+    .io2 = PIN_PB13,
+    .io3 = PIN_PA1,
+    .device_size = MT29F4G_BLOCK_COUNT_LOG2 + MT29F4G_PAGE_PER_BLOCK_LOG2 +
+                   MT29F4G_PAGE_SIZE_LOG2,
 };
 static uint8_t chip_ready = 0;
 

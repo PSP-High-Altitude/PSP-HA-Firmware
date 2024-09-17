@@ -119,7 +119,7 @@ static uint8_t s_map_buffer[1U << MT29F4G_PAGE_SIZE_LOG2];
 static dhara_error_t s_map_error = DHARA_E_NONE;
 
 /* Initialize NAND interface */
-Status diskio_init() {
+Status diskio_init(SdDevice *device) {
     generate_crc_table();
 
     // Initialize NAND
@@ -251,7 +251,6 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
                    void *buff /* Pointer to the conrtol data */
 ) {
     DWORD st, ed;
-    DRESULT res;
     LBA_t *dp;
 
     if (drv == 1) {

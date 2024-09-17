@@ -1,10 +1,13 @@
 #include "main.h"
 
+#include "buzzer.h"
+#include "clocks.h"
 #include "data.h"
 #include "gpio/gpio.h"
 #include "pspcom.h"
 #include "pyros.h"
 #include "status.h"
+#include "stdio.h"
 #include "stm32h7xx.h"
 #include "storage.h"
 #include "timer.h"
@@ -62,27 +65,30 @@ void init_task() {
 
     printf("Starting initialization...\n");
 
-    init_error |= (EXPECT_OK(init_usb(), "init usb") != STATUS_OK) << 0;
+    init_error |= (EXPECT_OK(init_usb(0), "init usb") != STATUS_OK) << 0;
     init_error |= (EXPECT_OK(init_storage(), "init storage") != STATUS_OK) << 1;
-    init_error |= (EXPECT_OK(init_sensors(), "init sensors") != STATUS_OK) << 2;
-    init_error |= (EXPECT_OK(init_pyros(), "init pyros") != STATUS_OK) << 4;
-    init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK) << 5;
-
-    MX_USB_DEVICE_Init(usb_mode);
+    // init_error |= (EXPECT_OK(init_sensors(), "init sensors") != STATUS_OK) <<
+    // 2; init_error |= (EXPECT_OK(init_pyros(), "init pyros") != STATUS_OK) <<
+    // 4; init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK)
+    // << 5;
 
     // One beep for initialization complete
     gpio_write(PIN_RED, GPIO_LOW);
-    gpio_write(PIN_BUZZER, GPIO_HIGH);
+    buzzer_set(BUZZER_FREQ_1KHZ);
     DELAY(200);
-    gpio_write(PIN_BUZZER, GPIO_LOW);
+    buzzer_set(BUZZER_FREQ_2KHZ);
     DELAY(200);
+    buzzer_set(BUZZER_FREQ_4KHZ);
+    DELAY(200);
+    buzzer_clear();
+    DELAY(1000);
 
     // Beep out the failure code (if any)
     for (int i = 0; i < init_error; i++) {
-        gpio_write(PIN_BUZZER, GPIO_HIGH);
+        buzzer_set(BUZZER_FREQ_4KHZ);
         gpio_write(PIN_RED, GPIO_HIGH);
         DELAY(100);
-        gpio_write(PIN_BUZZER, GPIO_LOW);
+        buzzer_clear();
         gpio_write(PIN_RED, GPIO_LOW);
         DELAY(100);
     }
@@ -90,19 +96,19 @@ void init_task() {
     printf("Initialization complete\n");
 
     // Start tasks if we are in normal mode
-    if (usb_mode == 1) {
-        printf("Launching tasks\n");
-        TASK_CREATE(pyros_task, +5, 2048);
-        TASK_CREATE(read_sensors_task, +4, 2048);
-        TASK_CREATE(state_est_task, +3, 2048);
-        TASK_CREATE(pspcom_process_bytes, +3, 2048);
-        TASK_CREATE(pspcom_send_standard, +2, 2048);
-        TASK_CREATE(read_gps_task, +2, 2048);
-        TASK_CREATE(storage_task, +1, 4096);
-    } else {
-        // MTP mode data queuing task
-        TASK_CREATE(mtp_readwrite_file_task, +1, 2048);
-    }
+    // if (usb_mode == 1) {
+    //    printf("Launching tasks\n");
+    //    TASK_CREATE(pyros_task, +5, 2048);
+    //    TASK_CREATE(read_sensors_task, +4, 2048);
+    //    TASK_CREATE(state_est_task, +3, 2048);
+    //    TASK_CREATE(pspcom_process_bytes, +3, 2048);
+    //    TASK_CREATE(pspcom_send_standard, +2, 2048);
+    //    TASK_CREATE(read_gps_task, +2, 2048);
+    //    TASK_CREATE(storage_task, +1, 4096);
+    //} else {
+    //    // MTP mode data queuing task
+    //    TASK_CREATE(mtp_readwrite_file_task, +1, 2048);
+    //}
 #ifdef DEBUG_MEMORY_USAGE
     TASK_CREATE(debug_memory_usage_task, +1, 512);
 #endif
@@ -131,7 +137,6 @@ int main(void) {
 
     // Set pull-ups on the button pins
     gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLUP);
-    gpio_mode(PIN_USB_MODE, GPIO_INPUT_PULLUP);
 
     // Launch FreeRTOS kernel and init task
     uxTopUsedPriority = configMAX_PRIORITIES - 1;

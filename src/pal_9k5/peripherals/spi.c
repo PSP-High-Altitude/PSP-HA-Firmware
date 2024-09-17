@@ -20,7 +20,7 @@ typedef struct {
     uint8_t af;
 } SpiPinAf;
 
-const SpiPinAf spi_pin_af[5][SPI_PIN_AF_COUNT] = {
+const SpiPinAf spi_pin_af[6][SPI_PIN_AF_COUNT] = {
     {
         // SPI1
         {PIN_PA5, SCK, GPIO_AF5_SPI1},
@@ -101,7 +101,7 @@ const SpiPinAf spi_pin_af[5][SPI_PIN_AF_COUNT] = {
     },
 };
 
-const static SPI_TypeDef* spi_base[5] = {SPI1, SPI2, SPI3, SPI4, SPI5, SPI6};
+static SPI_TypeDef* spi_base[6] = {SPI1, SPI2, SPI3, SPI4, SPI5, SPI6};
 static SPI_HandleTypeDef spi1_handle = {.State = 0};
 static SPI_HandleTypeDef spi2_handle = {.State = 0};
 static SPI_HandleTypeDef spi3_handle = {.State = 0};
@@ -113,7 +113,7 @@ static SPI_HandleTypeDef* spi_handles[] = {&spi1_handle, &spi2_handle,
                                            &spi5_handle, &spi6_handle};
 
 static Status get_pin(uint8_t periph, uint8_t pin, uint8_t function,
-                      uint8_t* af) {
+                      uint32_t* af) {
     for (int i = 0; i < SPI_PIN_AF_COUNT; i++) {
         // Invalid function means we ran out of pins
         if (spi_pin_af[periph][i].function == 0) {
