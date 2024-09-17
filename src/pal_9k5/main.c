@@ -95,20 +95,36 @@ void init_task() {
 
     printf("Initialization complete\n");
 
-    // Start tasks if we are in normal mode
-    // if (usb_mode == 1) {
-    //    printf("Launching tasks\n");
-    //    TASK_CREATE(pyros_task, +5, 2048);
-    //    TASK_CREATE(read_sensors_task, +4, 2048);
-    //    TASK_CREATE(state_est_task, +3, 2048);
-    //    TASK_CREATE(pspcom_process_bytes, +3, 2048);
-    //    TASK_CREATE(pspcom_send_standard, +2, 2048);
-    //    TASK_CREATE(read_gps_task, +2, 2048);
-    //    TASK_CREATE(storage_task, +1, 4096);
-    //} else {
-    //    // MTP mode data queuing task
-    //    TASK_CREATE(mtp_readwrite_file_task, +1, 2048);
-    //}
+    bool mtp_mode = false;
+
+#ifndef FLIGHT_MODE
+    printf("Waiting for MTP mode selection\n");
+    uint64_t start_time = MILLIS();
+    while (MILLIS() - start_time < MTP_SEL_DELAY_MS) {
+        if (gpio_read(MTP_SEL_PIN)) {
+            mtp_mode = true;
+            break;
+        }
+        DELAY(1);
+    }
+#endif
+
+    if (!mtp_mode) {
+        // Start tasks if we are in normal mode
+        printf("Launching flight tasks\n");
+        // TASK_CREATE(pyros_task, +5, 2048);
+        // TASK_CREATE(read_sensors_task, +4, 2048);
+        // TASK_CREATE(state_est_task, +3, 2048);
+        // TASK_CREATE(pspcom_process_bytes, +3, 2048);
+        // TASK_CREATE(pspcom_send_standard, +2, 2048);
+        // TASK_CREATE(read_gps_task, +2, 2048);
+        // TASK_CREATE(storage_task, +1, 4096);
+    } else {
+        // MTP mode data queuing task
+        printf("Launching MTP task\n");
+        // TASK_CREATE(mtp_readwrite_file_task, +1, 2048);
+    }
+
 #ifdef DEBUG_MEMORY_USAGE
     TASK_CREATE(debug_memory_usage_task, +1, 512);
 #endif
@@ -171,16 +187,16 @@ void SysTick_Handler(void) {
     }
 }
 
-void Error_Handler(void) { PANIC("Unexpected exception\n"); }
+void Error_Handler(void) { PANIC("unexpected exception\n"); }
 
-void NMI_Handler(void) { PANIC("Unexpected exception\n"); }
+void NMI_Handler(void) { PANIC("unexpected exception\n"); }
 
-void HardFault_Handler(void) { PANIC("Unexpected exception\n"); }
+void HardFault_Handler(void) { PANIC("unexpected exception\n"); }
 
-void MemManage_Handler(void) { PANIC("Unexpected exception\n"); }
+void MemManage_Handler(void) { PANIC("unexpected exception\n"); }
 
-void BusFault_Handler(void) { PANIC("Unexpected exception\n"); }
+void BusFault_Handler(void) { PANIC("unexpected exception\n"); }
 
-void UsageFault_Handler(void) { PANIC("Unexpected exception\n"); }
+void UsageFault_Handler(void) { PANIC("unexpected exception\n"); }
 
-void DebugMon_Handler(void) { PANIC("Unexpected exception\n"); }
+void DebugMon_Handler(void) { PANIC("unexpected exception\n"); }

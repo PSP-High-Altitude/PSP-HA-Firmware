@@ -8,6 +8,7 @@ volatile int uxTopUsedPriority;
 #define DEBUG
 // #define DEBUG_STORAGE
 // #define PSPCOM_SENSORS
+// #define FLIGHT_MODE
 
 // Misc
 #ifdef USE_SPI_CRC
@@ -26,6 +27,10 @@ volatile int uxTopUsedPriority;
 // Storage
 #define NAND_ALLOW_REFORMAT
 #define NAND_MAX_FLIGHTS 10
+
+// MTP
+#define MTP_SEL_PIN PIN_PB5
+#define MTP_SEL_DELAY_MS 5000
 
 // Extra debugging
 // #define DEBUG_MEMORY_USAGE

@@ -93,6 +93,8 @@
                 "error.h": "c",
                 "nand.h": "c",
                 "ospi.h": "c",
-                "usb.h": "c"
+                "usb.h": "c",
+                "state.h": "c",
+                "freertosconfig.h": "c"
         }
 }

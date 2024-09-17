@@ -8,6 +8,13 @@ of the OS.
 Macros
 ------
 
+.. c:macro:: PANIC(msg, ...)
+
+    Puts the board into an infinite loop of blinking the red LED and printing out the given error message.
+
+    :param msg: Format string about the error that caused the panic.
+    :param ...: Format string arguments (same as args to printf).
+
 .. c:macro:: TASK_CREATE(func, pri, ss)
 
     This macro creates a FreeRTOS task with the given function, priority, and stack size.
