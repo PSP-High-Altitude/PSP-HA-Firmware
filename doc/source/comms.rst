@@ -8,3 +8,4 @@ PAL 9000 utilizes several communication interfaces, each having a hardware-agnos
 
     I2C <i2c>
     SPI <spi>
+    OSPI <ospi>

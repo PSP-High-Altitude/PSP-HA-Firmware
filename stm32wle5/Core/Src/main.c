@@ -95,7 +95,7 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-  SUBGRF_SetTcxoMode(TCXO_CTRL_3_3V, 100);
+  //SUBGRF_SetTcxoMode(TCXO_CTRL_3_3V, 100);
   SubghzApp_Init();
   HAL_Delay(100);
   /* USER CODE END SysInit */

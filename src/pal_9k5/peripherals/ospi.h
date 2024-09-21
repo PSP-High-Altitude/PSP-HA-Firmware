@@ -37,6 +37,22 @@ typedef struct {
     uint8_t device_size;
 } OSpiDevice;
 
+typedef struct {
+    uint8_t inst;
+    uint8_t inst_mode;
+    uint8_t addr_mode;
+    uint32_t n_addr;
+    uint32_t addr;
+    uint8_t n_dummy;
+    uint8_t data_mode;
+    uint32_t n_data;
+} OSpiCommand;
+
+typedef enum {
+    OSPI_MATCH_AND,
+    OSPI_MATCH_OR,
+} OSpiMatchMode;
+
 Status ospi_auto_poll_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
                           OSPI_AutoPollingTypeDef* cfg, uint64_t timeout);
 Status ospi_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd);
