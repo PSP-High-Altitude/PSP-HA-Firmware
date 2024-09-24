@@ -137,6 +137,27 @@ static Status i2c_setup(I2cDevice *dev) {
         return STATUS_OK;
     }
 
+    // Enable clock
+    switch (dev->periph) {
+        case P_I2C1:
+            __HAL_RCC_I2C1_CLK_ENABLE();
+            break;
+        case P_I2C2:
+            __HAL_RCC_I2C2_CLK_ENABLE();
+            break;
+        case P_I2C3:
+            __HAL_RCC_I2C3_CLK_ENABLE();
+            break;
+        case P_I2C4:
+            __HAL_RCC_I2C4_CLK_ENABLE();
+            break;
+        case P_I2C5:
+            __HAL_RCC_I2C5_CLK_ENABLE();
+            break;
+        default:
+            return STATUS_PARAMETER_ERROR;
+    }
+
     // Get the base address of the peripheral
     I2C_TypeDef *base = i2c_base[dev->periph];
 

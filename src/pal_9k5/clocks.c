@@ -81,21 +81,6 @@ void SystemClock_Config() {
 
     HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
 
-    // Initialize I2C clocks
-    __HAL_RCC_I2C1_CLK_ENABLE();
-    __HAL_RCC_I2C2_CLK_ENABLE();
-    __HAL_RCC_I2C3_CLK_ENABLE();
-    __HAL_RCC_I2C4_CLK_ENABLE();
-    __HAL_RCC_I2C5_CLK_ENABLE();
-
-    // Initialize SPI clocks
-    __HAL_RCC_SPI1_CLK_ENABLE();
-    __HAL_RCC_SPI2_CLK_ENABLE();
-    __HAL_RCC_SPI3_CLK_ENABLE();
-    __HAL_RCC_SPI4_CLK_ENABLE();
-    __HAL_RCC_SPI5_CLK_ENABLE();
-    __HAL_RCC_SPI6_CLK_ENABLE();
-
     // Initialize GPIO clocks
     __HAL_RCC_GPIOA_CLK_ENABLE();
     __HAL_RCC_GPIOB_CLK_ENABLE();
@@ -105,6 +90,8 @@ void SystemClock_Config() {
     __HAL_RCC_GPIOF_CLK_ENABLE();
     __HAL_RCC_GPIOG_CLK_ENABLE();
     __HAL_RCC_GPIOH_CLK_ENABLE();
+    __HAL_RCC_GPIOJ_CLK_ENABLE();
+    __HAL_RCC_GPIOK_CLK_ENABLE();
 
     // Initialize UART clocks
     __HAL_RCC_UART7_CLK_ENABLE();
@@ -116,17 +103,8 @@ void SystemClock_Config() {
     HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
 
-    // Initialize QSPI
-    __HAL_RCC_OCTOSPIM_CLK_ENABLE();
-    __HAL_RCC_OSPI1_CLK_ENABLE();
-    __HAL_RCC_OSPI1_FORCE_RESET();
-    __HAL_RCC_OSPI1_RELEASE_RESET();
-
     // Initalize MDMA
     __HAL_RCC_MDMA_CLK_ENABLE();
-
-    // Initialize SDMMC
-    __HAL_RCC_SDMMC1_CLK_ENABLE();
 
     // Enable RAM D2
     __HAL_RCC_D2SRAM1_CLK_ENABLE();

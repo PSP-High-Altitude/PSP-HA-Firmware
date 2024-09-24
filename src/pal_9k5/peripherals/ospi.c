@@ -161,6 +161,22 @@ static Status ospi_setup(OSpiDevice* dev) {
         return STATUS_OK;
     }
 
+    __HAL_RCC_OCTOSPIM_CLK_ENABLE();
+
+    // Enable clock
+    switch (dev->periph) {
+        case P_OSPI1:
+            __HAL_RCC_OSPI1_CLK_ENABLE();
+            __HAL_RCC_OSPI1_FORCE_RESET();
+            __HAL_RCC_OSPI1_RELEASE_RESET();
+            break;
+        case P_OSPI2:
+            __HAL_RCC_OSPI2_CLK_ENABLE();
+            __HAL_RCC_OSPI2_FORCE_RESET();
+            __HAL_RCC_OSPI2_RELEASE_RESET();
+            break;
+    }
+
     OCTOSPI_TypeDef* base = ospi_base[dev->periph];
     GPIO_InitTypeDef pin_conf = {
         .Mode = GPIO_MODE_AF_PP,

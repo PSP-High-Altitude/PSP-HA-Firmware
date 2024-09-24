@@ -71,26 +71,16 @@ void init_task() {
     // 2; init_error |= (EXPECT_OK(init_pyros(), "init pyros") != STATUS_OK) <<
     // 4; init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK)
     // << 5;
+    init_error |= (EXPECT_OK(buzzer_init(), "init buzzer") != STATUS_OK) << 6;
 
-    // One beep for initialization complete
+    // Play init tune
     gpio_write(PIN_RED, GPIO_LOW);
-    buzzer_set(BUZZER_FREQ_1KHZ);
-    DELAY(200);
-    buzzer_set(BUZZER_FREQ_2KHZ);
-    DELAY(200);
-    buzzer_set(BUZZER_FREQ_4KHZ);
-    DELAY(200);
-    buzzer_clear();
-    DELAY(1000);
+    buzzer_play(BUZZER_SOUND_INIT);
+    buzzer_play(BUZZER_SOUND_SONG);
 
     // Beep out the failure code (if any)
     for (int i = 0; i < init_error; i++) {
-        buzzer_set(BUZZER_FREQ_4KHZ);
-        gpio_write(PIN_RED, GPIO_HIGH);
-        DELAY(100);
-        buzzer_clear();
-        gpio_write(PIN_RED, GPIO_LOW);
-        DELAY(100);
+        buzzer_play(BUZZER_SOUND_BEEP);
     }
 
     printf("Initialization complete\n");
@@ -109,6 +99,7 @@ void init_task() {
     }
 #endif
 
+    TASK_CREATE(buzzer_task, +1, 512);
     if (!mtp_mode) {
         // Start tasks if we are in normal mode
         printf("Launching flight tasks\n");

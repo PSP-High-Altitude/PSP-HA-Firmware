@@ -142,6 +142,28 @@ Status spi_setup(SpiDevice* dev) {
         return STATUS_OK;
     }
 
+    // Enable clocks
+    switch (dev->periph) {
+        case P_SPI1:
+            __HAL_RCC_SPI1_CLK_ENABLE();
+            break;
+        case P_SPI2:
+            __HAL_RCC_SPI2_CLK_ENABLE();
+            break;
+        case P_SPI3:
+            __HAL_RCC_SPI3_CLK_ENABLE();
+            break;
+        case P_SPI4:
+            __HAL_RCC_SPI4_CLK_ENABLE();
+            break;
+        case P_SPI5:
+            __HAL_RCC_SPI5_CLK_ENABLE();
+            break;
+        case P_SPI6:
+            __HAL_RCC_SPI6_CLK_ENABLE();
+            break;
+    }
+
     // Get the base address of the peripheral
     SPI_TypeDef* base = spi_base[dev->periph];
 
