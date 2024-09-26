@@ -213,5 +213,6 @@ __attribute__((unused)) static GPIO_TypeDef* PAL_GPIO_PORT[] = {
 #define PIN_BLUE PIN_PD3
 #define PIN_BUZZER PIN_PE5
 #define PIN_PAUSE PIN_PB5
+#define PIN_MTP PIN_PB5
 
 #endif  // BOARD_H

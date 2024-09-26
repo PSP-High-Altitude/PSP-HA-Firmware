@@ -37,6 +37,33 @@ typedef struct {
     uint8_t device_size;
 } OSpiDevice;
 
+enum {
+    OSPI_DATA_NONE,
+    OSPI_DATA_1_LINE,
+    OSPI_DATA_2_LINES,
+    OSPI_DATA_4_LINES,
+};
+
+enum {
+    OSPI_ADDR_NONE,
+    OSPI_ADDR_1_LINE,
+    OSPI_ADDR_2_LINES,
+    OSPI_ADDR_4_LINES,
+};
+
+enum {
+    OSPI_INST_1_LINE,
+    OSPI_INST_2_LINES,
+    OSPI_INST_4_LINES,
+};
+
+enum {
+    OSPI_ADDR_1_BYTE,
+    OSPI_ADDR_2_BYTES,
+    OSPI_ADDR_3_BYTES,
+    OSPI_ADDR_4_BYTES,
+};
+
 typedef struct {
     uint8_t inst;
     uint8_t inst_mode;
@@ -48,17 +75,29 @@ typedef struct {
     uint32_t n_data;
 } OSpiCommand;
 
-typedef enum {
+enum {
     OSPI_MATCH_AND,
     OSPI_MATCH_OR,
-} OSpiMatchMode;
+};
 
-Status ospi_auto_poll_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
-                          OSPI_AutoPollingTypeDef* cfg, uint64_t timeout);
-Status ospi_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd);
-Status ospi_write(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd, uint8_t* tx_buf,
+enum {
+    OSPI_AUTOMATIC_STOP_DISABLE,
+    OSPI_AUTOMATIC_STOP_ENABLE,
+};
+
+typedef struct {
+    uint32_t match;
+    uint32_t mask;
+    uint8_t match_mode;
+    uint16_t interval;
+} OSpiAutopoll;
+
+Status ospi_auto_poll_cmd(OSpiDevice* dev, OSpiCommand* cmd, OSpiAutopoll* cfg,
+                          uint64_t timeout);
+Status ospi_cmd(OSpiDevice* dev, OSpiCommand* cmd);
+Status ospi_write(OSpiDevice* dev, OSpiCommand* cmd, uint8_t* tx_buf,
                   uint64_t timeout);
-Status ospi_read(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd, uint8_t* rx_buf,
+Status ospi_read(OSpiDevice* dev, OSpiCommand* cmd, uint8_t* rx_buf,
                  uint64_t timeout);
 
 #endif

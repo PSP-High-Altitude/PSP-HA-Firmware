@@ -96,6 +96,9 @@
                 "usb.h": "c",
                 "state.h": "c",
                 "freertosconfig.h": "c",
-                "ms5637_model.h": "c"
+                "ms5637_model.h": "c",
+                "stm32h735xx.h": "c",
+                "system_stm32h7xx.h": "c",
+                "button_event.h": "c"
         }
 }

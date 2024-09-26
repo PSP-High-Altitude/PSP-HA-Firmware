@@ -4,7 +4,6 @@
 #include "ospi.h"
 #include "status.h"
 #include "stdint.h"
-#include "stm32h7xx_hal.h"
 
 #define MT29F4G_PAGE_SIZE 4096
 #define MT29F4G_PAGE_SIZE_LOG2 12

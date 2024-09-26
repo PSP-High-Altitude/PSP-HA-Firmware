@@ -281,7 +281,7 @@ try_gpio_port:
     }
 
     hmdma_octospi.Instance = MDMA_Channel0;
-    hmdma_octospi.Init.Request = dev->periph == P_OSPI1
+    hmdma_octospi.Init.Request = (dev->periph == P_OSPI1)
                                      ? MDMA_REQUEST_OCTOSPI1_FIFO_TH
                                      : MDMA_REQUEST_OCTOSPI2_FIFO_TH;
     hmdma_octospi.Init.TransferTriggerMode = MDMA_BUFFER_TRANSFER;
@@ -307,31 +307,116 @@ try_gpio_port:
 
     __HAL_LINKDMA(ospi_handles[dev->periph], hmdma, hmdma_octospi);
 
-    HAL_NVIC_SetPriority(dev->periph == P_OSPI1 ? OCTOSPI1_IRQn : OCTOSPI2_IRQn,
-                         0, 0);
-    HAL_NVIC_EnableIRQ(dev->periph == P_OSPI1 ? OCTOSPI1_IRQn : OCTOSPI2_IRQn);
+    HAL_NVIC_SetPriority(
+        (dev->periph == P_OSPI1) ? OCTOSPI1_IRQn : OCTOSPI2_IRQn, 0, 0);
+    HAL_NVIC_EnableIRQ((dev->periph == P_OSPI1) ? OCTOSPI1_IRQn
+                                                : OCTOSPI2_IRQn);
     HAL_NVIC_SetPriority(MDMA_IRQn, 0, 0);
     HAL_NVIC_EnableIRQ(MDMA_IRQn);
 
     return STATUS_OK;
 }
 
-Status ospi_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd) {
+Status ospi_cmd(OSpiDevice* dev, OSpiCommand* cmd) {
+    uint32_t data_mode = HAL_OSPI_DATA_1_LINE;
+    switch (cmd->data_mode) {
+        case OSPI_DATA_NONE:
+            data_mode = HAL_OSPI_DATA_NONE;
+            break;
+        case OSPI_DATA_1_LINE:
+            data_mode = HAL_OSPI_DATA_1_LINE;
+            break;
+        case OSPI_DATA_2_LINES:
+            data_mode = HAL_OSPI_DATA_2_LINES;
+            break;
+        case OSPI_DATA_4_LINES:
+            data_mode = HAL_OSPI_DATA_4_LINES;
+            break;
+    }
+
+    uint32_t addr_mode = HAL_OSPI_ADDRESS_1_LINE;
+    switch (cmd->addr_mode) {
+        case OSPI_ADDR_NONE:
+            addr_mode = HAL_OSPI_ADDRESS_NONE;
+            break;
+        case OSPI_ADDR_1_LINE:
+            addr_mode = HAL_OSPI_ADDRESS_1_LINE;
+            break;
+        case OSPI_ADDR_2_LINES:
+            addr_mode = HAL_OSPI_ADDRESS_2_LINES;
+            break;
+        case OSPI_ADDR_4_LINES:
+            addr_mode = HAL_OSPI_ADDRESS_4_LINES;
+            break;
+    }
+
+    uint32_t inst_mode = HAL_OSPI_INSTRUCTION_1_LINE;
+    switch (cmd->inst_mode) {
+        case OSPI_INST_1_LINE:
+            inst_mode = HAL_OSPI_INSTRUCTION_1_LINE;
+            break;
+        case OSPI_INST_2_LINES:
+            inst_mode = HAL_OSPI_INSTRUCTION_2_LINES;
+            break;
+        case OSPI_INST_4_LINES:
+            inst_mode = HAL_OSPI_INSTRUCTION_4_LINES;
+            break;
+    }
+
+    uint32_t addr_size = HAL_OSPI_ADDRESS_8_BITS;
+    switch (cmd->n_addr) {
+        case OSPI_ADDR_1_BYTE:
+            addr_size = HAL_OSPI_ADDRESS_8_BITS;
+            break;
+        case OSPI_ADDR_2_BYTES:
+            addr_size = HAL_OSPI_ADDRESS_16_BITS;
+            break;
+        case OSPI_ADDR_3_BYTES:
+            addr_size = HAL_OSPI_ADDRESS_24_BITS;
+            break;
+        case OSPI_ADDR_4_BYTES:
+            addr_size = HAL_OSPI_ADDRESS_32_BITS;
+            break;
+    }
+
+    OSPI_RegularCmdTypeDef hal_cmd = {
+        .OperationType = HAL_OSPI_OPTYPE_COMMON_CFG,
+        .FlashId = HAL_OSPI_FLASH_ID_1,
+        .Instruction = cmd->inst,
+        .InstructionMode = inst_mode,
+        .InstructionSize = HAL_OSPI_INSTRUCTION_8_BITS,
+        .InstructionDtrMode = HAL_OSPI_INSTRUCTION_DTR_DISABLE,
+        .Address = cmd->addr,
+        .AddressMode = addr_mode,
+        .AddressSize = addr_size,
+        .AddressDtrMode = HAL_OSPI_ADDRESS_DTR_DISABLE,
+        .AlternateBytes = 0,
+        .AlternateBytesMode = HAL_OSPI_ALTERNATE_BYTES_NONE,
+        .AlternateBytesSize = 0,
+        .AlternateBytesDtrMode = HAL_OSPI_ALTERNATE_BYTES_DTR_DISABLE,
+        .DataMode = data_mode,
+        .DummyCycles = cmd->n_dummy,
+        .NbData = cmd->n_data,
+        .SIOOMode = HAL_OSPI_SIOO_INST_EVERY_CMD,
+        .DQSMode = HAL_OSPI_DQS_DISABLE,
+
+    };
+
     if (ospi_setup(dev) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
     }
-    if (HAL_OSPI_Command(ospi_handles[dev->periph], cmd, 100) != HAL_OK) {
+    if (HAL_OSPI_Command(ospi_handles[dev->periph], &hal_cmd, 100) != HAL_OK) {
         return STATUS_HARDWARE_ERROR;
     }
     return STATUS_OK;
 }
 
-Status ospi_auto_poll_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
-                          OSPI_AutoPollingTypeDef* cfg, uint64_t timeout) {
+Status ospi_auto_poll_cmd(OSpiDevice* dev, OSpiCommand* cmd, OSpiAutopoll* cfg,
+                          uint64_t timeout) {
     if (ospi_setup(dev) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
     }
-    if (cmd->NbData != 1) {
+    if (cmd->n_data != 1) {
         return STATUS_PARAMETER_ERROR;
     }
 
@@ -339,7 +424,7 @@ Status ospi_auto_poll_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
     while (MILLIS() - start_time < timeout) {
         // Poll the device
         uint32_t rx_buf;
-        if (HAL_OSPI_Command(ospi_handles[dev->periph], cmd, 10) != HAL_OK) {
+        if (ospi_cmd(dev, cmd) != STATUS_OK) {
             return STATUS_HARDWARE_ERROR;
         }
         if (HAL_OSPI_Receive_DMA(ospi_handles[dev->periph],
@@ -350,25 +435,22 @@ Status ospi_auto_poll_cmd(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd,
         // Wait for the data to come
         while (HAL_OSPI_GetState(ospi_handles[dev->periph]) !=
                HAL_OSPI_STATE_READY) {
-            DELAY(0);
+            DELAY(cfg->interval);
         }
 
         // Check if the data matches
-        rx_buf = cfg->MatchMode == HAL_OSPI_MATCH_MODE_AND ? rx_buf & cfg->Mask
-                                                           : rx_buf | cfg->Mask;
-        if (rx_buf == cfg->Match) {
+        rx_buf = (cfg->match_mode == OSPI_MATCH_AND) ? (rx_buf & cfg->mask)
+                                                     : (rx_buf | cfg->mask);
+        if (rx_buf == cfg->match) {
             return STATUS_OK;
         }
     }
     return STATUS_TIMEOUT_ERROR;
 }
 
-Status ospi_write(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd, uint8_t* tx_buf,
+Status ospi_write(OSpiDevice* dev, OSpiCommand* cmd, uint8_t* tx_buf,
                   uint64_t timeout) {
-    if (ospi_setup(dev) != STATUS_OK) {
-        return STATUS_PARAMETER_ERROR;
-    }
-    if (HAL_OSPI_Command(ospi_handles[dev->periph], cmd, 10) != HAL_OK) {
+    if (ospi_cmd(dev, cmd) != STATUS_OK) {
         return STATUS_HARDWARE_ERROR;
     }
     if (HAL_OSPI_Transmit_DMA(ospi_handles[dev->periph], tx_buf) != HAL_OK) {
@@ -378,19 +460,15 @@ Status ospi_write(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd, uint8_t* tx_buf,
     while (HAL_OSPI_GetState(ospi_handles[dev->periph]) !=
            HAL_OSPI_STATE_READY) {
         if (MILLIS() - start_time > timeout) {
-            DELAY(0);
             return STATUS_TIMEOUT_ERROR;
         }
     }
     return STATUS_OK;
 }
 
-Status ospi_read(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd, uint8_t* rx_buf,
+Status ospi_read(OSpiDevice* dev, OSpiCommand* cmd, uint8_t* rx_buf,
                  uint64_t timeout) {
-    if (ospi_setup(dev) != STATUS_OK) {
-        return STATUS_PARAMETER_ERROR;
-    }
-    if (HAL_OSPI_Command(ospi_handles[dev->periph], cmd, 10) != HAL_OK) {
+    if (ospi_cmd(dev, cmd) != STATUS_OK) {
         return STATUS_HARDWARE_ERROR;
     }
     if (HAL_OSPI_Receive_DMA(ospi_handles[dev->periph], rx_buf) != HAL_OK) {
@@ -400,7 +478,6 @@ Status ospi_read(OSpiDevice* dev, OSPI_RegularCmdTypeDef* cmd, uint8_t* rx_buf,
     while (HAL_OSPI_GetState(ospi_handles[dev->periph]) !=
            HAL_OSPI_STATE_READY) {
         if (MILLIS() - start_time > timeout) {
-            DELAY(0);
             return STATUS_TIMEOUT_ERROR;
         }
     }

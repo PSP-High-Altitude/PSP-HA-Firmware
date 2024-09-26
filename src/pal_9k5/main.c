@@ -1,5 +1,6 @@
 #include "main.h"
 
+#include "button_event.h"
 #include "buzzer.h"
 #include "clocks.h"
 #include "data.h"
@@ -57,6 +58,8 @@
  * After initialization, this task runs periodically to perform
  * maintenance functions and handle outside events.
  */
+void mtp_button_handler() { printf("hello!\n"); }
+
 void init_task() {
     // Suspend all tasks until initialization is complete
     vTaskSuspendAll();
@@ -65,6 +68,13 @@ void init_task() {
 
     printf("Starting initialization...\n");
 
+    ButtonEventConfig mtp_button = {
+        .pin = PIN_MTP,
+        .rising = true,
+        .falling = false,
+        .event_handler = mtp_button_handler,
+    };
+
     init_error |= (EXPECT_OK(init_usb(0), "init usb") != STATUS_OK) << 0;
     init_error |= (EXPECT_OK(init_storage(), "init storage") != STATUS_OK) << 1;
     // init_error |= (EXPECT_OK(init_sensors(), "init sensors") != STATUS_OK) <<
@@ -72,11 +82,16 @@ void init_task() {
     // 4; init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK)
     // << 5;
     init_error |= (EXPECT_OK(buzzer_init(), "init buzzer") != STATUS_OK) << 6;
+    init_error |= (EXPECT_OK(button_event_init(), "init button") != STATUS_OK)
+                  << 7;
+    init_error |= (EXPECT_OK(button_event_create(&mtp_button),
+                             "register mtp button event") != STATUS_OK)
+                  << 7;
 
     // Play init tune
     gpio_write(PIN_RED, GPIO_LOW);
     buzzer_play(BUZZER_SOUND_INIT);
-    buzzer_play(BUZZER_SOUND_SONG);
+    // buzzer_play(BUZZER_SOUND_SONG);
 
     // Beep out the failure code (if any)
     for (int i = 0; i < init_error; i++) {
