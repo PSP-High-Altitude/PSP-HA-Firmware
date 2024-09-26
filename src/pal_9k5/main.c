@@ -1,5 +1,6 @@
 #include "main.h"
 
+#include "backup.h"
 #include "button_event.h"
 #include "buzzer.h"
 #include "clocks.h"
@@ -58,35 +59,25 @@
  * After initialization, this task runs periodically to perform
  * maintenance functions and handle outside events.
  */
-void mtp_button_handler() { printf("hello!\n"); }
-
 void init_task() {
     // Suspend all tasks until initialization is complete
     vTaskSuspendAll();
 
     uint32_t init_error = 0;  // Set if error occurs during initialization
 
+    uint8_t mtp_mode = get_backup_ptr()->flag_mtp_pressed;
+
     printf("Starting initialization...\n");
 
-    ButtonEventConfig mtp_button = {
-        .pin = PIN_MTP,
-        .rising = true,
-        .falling = false,
-        .event_handler = mtp_button_handler,
-    };
-
-    init_error |= (EXPECT_OK(init_usb(0), "init usb") != STATUS_OK) << 0;
-    init_error |= (EXPECT_OK(init_storage(), "init storage") != STATUS_OK) << 1;
+    init_error |= (EXPECT_OK(button_event_init(), "init button") != STATUS_OK)
+                  << 0;
+    init_error |= (EXPECT_OK(init_usb(), "init usb") != STATUS_OK) << 1;
+    init_error |= (EXPECT_OK(init_storage(), "init storage") != STATUS_OK) << 2;
     // init_error |= (EXPECT_OK(init_sensors(), "init sensors") != STATUS_OK) <<
-    // 2; init_error |= (EXPECT_OK(init_pyros(), "init pyros") != STATUS_OK) <<
+    // 3; init_error |= (EXPECT_OK(init_pyros(), "init pyros") != STATUS_OK) <<
     // 4; init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK)
     // << 5;
     init_error |= (EXPECT_OK(buzzer_init(), "init buzzer") != STATUS_OK) << 6;
-    init_error |= (EXPECT_OK(button_event_init(), "init button") != STATUS_OK)
-                  << 7;
-    init_error |= (EXPECT_OK(button_event_create(&mtp_button),
-                             "register mtp button event") != STATUS_OK)
-                  << 7;
 
     // Play init tune
     gpio_write(PIN_RED, GPIO_LOW);
@@ -99,20 +90,6 @@ void init_task() {
     }
 
     printf("Initialization complete\n");
-
-    bool mtp_mode = false;
-
-#ifndef FLIGHT_MODE
-    printf("Waiting for MTP mode selection\n");
-    uint64_t start_time = MILLIS();
-    while (MILLIS() - start_time < MTP_SEL_DELAY_MS) {
-        if (gpio_read(MTP_SEL_PIN)) {
-            mtp_mode = true;
-            break;
-        }
-        DELAY(1);
-    }
-#endif
 
     TASK_CREATE(buzzer_task, +1, 512);
     if (!mtp_mode) {
@@ -150,6 +127,7 @@ int main(void) {
     HAL_Init();
     SystemClock_Config();
     init_timers();
+    init_backup();
 
     // Light all LEDs to indicate initialization
     gpio_write(PIN_RED, GPIO_HIGH);

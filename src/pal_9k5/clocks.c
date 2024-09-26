@@ -1,5 +1,7 @@
 #include "clocks.h"
 
+#include "main.h"
+#include "stdio.h"
 #include "stm32h7xx_hal.h"
 #include "stm32h7xx_hal_tim.h"
 
@@ -118,6 +120,9 @@ HAL_StatusTypeDef HAL_InitTick(uint32_t TickPriority) {
     uint32_t uwPrescalerValue;
     uint32_t pFLatency;
     /*Configure the TIM1 IRQ priority */
+#ifdef TICK_INT_PRIORITY_OVERRIDE
+    TickPriority = TICK_INT_PRIORITY_OVERRIDE;
+#endif
     if (TickPriority < (1UL << __NVIC_PRIO_BITS)) {
         HAL_NVIC_SetPriority(TIM1_UP_IRQn, TickPriority, 0U);
 
@@ -172,6 +177,7 @@ HAL_StatusTypeDef HAL_InitTick(uint32_t TickPriority) {
  */
 void HAL_SuspendTick(void) {
     /* Disable TIM1 update Interrupt */
+    printf("disabled tick\n");
     __HAL_TIM_DISABLE_IT(&htim1, TIM_IT_UPDATE);
 }
 

@@ -28,11 +28,10 @@ volatile int uxTopUsedPriority;
 #define NAND_ALLOW_REFORMAT
 #define NAND_MAX_FLIGHTS 10
 
-// MTP
-#define MTP_SEL_PIN PIN_PB5
-#define MTP_SEL_DELAY_MS 5000
-
 // Extra debugging
 // #define DEBUG_MEMORY_USAGE
+
+// Tick priority
+// #define TICK_INT_PRIORITY_OVERRIDE 0x0E
 
 #endif  // MAIN_H

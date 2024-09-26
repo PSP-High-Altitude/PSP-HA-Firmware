@@ -99,6 +99,7 @@
                 "ms5637_model.h": "c",
                 "stm32h735xx.h": "c",
                 "system_stm32h7xx.h": "c",
-                "button_event.h": "c"
+                "button_event.h": "c",
+                "backup.h": "c"
         }
 }
