@@ -95,7 +95,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+#lib/  # How did this not cause problems before?
 lib64/
 parts/
 sdist/
