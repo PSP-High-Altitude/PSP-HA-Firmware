@@ -101,7 +101,7 @@ static void sound_init() {
     DELAY(200);
 }
 
-static void sound_soung() {
+static void sound_song() {
     int num_notes = 75;
     int bpm = 200;
     Note notes[] = {
@@ -226,7 +226,7 @@ void buzzer_task() {
                     sound_init();
                     break;
                 case BUZZER_SOUND_SONG:
-                    sound_soung();
+                    sound_song();
                     break;
                 default:
                     break;

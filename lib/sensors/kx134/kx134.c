@@ -92,7 +92,7 @@ Status kx134_init(SpiDevice* device, Kx134OutputDataRate rate,
     }
 
     // power up procedure
-    tx_buf = 0x1C;
+    tx_buf = 0x00;
     if (kx134_write(device, KX134_CNTL2, &tx_buf, 1) != STATUS_OK) {
         return STATUS_ERROR;
     }
