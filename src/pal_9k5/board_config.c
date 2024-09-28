@@ -23,7 +23,7 @@ const static BoardConfig s_default_config = {
 static uint32_t calc_config_checksum(const BoardConfig* config) {
     const uint8_t* config_bytes = (const uint8_t*)config;
 
-    const uint32_t poly = 0x07;  // CRC-32 polynomial (IEEE 802.3)
+    const uint32_t poly = 0x04C11DB7;  // CRC-32 polynomial (IEEE 802.3)
     uint32_t crc = 0xFFFFFFFF;
 
     size_t size = sizeof(*config) - sizeof(config->checksum);
