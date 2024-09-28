@@ -1,5 +1,5 @@
-SPI
-===
+OSPI
+====
 
 The OSPI driver is contained within its header :code:`ospi.h` and its source :code:`ospi.c` in 
 :ref:`Src <src_section>`. The driver allows for new code to easily read and write to an OSPI interface 

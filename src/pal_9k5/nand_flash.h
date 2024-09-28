@@ -1,6 +1,7 @@
 #ifndef NAND_FLASH_H
 #define NAND_FLASH_H
 
+#include "board_config.h"
 #include "gps.pb.h"
 #include "mt29f4g.h"
 #include "sensor.pb.h"
@@ -23,6 +24,10 @@ Status nand_flash_write_gps_data(pb_byte_t* gps_frame, size_t size);
 Status nand_flash_write_state_data(pb_byte_t* state_frame, size_t size);
 
 Status nand_flash_dump_prf_stats(char stats[]);
+
+Status nand_flash_load_board_config(BoardConfig* board_config);
+
+Status nand_flash_store_board_config(BoardConfig* board_config);
 
 // Prints the files and directories at the specified path
 // Returns an error code on failure

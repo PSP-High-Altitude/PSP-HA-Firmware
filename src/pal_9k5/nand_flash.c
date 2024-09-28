@@ -20,6 +20,7 @@ static char s_filename[FNAME_LEN + FDIR_LEN] = "/dat_00.pb3";
 static char s_gpsfname[FNAME_LEN + FDIR_LEN] = "/gps_00.pb3";
 static char s_statefname[FNAME_LEN + FDIR_LEN] = "/fsl_00.pb3";
 static char s_prffname[FNAME_LEN + FDIR_LEN] = "/prf_00.txt";
+static char s_cfgfname[FNAME_LEN + FDIR_LEN] = "/cfg.bin";
 
 static FIL s_datfile;
 static FIL s_gpsfile;
@@ -438,6 +439,44 @@ Status nand_flash_flush() {
         if (f_sync(&s_statefile) != 0) {
             return STATUS_HARDWARE_ERROR;
         }
+    }
+
+    return STATUS_OK;
+}
+
+Status nand_flash_load_board_config(BoardConfig* board_config) {
+    FIL cfgfile;
+
+    if (f_open(&cfgfile, s_cfgfname, FA_OPEN_EXISTING | FA_READ) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    UINT br;
+    if (f_read(&cfgfile, board_config, sizeof(board_config), &br) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    if (br != sizeof(board_config)) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    return STATUS_OK;
+}
+
+Status nand_flash_store_board_config(BoardConfig* board_config) {
+    FIL cfgfile;
+
+    if (f_open(&cfgfile, s_cfgfname, FA_OPEN_ALWAYS | FA_WRITE) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    UINT bw;
+    if (f_write(&cfgfile, board_config, sizeof(board_config), &bw) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    if (bw != sizeof(board_config)) {
+        return STATUS_HARDWARE_ERROR;
     }
 
     return STATUS_OK;
