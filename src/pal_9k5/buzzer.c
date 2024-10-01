@@ -56,7 +56,7 @@ Status buzzer_init() {
     HAL_TIM_OC_ConfigChannel(&tim15_handle, &tim15_oc_conf, TIM_CHANNEL_1);
 
     // Configure queue
-    buzzer_queue = xQueueCreate(10, sizeof(BuzzerSound));
+    buzzer_queue = xQueueCreate(BUZZER_QUEUE_LEN, sizeof(BuzzerSound));
     if (buzzer_queue == NULL) {
         return STATUS_ERROR;
     }
@@ -83,11 +83,20 @@ Status buzzer_clear() {
     return STATUS_OK;
 }
 
-static void sound_beep() {
+static void sound_beep(uint16_t period) {
     buzzer_set(BUZZER_FREQ_4KHZ);
-    DELAY(200);
+    DELAY(period);
     buzzer_clear();
-    DELAY(200);
+    DELAY(period);
+}
+
+static void sound_descending_beep(uint16_t period) {
+    buzzer_set(BUZZER_FREQ_4KHZ);
+    DELAY(period / 2);
+    buzzer_set(BUZZER_FREQ_2KHZ);
+    DELAY(period / 2);
+    buzzer_clear();
+    DELAY(period);
 }
 
 static void sound_init() {
@@ -220,13 +229,35 @@ void buzzer_task() {
             xQueueReceive(buzzer_queue, &sound, 0);
             switch (sound) {
                 case BUZZER_SOUND_BEEP:
-                    sound_beep();
+                    sound_beep(200);
+                    break;
+                case BUZZER_SOUND_DOUBLE_BEEP:
+                    sound_beep(200);
+                    sound_beep(200);
+                    break;
+                case BUZZER_SOUND_LONG_BEEP:
+                    sound_beep(1000);
+                    break;
+                case BUZZER_SOUND_DESCENDING_BEEP:
+                    sound_descending_beep(200);
+                    break;
+                case BUZZER_SOUND_LONG_DESCENDING_BEEP:
+                    sound_descending_beep(1000);
                     break;
                 case BUZZER_SOUND_INIT:
                     sound_init();
                     break;
                 case BUZZER_SOUND_SONG:
                     sound_song();
+                    break;
+                case BUZZER_SOUND_REST_1S:
+                    DELAY(1000);
+                    break;
+                case BUZZER_SOUND_REST_500MS:
+                    DELAY(500);
+                    break;
+                case BUZZER_SOUND_REST_200MS:
+                    DELAY(200);
                     break;
                 default:
                     break;

@@ -65,6 +65,7 @@ void init_task() {
     vTaskSuspendAll();
 
     uint32_t init_error = 0;  // Set if error occurs during initialization
+    uint32_t num_inits = 4;   // Number of inits the error code refers to
 
     uint8_t mtp_mode = get_backup_ptr()->flag_mtp_pressed;
 
@@ -81,7 +82,7 @@ void init_task() {
     //  << 4; init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") !=
     //  STATUS_OK)
     //  << 5;
-    init_error |= (EXPECT_OK(buzzer_init(), "init buzzer") != STATUS_OK) << 6;
+    init_error |= (EXPECT_OK(buzzer_init(), "init buzzer") != STATUS_OK) << 3;
 
     // Play init tune
     gpio_write(PIN_RED, GPIO_LOW);
@@ -89,8 +90,14 @@ void init_task() {
     // buzzer_play(BUZZER_SOUND_SONG);
 
     // Beep out the failure code (if any)
-    for (int i = 0; i < init_error; i++) {
-        buzzer_play(BUZZER_SOUND_BEEP);
+    for (int i = 0; i < num_inits; i++) {
+        if ((init_error >> i) & 1) {
+            buzzer_play(BUZZER_SOUND_LONG_DESCENDING_BEEP);
+            // buzzer_play(BUZZER_SOUND_DOUBLE_BEEP);
+            // buzzer_play(BUZZER_SOUND_REST_200MS);
+        } else {
+            buzzer_play(BUZZER_SOUND_LONG_BEEP);
+        }
     }
 
     printf("Initialization complete\n");

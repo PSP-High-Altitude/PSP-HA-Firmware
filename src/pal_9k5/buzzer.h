@@ -4,6 +4,8 @@
 #include "status.h"
 #include "stdint.h"
 
+#define BUZZER_QUEUE_LEN 20
+
 typedef enum {
     BUZZER_OFF = 0,
     BUZZER_ON = 1,
@@ -23,6 +25,10 @@ typedef enum {
     BUZZER_SOUND_REST_500MS,
     BUZZER_SOUND_REST_200MS,
     BUZZER_SOUND_BEEP,
+    BUZZER_SOUND_DESCENDING_BEEP,
+    BUZZER_SOUND_LONG_BEEP,
+    BUZZER_SOUND_LONG_DESCENDING_BEEP,
+    BUZZER_SOUND_DOUBLE_BEEP,
     BUZZER_SOUND_INIT,
     BUZZER_SOUND_SONG,
 } BuzzerSound;
