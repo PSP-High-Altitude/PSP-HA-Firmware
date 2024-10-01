@@ -8,6 +8,7 @@
 #include "button_event.h"
 #include "gpio/gpio.h"
 #include "main.h"
+#include "nand_flash.h"
 #include "timer.h"
 #include "timers.h"
 #include "usb_device.h"
@@ -49,6 +50,10 @@ static void mtp_button_handler() {
     printf("MTP mode selected!\n");
     xTimerStopFromISR(g_mtp_button_timer, 0);
 
+    // Save the NAND flash
+    nand_flash_flush();
+    nand_flash_deinit();
+
     DELAY_MICROS(1000000);
     get_backup_ptr()->flag_mtp_pressed = 1;
     NVIC_SystemReset();
@@ -85,6 +90,16 @@ int _write(int file, char *data, int len) {
     }
 
 #ifdef DEBUG
+    /***************************/
+    /*       NAND Section      */
+    /***************************/
+
+    nand_flash_write_log(data, len);
+
+    /***************************/
+    /*       USB Section       */
+    /***************************/
+
     // If the USB isn't yet initialized, buffer the writes in an internal buffer
     // so that they can be output when the interface actually gets initialized.
     if (!s_usb_initialized || (MILLIS() - s_usb_initialized_time < 1000)) {

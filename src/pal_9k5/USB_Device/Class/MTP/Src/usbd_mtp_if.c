@@ -42,6 +42,7 @@ typedef struct {
     uint32_t AssociationDesc;
     uint32_t ObjectCompressedSize;
     uint8_t Filename[255];
+    uint8_t Path[255];
 } mtp_object_info;
 
 typedef struct mtp_fnode {
@@ -92,6 +93,7 @@ static int add_file_node(mtp_file_list_t *list, uint32_t handle,
         free(data);
         return 1;
     }
+    node->handle = handle;
     node->data = data;
     node->next = NULL;
     node->prev = list->tail;
@@ -260,6 +262,7 @@ static void traverse_fs(char path[256], uint32_t parent) {
             mtp_object_info *obj_info =
                 (mtp_object_info *)malloc(sizeof(mtp_object_info));
             memcpy(obj_info->Filename, info.fname, strlen(info.fname) + 1);
+            memcpy(obj_info->Path, path, strlen(path) + 1);
             obj_info->Storage_id = MTP_STORAGE_ID;
             obj_info->ObjectFormat = MTP_OBJ_FORMAT_UNDEFINED;
             obj_info->ParentObject = parent == 0xFFFFFFFF ? 0xFFFFFFFF : parent;
@@ -267,6 +270,7 @@ static void traverse_fs(char path[256], uint32_t parent) {
             obj_info->AssociationDesc = 0;
             obj_info->ObjectCompressedSize = info.fsize;
             mtp_fs_size += info.fsize;
+
             if (parent != 0xFFFFFFFF) {
                 mtp_object_info *parent_obj =
                     get_file_node(&mtp_file_list, parent)->data;
@@ -284,19 +288,24 @@ static void traverse_fs(char path[256], uint32_t parent) {
             mtp_object_info *obj_info =
                 (mtp_object_info *)malloc(sizeof(mtp_object_info));
             memcpy(obj_info->Filename, info.fname, strlen(info.fname) + 1);
+            memcpy(obj_info->Path, path, strlen(path) + 1);
             obj_info->Storage_id = MTP_STORAGE_ID;
             obj_info->ObjectFormat = MTP_OBJ_FORMAT_ASSOCIATION;
             obj_info->ParentObject = parent == 0xFFFFFFFF ? 0xFFFFFFFF : parent;
             obj_info->AssociationType = 1;
             obj_info->AssociationDesc = 0;
             obj_info->ObjectCompressedSize = 0;
+
             if (add_file_node(&mtp_file_list, mtp_file_new_idx++, obj_info) !=
                 0) {
                 f_closedir(&dir);
                 return;
             }
 
-            traverse_fs(info.fname, obj_info->Storage_id);
+            // Append directory and recurse
+            char new_path[256];
+            snprintf(new_path, sizeof(new_path), "%s/%s", path, info.fname);
+            traverse_fs(new_path, mtp_file_new_idx - 1);
         }
     }
     f_closedir(&dir);
@@ -534,14 +543,13 @@ static uint16_t USBD_MTP_Itf_DeleteObject(uint32_t Param1) {
     }
 
     char path[256];
-    snprintf(path, 256, "%s/%s", NAND_MOUNT_POINT, (char *)obj->Filename);
+    snprintf(path, 256, "%s/%s", (char *)obj->Path, (char *)obj->Filename);
 
     if (obj->ObjectFormat == MTP_OBJ_FORMAT_ASSOCIATION) {
         mtp_file_node_t *node = mtp_file_list.head;
         while (node != NULL) {
             if (node->data->ParentObject == Param1) {
-                if (USBD_MTP_Itf_DeleteObject(node->data->Storage_id) !=
-                    0x2001) {
+                if (USBD_MTP_Itf_DeleteObject(node->handle) != 0x2001) {
                     return 0x2002;
                 }
             }
@@ -598,7 +606,7 @@ static uint32_t USBD_MTP_Itf_ReadData(uint32_t Param1, uint8_t *buff,
         }
 
         char path[256];
-        snprintf(path, 256, "%s/%s", NAND_MOUNT_POINT, (char *)obj->Filename);
+        snprintf(path, 256, "%s/%s", (char *)obj->Path, (char *)obj->Filename);
         // Open file on first read
         if (f_open(&curr_file, path, FA_READ) != FR_OK) {
             data_length->totallen = 0;

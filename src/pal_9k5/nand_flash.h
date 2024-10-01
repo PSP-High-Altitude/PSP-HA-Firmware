@@ -29,8 +29,10 @@ Status nand_flash_load_board_config(BoardConfig* board_config);
 
 Status nand_flash_store_board_config(BoardConfig* board_config);
 
+int nand_flash_write_log(const char* log, size_t size);
+
 // Prints the files and directories at the specified path
 // Returns an error code on failure
-int f_ls(const char* path);
+int f_ls(const char* path, int depth);
 
 #endif  // NAND_FLASH_H

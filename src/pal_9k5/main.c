@@ -15,10 +15,13 @@
 #include "storage.h"
 #include "timer.h"
 #include "usb.h"
+#include "usbd_mtp_if.h"
 
 // FreeRTOS
 #include "FreeRTOS.h"
 #include "task.h"
+
+uint8_t mtp_mode = 0;
 
 /*****************/
 /* HELPER MACROS */
@@ -67,11 +70,10 @@ void init_task() {
     uint32_t init_error = 0;  // Set if error occurs during initialization
     uint32_t num_inits = 4;   // Number of inits the error code refers to
 
-    uint8_t mtp_mode = get_backup_ptr()->flag_mtp_pressed;
+    mtp_mode = get_backup_ptr()->flag_mtp_pressed;
 
     printf("Starting initialization...\n");
 
-    // rtc_deinit();
     rtc_init();
     init_error |= (EXPECT_OK(button_event_init(), "init button") != STATUS_OK)
                   << 0;
@@ -116,7 +118,7 @@ void init_task() {
     } else {
         // MTP mode data queuing task
         printf("Launching MTP task\n");
-        // TASK_CREATE(mtp_readwrite_file_task, +1, 2048);
+        TASK_CREATE(mtp_readwrite_file_task, +1, 2048);
     }
 
 #ifdef DEBUG_MEMORY_USAGE

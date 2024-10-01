@@ -10,8 +10,7 @@ def decode_protobuf_file(file_path, protobuf_class):
     start_time = time.time()
 
     with open(file_path, 'rb') as file:
-        # Read and print the header
-        header = file.read(64)
+        header = file.readline()
         print("Firmware specifier:", header.decode('utf-8'))
 
         while True:
