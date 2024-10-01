@@ -62,7 +62,7 @@ void SystemClock_Config() {
     PeriphClkInitStruct.PeriphClockSelection =
         RCC_PERIPHCLK_OSPI | RCC_PERIPHCLK_SPI123 | RCC_PERIPHCLK_SPI45 |
         RCC_PERIPHCLK_I2C1235 | RCC_PERIPHCLK_I2C4 | RCC_PERIPHCLK_USART234578 |
-        RCC_PERIPHCLK_SDMMC;
+        RCC_PERIPHCLK_SDMMC | RCC_PERIPHCLK_USB;
     PeriphClkInitStruct.PLL2.PLL2M = 48;
     PeriphClkInitStruct.PLL2.PLL2N = 160;
     PeriphClkInitStruct.PLL2.PLL2P = 4;
@@ -111,6 +111,10 @@ void SystemClock_Config() {
     // Enable RAM D2
     __HAL_RCC_D2SRAM1_CLK_ENABLE();
     __HAL_RCC_D2SRAM2_CLK_ENABLE();
+
+    // Wait for clocks to be ready
+    while (!__HAL_RCC_GET_FLAG(RCC_FLAG_HSERDY) ||
+           !__HAL_RCC_GET_FLAG(RCC_FLAG_HSIRDY));
 }
 
 HAL_StatusTypeDef HAL_InitTick(uint32_t TickPriority) {

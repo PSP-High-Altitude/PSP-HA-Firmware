@@ -8,6 +8,7 @@
 #include "gpio/gpio.h"
 #include "pspcom.h"
 #include "pyros.h"
+#include "rtc.h"
 #include "status.h"
 #include "stdio.h"
 #include "stm32h7xx.h"
@@ -69,14 +70,17 @@ void init_task() {
 
     printf("Starting initialization...\n");
 
+    // rtc_deinit();
+    rtc_init();
     init_error |= (EXPECT_OK(button_event_init(), "init button") != STATUS_OK)
                   << 0;
-    init_error |= (EXPECT_OK(init_usb(), "init usb") != STATUS_OK) << 1;
+    init_error |= (EXPECT_OK(usb_init(), "init usb") != STATUS_OK) << 1;
     init_error |= (EXPECT_OK(init_storage(), "init storage") != STATUS_OK) << 2;
-    // init_error |= (EXPECT_OK(init_sensors(), "init sensors") != STATUS_OK) <<
-    // 3; init_error |= (EXPECT_OK(init_pyros(), "init pyros") != STATUS_OK) <<
-    // 4; init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK)
-    // << 5;
+    //  init_error |= (EXPECT_OK(init_sensors(), "init sensors") != STATUS_OK)
+    //  << 3; init_error |= (EXPECT_OK(init_pyros(), "init pyros") != STATUS_OK)
+    //  << 4; init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") !=
+    //  STATUS_OK)
+    //  << 5;
     init_error |= (EXPECT_OK(buzzer_init(), "init buzzer") != STATUS_OK) << 6;
 
     // Play init tune
@@ -115,7 +119,9 @@ void init_task() {
     xTaskResumeAll();
 
     while (1) {
-        DELAY(0xFFFF);
+        rtc_print_datetime();
+        DELAY(1000);
+        // DELAY(0xFFFF);
     }
 }
 
@@ -127,7 +133,7 @@ int main(void) {
     HAL_Init();
     SystemClock_Config();
     init_timers();
-    init_backup();
+    backup_init();
 
     // Light all LEDs to indicate initialization
     gpio_write(PIN_RED, GPIO_HIGH);

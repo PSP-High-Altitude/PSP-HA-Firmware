@@ -18,7 +18,7 @@ typedef struct {
 
 _Static_assert(sizeof(Backup) < BKPSRAM_SIZE, "Backup does not fit in BKPSRAM");
 
-void init_backup();
+Status backup_init();
 
 Backup* get_backup_ptr();
 

@@ -6,7 +6,7 @@
 
 #include "status.h"
 
-Status init_usb();
+Status usb_init();
 
 extern int _write(int file, char *data, int len);
 

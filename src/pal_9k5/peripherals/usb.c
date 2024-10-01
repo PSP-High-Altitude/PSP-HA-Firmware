@@ -54,7 +54,7 @@ static void mtp_button_handler() {
     NVIC_SystemReset();
 }
 
-Status init_usb() {
+Status usb_init() {
     MX_USB_DEVICE_Init(!get_backup_ptr()->flag_mtp_pressed);
     s_usb_initialized = true;
 
@@ -87,7 +87,7 @@ int _write(int file, char *data, int len) {
 #ifdef DEBUG
     // If the USB isn't yet initialized, buffer the writes in an internal buffer
     // so that they can be output when the interface actually gets initialized.
-    if (!s_usb_initialized || (MILLIS() - s_usb_initialized_time < 500)) {
+    if (!s_usb_initialized || (MILLIS() - s_usb_initialized_time < 1000)) {
         int32_t copy_size = len;
         if (s_usb_serial_buffer_idx + copy_size >= SERIAL_BUFFER_SIZE) {
             copy_size = SERIAL_BUFFER_SIZE - s_usb_serial_buffer_idx;
