@@ -19,27 +19,18 @@ const static BoardConfig s_default_config = {
     .deploy_lockout_ms = 10000,  // ms
 };
 
-// CRC of the config object (excluding the checksum itself)
+// Simple summing checksum with non-zero initialization
 static uint32_t calc_config_checksum(const BoardConfig* config) {
+    const size_t size = sizeof(*config) - sizeof(config->checksum);
     const uint8_t* config_bytes = (const uint8_t*)config;
 
-    const uint32_t poly = 0x04C11DB7;  // CRC-32 polynomial (IEEE 802.3)
-    uint32_t crc = 0xFFFFFFFF;
+    uint32_t sum = 0x48414156;
 
-    size_t size = sizeof(*config) - sizeof(config->checksum);
     for (size_t i = 0; i < size; i++) {
-        crc ^= (uint32_t)(config_bytes[i] << 24);
-
-        for (int j = 0; j < 8; j++) {
-            if (crc & 0x80000000) {
-                crc = (crc << 1) ^ poly;
-            } else {
-                crc <<= 1;
-            }
-        }
+        sum += (i + 1) * config_bytes[i];
     }
 
-    return crc ^ 0xFFFFFFFF;
+    return sum;
 }
 
 BoardConfig* get_config_ptr() {
@@ -56,7 +47,7 @@ Status load_config() {
     BoardConfig* sram_config = &(get_backup_ptr()->board_config);
 
     if (calc_config_checksum(sram_config) == sram_config->checksum) {
-        // If the CRC verifies, do nothing
+        // If the checksum verifies, do nothing
         s_valid_config_loaded = 1;
         return STATUS_OK;
     }
@@ -65,7 +56,7 @@ Status load_config() {
     if (nand_flash_load_board_config(sram_config) == STATUS_OK) {
         // Verify checksum of the config we just loaded
         if (calc_config_checksum(sram_config) == sram_config->checksum) {
-            // If the CRC verifies, we're done
+            // If the checksum verifies, we're done
             s_valid_config_loaded = 2;
             return STATUS_OK;
         }

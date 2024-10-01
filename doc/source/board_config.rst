@@ -48,7 +48,7 @@ Types
 
     .. c:member:: uint32_t checksum
 
-        The CRC-32 checksum of the configuration, used to verify data integrity.
+        The checksum of the configuration, used to verify data integrity.
 
 
 Functions
