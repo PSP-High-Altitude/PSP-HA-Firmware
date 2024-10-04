@@ -93,7 +93,7 @@
 extern USBD_CDC_ItfTypeDef USBD_Interface_fops_HS;
 
 /* USER CODE BEGIN EXPORTED_VARIABLES */
-
+void (*cdc_rx_callback)(uint8_t*, uint32_t*);
 /* USER CODE END EXPORTED_VARIABLES */
 
 /**

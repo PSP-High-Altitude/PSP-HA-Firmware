@@ -78,7 +78,7 @@ void init_task() {
     init_error |= (EXPECT_OK(button_event_init(), "init button") != STATUS_OK)
                   << 0;
     init_error |= (EXPECT_OK(usb_init(), "init usb") != STATUS_OK) << 1;
-    init_error |= (EXPECT_OK(init_storage(), "init storage") != STATUS_OK) << 2;
+    init_error |= (EXPECT_OK(storage_init(), "init storage") != STATUS_OK) << 2;
     //  init_error |= (EXPECT_OK(init_sensors(), "init sensors") != STATUS_OK)
     //  << 3; init_error |= (EXPECT_OK(init_pyros(), "init pyros") != STATUS_OK)
     //  << 4; init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") !=

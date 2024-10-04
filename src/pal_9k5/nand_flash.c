@@ -5,34 +5,24 @@
 #include "pb_create.h"
 #include "rtc.h"
 #include "stdio.h"
+#include "stdlib.h"
 #include "timer.h"
 #include "usbd_mtp_if.h"
 
-#define FNAME_LEN 16
-#define FDIR_LEN 32
+#define FNAME_LEN 64
 #define HEADER_LEN 64
 
 static FATFS g_fs;
 
 extern uint8_t mtp_mode;
 
-static char s_fltdata_dir[FDIR_LEN] = NAND_MOUNT_POINT "/data";
 // static char s_cfg_dir[FDIR_LEN] = NAND_MOUNT_POINT "/cfg";
-static char s_filename[FNAME_LEN + FDIR_LEN] = "/dat_00.pb3";
-static char s_gpsfname[FNAME_LEN + FDIR_LEN] = "/gps_00.pb3";
-static char s_statefname[FNAME_LEN + FDIR_LEN] = "/fsl_00.pb3";
-static char s_cfgfname[FNAME_LEN + FDIR_LEN] = "/cfg.bin";
-static char s_logfname[FNAME_LEN + FDIR_LEN] = "/log_00.txt";
-static char s_prffname[FNAME_LEN + FDIR_LEN] = "/prf_00.txt";
-
-static FIL s_datfile;
-static FIL s_gpsfile;
-static FIL s_statefile;
-static FIL s_logfile;
-static uint8_t s_datfile_open = 0;
-static uint8_t s_gpsfile_open = 0;
-static uint8_t s_statefile_open = 0;
-static uint8_t s_logfile_open = 0;
+// static char s_filename[FNAME_LEN] = "/dat_00.pb3";
+// static char s_gpsfname[FNAME_LEN] = "/gps_00.pb3";
+// static char s_statefname[FNAME_LEN] = "/fsl_00.pb3";
+static char s_cfgfname[FNAME_LEN] = "/cfg.bin";
+// static char s_logfname[FNAME_LEN] = "/log_00.txt";
+static char s_prffname[FNAME_LEN] = "/prf_00.txt";
 
 // static pb_byte_t s_sensor_buffer[SENSOR_BUF_LEN];
 // static pb_byte_t s_gps_buffer[GPS_BUF_LEN];
@@ -42,16 +32,18 @@ static const char s_header[HEADER_LEN] = FIRMWARE_SPECIFIER "\n";
 
 extern uint32_t mtp_file_idx;
 
-static Status nand_flash_create_sensor_file() {
+Status nand_flash_open_binary_file(FIL* fp, const char* fname) {
+    char new_path[256];  // Max path length
+    snprintf(new_path, 256, NAND_MOUNT_POINT "%s", fname);
+
     // Create sensor data file
-    if (f_open(&s_datfile, s_filename, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) {
+    if (f_open(fp, new_path, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
-    s_datfile_open = 1;
 
     // Write the header
     UINT bw = 0;
-    if (f_write(&s_datfile, s_header, strlen(s_header), &bw) != FR_OK) {
+    if (f_write(fp, s_header, strlen(s_header), &bw) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -61,107 +53,14 @@ static Status nand_flash_create_sensor_file() {
     }
 
     // Flush the header to disk
-    if (f_sync(&s_datfile) != 0) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Check that the frame will at least nominally fit in our buffer
-    if (SENSOR_BUF_LEN < sizeof(SensorFrame)) {
-        return STATUS_DATA_ERROR;
-    }
-
-    return STATUS_OK;
-}
-
-static Status nand_flash_create_gps_file() {
-    // Create gps data file
-    if (f_open(&s_gpsfile, s_gpsfname, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-    s_gpsfile_open = 1;
-
-    // Write the header
-    UINT bw = 0;
-    if (f_write(&s_gpsfile, s_header, strlen(s_header), &bw) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Check the correct number of bytes was written
-    if (bw != strlen(s_header)) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Flush the header to disk
-    if (f_sync(&s_gpsfile) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Check that the frame will at least nominally fit in our buffer
-    if (SENSOR_BUF_LEN < sizeof(GpsFrame)) {
-        return STATUS_DATA_ERROR;
-    }
-
-    return STATUS_OK;
-}
-
-static Status nand_flash_create_state_file() {
-    // Create state data file
-    if (f_open(&s_statefile, s_statefname, FA_CREATE_ALWAYS | FA_WRITE) !=
-        FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-    s_statefile_open = 1;
-
-    // Write the header
-    UINT bw = 0;
-    if (f_write(&s_statefile, s_header, strlen(s_header), &bw) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Check the correct number of bytes was written
-    if (bw != strlen(s_header)) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Flush the header to disk
-    if (f_sync(&s_statefile) != 0) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Check that the frame will at least nominally fit in our buffer
-    if (STATE_BUF_LEN < sizeof(StateFrame)) {
-        return STATUS_DATA_ERROR;
-    }
-
-    return STATUS_OK;
-}
-
-static Status nand_flash_create_log_file() {
-    // Create log file
-    if (f_open(&s_logfile, s_logfname, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-    s_logfile_open = 1;
-
-    // Write the header
-    UINT bw = 0;
-    if (f_write(&s_logfile, s_header, strlen(s_header), &bw) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Check the correct number of bytes was written
-    if (bw != strlen(s_header)) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Flush the header to disk
-    if (f_sync(&s_logfile) != 0) {
+    if (f_sync(fp) != 0) {
         return STATUS_HARDWARE_ERROR;
     }
 
     return STATUS_OK;
 }
 
+/*
 static Status nand_flash_open_files() {
     // Traverse the directory to find the oldest and newest files
     DIR dir;
@@ -267,92 +166,26 @@ static Status nand_flash_open_files() {
     }
 
     return STATUS_OK;
-}
+}*/
 
-Status nand_flash_write_sensor_data(pb_byte_t* frame, size_t size) {
-    if (frame == NULL) {
+Status nand_flash_write_binary_data(FIL* fp, uint8_t* data, size_t size) {
+    // Check if data pointer is valid
+    if (data == NULL) {
         return STATUS_ERROR;
     }
 
-    if (!s_datfile_open) {
+    // Check if the file pointer is valid
+    if (fp == NULL || fp->obj.fs == NULL) {
         return STATUS_ERROR;
     }
 
+    // Write the data to the file
     UINT bw;
-    if (f_write(&s_datfile, (uint8_t*)frame, size, &bw) != FR_OK) {
+    if (f_write(fp, data, size, &bw) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
     return STATUS_OK;
-}
-
-Status nand_flash_write_gps_data(pb_byte_t* frame, size_t size) {
-    if (frame == NULL) {
-        return STATUS_ERROR;
-    }
-
-    if (!s_gpsfile_open) {
-        return STATUS_ERROR;
-    }
-
-    UINT bw;
-    if (f_write(&s_gpsfile, (uint8_t*)frame, size, &bw) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    return STATUS_OK;
-}
-
-Status nand_flash_write_state_data(pb_byte_t* frame, size_t size) {
-    if (frame == NULL) {
-        return STATUS_ERROR;
-    }
-
-    if (!s_statefile_open) {
-        return STATUS_ERROR;
-    }
-
-    UINT bw;
-    if (f_write(&s_statefile, (uint8_t*)frame, size, &bw) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    return STATUS_OK;
-}
-
-int nand_flash_write_log(const char* log, size_t size) {
-    if (log == NULL) {
-        return -1;
-    }
-
-    if (!s_logfile_open) {
-        return -1;
-    }
-
-    RTCDateTime dt = rtc_get_datetime();
-
-    // Determine size of new buffer
-    int new_size =
-        snprintf(NULL, 0, "%04ld-%02ld-%02ld %02ld:%02ld:%02ld     %.*s",
-                 dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, size,
-                 log) +
-        1;
-
-    char* new_buf = malloc(new_size);
-
-    snprintf(new_buf, new_size, "%04ld-%02ld-%02ld %02ld:%02ld:%02ld     %.*s",
-             dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, size,
-             log);
-
-    UINT bw;
-    if (f_write(&s_logfile, (const uint8_t*)new_buf, new_size - 1, &bw) !=
-        FR_OK) {
-        free(new_buf);
-        return -1;
-    }
-
-    free(new_buf);
-    return bw;
 }
 
 Status nand_flash_dump_prf_stats(char stats[]) {
@@ -420,6 +253,7 @@ Status nand_flash_init() {
     }
     printf("NAND mounted successfully!\n");
 
+    /*
     if (mtp_mode == 0) {
         // Open the files
         Status open_file_stat = nand_flash_open_files();
@@ -428,6 +262,7 @@ Status nand_flash_init() {
             return open_file_stat;
         }
     }
+    */
 
     // See the files in the root directory
     if (f_ls(NAND_MOUNT_POINT, 0) != 0) {
@@ -455,96 +290,93 @@ Status nand_flash_init() {
     return STATUS_OK;
 }
 
-Status nand_flash_reinit() {
-    if (!s_datfile_open) {
-        if (f_open(&s_datfile, s_filename, FA_CREATE_ALWAYS | FA_WRITE) !=
-            FR_OK) {
-            return STATUS_HARDWARE_ERROR;
-            s_datfile_open = 0;
-        }
-        s_datfile_open = 1;
+char** nand_flash_get_file_list(const char* path, size_t* num_files) {
+    char new_path[256];  // Max path length
+    snprintf(new_path, 256, NAND_MOUNT_POINT "%s", path);
+    char** ret = NULL;
+
+    // First pass: count the number of files
+    *num_files = 0;
+    DIR dir;
+    if (f_opendir(&dir, new_path) != FR_OK) {
+        return ret;
     }
-    if (!s_gpsfile_open) {
-        if (f_open(&s_gpsfile, s_gpsfname, FA_CREATE_ALWAYS | FA_WRITE) !=
-            FR_OK) {
-            return STATUS_HARDWARE_ERROR;
-            s_gpsfile_open = 0;
+
+    FILINFO info;
+    while (true) {
+        if (f_readdir(&dir, &info) != FR_OK) {
+            f_closedir(&dir);
+            return ret;
         }
-        s_gpsfile_open = 1;
-    }
-    if (!s_statefile_open) {
-        if (f_open(&s_statefile, s_statefname, FA_CREATE_ALWAYS | FA_WRITE) !=
-            FR_OK) {
-            return STATUS_HARDWARE_ERROR;
-            s_statefile_open = 0;
+
+        if (info.fname[0] == '\0') {
+            break;
         }
-        s_statefile_open = 1;
-    }
-    if (!s_logfile_open) {
-        if (f_open(&s_logfile, s_logfname, FA_CREATE_ALWAYS | FA_WRITE) !=
-            FR_OK) {
-            return STATUS_HARDWARE_ERROR;
-            s_logfile_open = 0;
+
+        if (info.fattrib & AM_DIR) {
+            continue;
+        } else {
+            *num_files += 1;
         }
-        s_logfile_open = 1;
     }
+
+    if (num_files == 0) {
+        return ret;
+    }
+
+    // Allocate space for the filenames
+    ret = (char**)malloc(*num_files * sizeof(char*));
+    *num_files = 0;
+
+    // Second pass: copy the filenames
+    if (f_opendir(&dir, new_path) != FR_OK) {
+        free(ret);
+        return NULL;
+    }
+
+    while (true) {
+        if (f_readdir(&dir, &info) != FR_OK) {
+            f_closedir(&dir);
+            return ret;
+        }
+
+        if (info.fname[0] == '\0') {
+            break;
+        }
+
+        if (info.fattrib & AM_DIR) {
+            continue;
+        } else {
+            // Copy the filename to the list
+            ret[*num_files] = (char*)malloc(strlen(info.fname) + 1);
+            strcpy(ret[*num_files], info.fname);
+            (*num_files)++;
+        }
+    }
+
+    if (f_closedir(&dir) != 0) {
+        return ret;
+    }
+
+    return ret;
+}
+
+Status nand_flash_delete_file_list(char** file_list, size_t num_files) {
+    if (file_list == NULL) {
+        return STATUS_OK;
+    }
+
+    for (size_t i = 0; i < num_files; i++) {
+        if (file_list[i] != NULL) free(file_list[i]);
+    }
+    free(file_list);
 
     return STATUS_OK;
 }
 
-Status nand_flash_deinit() {
-    if (s_datfile_open) {
-        if (f_close(&s_datfile) != 0) {
-            return STATUS_HARDWARE_ERROR;
-        }
-        s_datfile_open = 0;
-    }
-    if (s_gpsfile_open) {
-        if (f_close(&s_gpsfile) != 0) {
-            return STATUS_HARDWARE_ERROR;
-        }
-        s_gpsfile_open = 0;
-    }
-    if (s_statefile_open) {
-        if (f_close(&s_statefile) != 0) {
-            return STATUS_HARDWARE_ERROR;
-        }
-        s_statefile_open = 0;
-    }
-    if (s_logfile_open) {
-        if (f_close(&s_logfile) != 0) {
-            return STATUS_HARDWARE_ERROR;
-        }
-        s_logfile_open = 0;
-    }
+Status nand_flash_reinit() { return STATUS_OK; }
 
-    return STATUS_OK;
-}
-
-Status nand_flash_flush() {
-    if (s_datfile_open) {
-        if (f_sync(&s_datfile) != 0) {
-            return STATUS_HARDWARE_ERROR;
-        }
-    }
-    if (s_gpsfile_open) {
-        if (f_sync(&s_gpsfile) != 0) {
-            return STATUS_HARDWARE_ERROR;
-        }
-    }
-    if (s_statefile_open) {
-        if (f_sync(&s_statefile) != 0) {
-            return STATUS_HARDWARE_ERROR;
-        }
-    }
-    if (s_logfile_open) {
-        if (f_sync(&s_logfile) != 0) {
-            return STATUS_HARDWARE_ERROR;
-        }
-    }
-
-    return STATUS_OK;
-}
+Status nand_flash_deinit() { return STATUS_OK; }
 
 Status nand_flash_load_board_config(BoardConfig* board_config) {
     FIL cfgfile;

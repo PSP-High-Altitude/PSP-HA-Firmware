@@ -5,6 +5,8 @@
 #include "sd.h"
 #include "status.h"
 
-Status init_storage();
+Status storage_init();
+
+Status storage_write_log(const char *log, size_t size);
 
 #endif  // STORAGE_H

@@ -111,17 +111,18 @@ uint8_t UserTxBufferHS[APP_TX_DATA_SIZE];
 extern USBD_HandleTypeDef hUsbDeviceHS;
 
 /* USER CODE BEGIN EXPORTED_VARIABLES */
-
+void (*cdc_rx_callback)(uint8_t *, uint32_t *) = NULL;
 /* USER CODE END EXPORTED_VARIABLES */
 
 /**
-  * @}
-  */
+ * @}
+ */
 
-/** @defgroup USBD_CDC_IF_Private_FunctionPrototypes USBD_CDC_IF_Private_FunctionPrototypes
-  * @brief Private functions declaration.
-  * @{
-  */
+/** @defgroup USBD_CDC_IF_Private_FunctionPrototypes
+ * USBD_CDC_IF_Private_FunctionPrototypes
+ * @brief Private functions declaration.
+ * @{
+ */
 
 static int8_t CDC_Init_HS(void);
 static int8_t CDC_DeInit_HS(void);
@@ -274,6 +275,11 @@ static int8_t CDC_Receive_HS(uint8_t* Buf, uint32_t *Len)
   /* USER CODE BEGIN 11 */
   USBD_CDC_SetRxBuffer(&hUsbDeviceHS, &Buf[0]);
   USBD_CDC_ReceivePacket(&hUsbDeviceHS);
+
+  if (cdc_rx_callback != NULL) {
+      cdc_rx_callback(Buf, Len);
+  }
+
   return (USBD_OK);
   /* USER CODE END 11 */
 }

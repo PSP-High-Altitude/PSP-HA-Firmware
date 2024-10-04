@@ -101,6 +101,7 @@
                 "system_stm32h7xx.h": "c",
                 "button_event.h": "c",
                 "backup.h": "c",
-                "rtc.h": "c"
+                "rtc.h": "c",
+                "regex.h": "c"
         }
 }

@@ -4,11 +4,13 @@
 #include <sys/unistd.h>
 
 #include "FreeRTOS.h"
+#include "Regex.h"
 #include "backup.h"
 #include "button_event.h"
 #include "gpio/gpio.h"
 #include "main.h"
-#include "nand_flash.h"
+#include "rtc.h"
+#include "storage.h"
 #include "timer.h"
 #include "timers.h"
 #include "usb_device.h"
@@ -16,6 +18,8 @@
 #include "usbd_mtp_if.h"
 
 static void mtp_button_handler();
+extern void (*cdc_rx_callback)(uint8_t *, uint32_t *);
+void CDC_Receive_Callback(uint8_t *data, uint32_t *len);
 
 extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
 
@@ -51,8 +55,8 @@ static void mtp_button_handler() {
     xTimerStopFromISR(g_mtp_button_timer, 0);
 
     // Save the NAND flash
-    nand_flash_flush();
-    nand_flash_deinit();
+    // nand_flash_flush();
+    // nand_flash_deinit();
 
     DELAY_MICROS(1000000);
     get_backup_ptr()->flag_mtp_pressed = 1;
@@ -60,6 +64,9 @@ static void mtp_button_handler() {
 }
 
 Status usb_init() {
+    // Set rx callback
+    cdc_rx_callback = CDC_Receive_Callback;
+
     MX_USB_DEVICE_Init(!get_backup_ptr()->flag_mtp_pressed);
     s_usb_initialized = true;
 
@@ -89,13 +96,13 @@ int _write(int file, char *data, int len) {
         return -1;
     }
 
-#ifdef DEBUG
     /***************************/
     /*       NAND Section      */
     /***************************/
 
-    nand_flash_write_log(data, len);
+    storage_write_log(data, len);
 
+#ifdef DEBUG
     /***************************/
     /*       USB Section       */
     /***************************/
@@ -139,6 +146,54 @@ int _write(int file, char *data, int len) {
 #endif
 
     return len;
+}
+
+void CDC_Receive_Callback(uint8_t *data, uint32_t *len) {
+    char str[*len + 1];
+    memcpy(str, data, *len);
+    str[*len] = '\0';
+
+    // Help command
+    Regex regex_help;
+    regexCompile(&regex_help, "^help[\n]*$");
+
+    // Set datetime command
+    Regex regex_set_datetime;
+    regexCompile(&regex_set_datetime,
+                 "^set_datetime [0-9]{4}\\-[0-9]{2}\\-[0-9]{2} "
+                 "[0-9]{2}:[0-9]{2}:[0-9]{2}[\n]*$");
+
+    // Get datetime command
+    Regex regex_get_datetime;
+    regexCompile(&regex_get_datetime, "^get_datetime[\n]*$");
+
+    // Test all commands
+    Matcher match = regexMatch(&regex_help, str);
+    if (match.isFound) {
+        printf(
+            "Commands:\n"
+            "  help                                  this command\n"
+            "  set_datetime YYYY-MM-DD HH:MM:SS      sets the RTC time\n"
+            "  get_datetime                          gets the RTC time\n");
+        return;
+    }
+    match = regexMatch(&regex_set_datetime, str);
+    if (match.isFound) {
+        int year, month, day, hour, minute, second;
+        sscanf(str, "set_datetime %d-%d-%d %d:%d:%d", &year, &month, &day,
+               &hour, &minute, &second);
+        RTCDateTime dt = {year, month, day, hour, minute, second};
+        rtc_set_datetime(dt);
+        printf("Time set!\n");
+        return;
+    }
+    match = regexMatch(&regex_get_datetime, str);
+    if (match.isFound) {
+        RTCDateTime dt = rtc_get_datetime(dt);
+        printf("Current time: %04ld-%02ld-%02ld %02ld:%02ld:%02ld\n", dt.year,
+               dt.month, dt.day, dt.hour, dt.minute, dt.second);
+        return;
+    }
 }
 
 void OTG_HS_IRQHandler(void) { HAL_PCD_IRQHandler(&hpcd_USB_OTG_HS); }
