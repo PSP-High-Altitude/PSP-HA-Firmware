@@ -1,21 +1,28 @@
 #ifndef BOARD_CONFIG_H
 #define BOARD_CONFIG_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "status.h"
 
 typedef struct {
     // period in ms between state estimation update steps
-    uint32_t sampling_rate_ms;
+    uint32_t sampling_period_ms;
 
     /* STATE ESTIMATION SETTINGS */
     // time in ms during which a baseline value for the sensors is determined
     uint32_t state_init_time_ms;
-    // minimum acceleration above which we are considered to be in boost
-    float min_boost_acc_ms2;
+    // time in ms for which accel must be above boost threshold to detect launch
+    uint32_t launch_detect_period_ms;
+    // whether to replay state estimation of launch detection interval at exit
+    bool launch_detect_replay;
+    // vertical velocity over which we're considered to be fast
+    float min_fast_vel_mps;
+    // launch minimum acceleration above which we are considered to be in boost
+    float min_boost_acc_mps2;
     // maximum acceleration below which we are considered to be in coast
-    float max_coast_acc_ms2;
+    float max_coast_acc_mps2;
 
     /* RECOVERY SETTINGS */
     // height above ground in m at which main pyro is fired

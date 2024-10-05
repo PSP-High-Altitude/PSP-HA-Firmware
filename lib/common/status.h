@@ -6,6 +6,7 @@ typedef enum {
     STATUS_BUSY,
     STATUS_ERROR,
     STATUS_DATA_ERROR,
+    STATUS_MEMORY_ERROR,
     STATUS_HARDWARE_ERROR,
     STATUS_TESTING_ERROR,
     STATUS_PARAMETER_ERROR,  // Error with invalid parameter being passed

@@ -6,12 +6,15 @@
 static uint32_t s_valid_config_loaded = 0;
 
 const static BoardConfig s_default_config = {
-    .sampling_rate_ms = 10,  // ms
+    .sampling_period_ms = 10,  // ms
 
     // State estimation settings
-    .state_init_time_ms = 10000,  // ms
-    .min_boost_acc_ms2 = 50,      // m/s^2
-    .max_coast_acc_ms2 = 0,       // m/s^2
+    .state_init_time_ms = 10000,     // ms
+    .launch_detect_period_ms = 500,  // ms
+    .launch_detect_replay = true,    // will replay
+    .min_fast_vel_mps = 300,         // m/s
+    .min_boost_acc_mps2 = 50,        // m/s^2
+    .max_coast_acc_mps2 = 0,         // m/s^2
 
     // Recovery settings
     .main_height_m = 300.0,      // m
