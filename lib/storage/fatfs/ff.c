@@ -5817,6 +5817,12 @@ FRESULT f_setlabel (
 	res = mount_volume(&label, &fs, FA_WRITE);
 	if (res != FR_OK) LEAVE_FF(fs, res);
 
+// FIX FOR UNIX STYLE DRIVE NUMBERS
+#if FF_STR_VOLUME_ID == 2
+    for (; *label == '/'; label++) {
+    } /* Snip the separators off */
+#endif
+
 #if FF_FS_EXFAT
 	if (fs->fs_type == FS_EXFAT) {	/* On the exFAT volume */
 		memset(dirvn, 0, 22);

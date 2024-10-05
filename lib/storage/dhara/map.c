@@ -117,14 +117,18 @@ static int trace_path(struct dhara_map *m, dhara_sector_t target,
 
     if (new_meta) meta_set_id(new_meta, target);
 
-    if (p == DHARA_PAGE_NONE) goto not_found;
+    if (p == DHARA_PAGE_NONE) {
+        goto not_found;
+    }
 
     if (dhara_journal_read_meta(&m->journal, p, meta, err) < 0) return -1;
 
     while (depth < DHARA_RADIX_DEPTH) {
         const dhara_sector_t id = meta_get_id(meta);
 
-        if (id == DHARA_SECTOR_NONE) goto not_found;
+        if (id == DHARA_SECTOR_NONE) {
+            goto not_found;
+        }
 
         if ((target ^ id) & d_bit(depth)) {
             if (new_meta) meta_set_alt(new_meta, depth, p);
@@ -172,7 +176,7 @@ int dhara_map_read(struct dhara_map *m, dhara_sector_t s, uint8_t *data,
 
     if (dhara_map_find(m, s, &p, &my_err) < 0) {
         if (my_err == DHARA_E_NOT_FOUND) {
-            printf("not found\n");
+            // printf("not found\n");
             memset(data, 0xff, 1 << n->log2_page_size);
             return 0;
         }

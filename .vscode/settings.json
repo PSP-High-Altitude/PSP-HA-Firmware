@@ -102,6 +102,7 @@
                 "button_event.h": "c",
                 "backup.h": "c",
                 "rtc.h": "c",
-                "regex.h": "c"
+                "regex.h": "c",
+                "debug_tasks.h": "c"
         }
 }

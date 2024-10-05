@@ -7,85 +7,45 @@
 #include "Regex.h"
 #include "backup.h"
 #include "button_event.h"
+#include "fifos.h"
 #include "gpio/gpio.h"
 #include "main.h"
 #include "rtc.h"
 #include "storage.h"
 #include "timer.h"
-#include "timers.h"
-#include "usb_device.h"
-#include "usbd_cdc_if.h"
-#include "usbd_mtp_if.h"
+#include "tusb.h"
 
-static void mtp_button_handler();
-extern void (*cdc_rx_callback)(uint8_t *, uint32_t *);
-void CDC_Receive_Callback(uint8_t *data, uint32_t *len);
-
-extern PCD_HandleTypeDef hpcd_USB_OTG_HS;
+TaskHandle_t s_usb_device_handle;
 
 static bool s_usb_initialized = false;
 static uint32_t s_usb_initialized_time = 0;
 
 #ifdef DEBUG
-static char s_usb_serial_buffer[SERIAL_BUFFER_SIZE];
-static size_t s_usb_serial_buffer_idx = 0;
+static uint8_t s_usb_serial_buffer[CFG_TUD_CDC_TX_BUFSIZE];
+static FIFO_t s_usb_serial_fifo = {
+    .buffer = s_usb_serial_buffer,
+    .size = CFG_TUD_CDC_TX_BUFSIZE,
+    .circ = 0,
+    .head = 0,
+    .tail = 0,
+    .count = 0,
+};
 #endif
 
-static ButtonEventConfig g_mtp_button = {
-    .pin = PIN_MTP,
-    .rising = true,
-    .falling = false,
-    .event_handler = mtp_button_handler,
-};
-
-static xTimerHandle g_mtp_button_timer;
-
-// If the MTP button is not pressed
-static void mtp_button_timeout(TimerHandle_t timer) {
-    // Handle button timeout
-    button_event_destroy(&g_mtp_button);
-    printf("MTP mode was not selected!\n");
-}
-
-// If the MTP button is pressed
-static void mtp_button_handler() {
-    // Handle button press
-    button_event_destroy(&g_mtp_button);
-    printf("MTP mode selected!\n");
-    xTimerStopFromISR(g_mtp_button_timer, 0);
-
-    // Save the NAND flash
-    // nand_flash_flush();
-    // nand_flash_deinit();
-
-    DELAY_MICROS(1000000);
-    get_backup_ptr()->flag_mtp_pressed = 1;
-    NVIC_SystemReset();
-}
-
 Status usb_init() {
-    // Set rx callback
-    cdc_rx_callback = CDC_Receive_Callback;
+#ifdef DEBUG
+    // Low level Init
+    __HAL_RCC_USB1_OTG_HS_CLK_ENABLE();
+    NVIC_SetPriority(OTG_HS_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY);
 
-    MX_USB_DEVICE_Init(!get_backup_ptr()->flag_mtp_pressed);
-    s_usb_initialized = true;
+    USB_OTG_HS->GCCFG &= ~USB_OTG_GCCFG_VBDEN;
 
-    // Allows us to delay a little so the USB host can
-    // establish a connection before we start sending data.
-    s_usb_initialized_time = MILLIS();
-
-    // Wait asynchronously to enter MTP mode
-    if (!get_backup_ptr()->flag_mtp_pressed) {
-        button_event_create(&g_mtp_button);
-        g_mtp_button_timer =
-            xTimerCreate("mtp_button_timeout", pdMS_TO_TICKS(5000), pdFALSE,
-                         NULL, mtp_button_timeout);
-        xTimerStart(g_mtp_button_timer, 0);
+    // Init USB stack
+    if (xTaskCreate(usb_device_task, "usb_device_task", 4096, NULL,
+                    tskIDLE_PRIORITY + 1, &s_usb_device_handle) != pdPASS) {
+        return STATUS_ERROR;
     }
-
-    // Clear the flag so we go to normal mode next time
-    get_backup_ptr()->flag_mtp_pressed = 0;
-
+#endif
     return STATUS_OK;
 }
 
@@ -101,57 +61,43 @@ int _write(int file, char *data, int len) {
     /***************************/
 
     storage_write_log(data, len);
-
 #ifdef DEBUG
     /***************************/
     /*       USB Section       */
     /***************************/
 
     // If the USB isn't yet initialized, buffer the writes in an internal buffer
-    // so that they can be output when the interface actually gets initialized.
+    // so that they can be output when the interface actually gets initialized
     if (!s_usb_initialized || (MILLIS() - s_usb_initialized_time < 1000)) {
-        int32_t copy_size = len;
-        if (s_usb_serial_buffer_idx + copy_size >= SERIAL_BUFFER_SIZE) {
-            copy_size = SERIAL_BUFFER_SIZE - s_usb_serial_buffer_idx;
-        }
-        memcpy(s_usb_serial_buffer + s_usb_serial_buffer_idx, data,
-               copy_size * sizeof(char));
-        s_usb_serial_buffer_idx += copy_size;
+        int32_t copy_size =
+            fifo_enqueuen(&s_usb_serial_fifo, (uint8_t *)data, len);
         return copy_size;
     }
 
-    uint64_t start_time = MILLIS();
-    USBD_StatusTypeDef rc = USBD_OK;
+    // If the USB is initialized, write the data to the USB interface
+    // and flush the buffer.
+    int new_len = s_usb_serial_fifo.count;
+    uint8_t buf[CFG_TUD_CDC_TX_BUFSIZE];
+    fifo_dequeuen(&s_usb_serial_fifo, buf, new_len);
+    tud_cdc_write(buf, new_len);
+    tud_cdc_write_flush();
 
-    // Empty the serial buffer if it has content.
-    if (s_usb_serial_buffer_idx > 0) {
-        do {
-            rc = CDC_Transmit_HS((uint8_t *)s_usb_serial_buffer,
-                                 s_usb_serial_buffer_idx);
-        } while (USBD_BUSY == rc && MILLIS() - start_time < 10);
+    // Send data
+    tud_cdc_write(data, len);
 
-        s_usb_serial_buffer_idx = 0;
-    }
-
-    // Finally, transmit the newly provided data.
-    start_time = MILLIS();
-
-    do {
-        rc = CDC_Transmit_HS((uint8_t *)data, len);
-    } while (USBD_BUSY == rc && MILLIS() - start_time < 10);
-
-    if (USBD_FAIL == rc) {
-        return 0;
-    }
 #endif
 
+    gpio_write(PIN_RED, GPIO_LOW);
     return len;
 }
 
-void CDC_Receive_Callback(uint8_t *data, uint32_t *len) {
-    char str[*len + 1];
-    memcpy(str, data, *len);
-    str[*len] = '\0';
+void tud_cdc_rx_cb(uint8_t itf) {
+    int len = tud_cdc_available();
+
+    // char str[*len + 1];
+    char *str = malloc(len + 1);
+    tud_cdc_read(str, len);
+    str[len] = '\0';
 
     // Help command
     Regex regex_help;
@@ -175,6 +121,7 @@ void CDC_Receive_Callback(uint8_t *data, uint32_t *len) {
             "  help                                  this command\n"
             "  set_datetime YYYY-MM-DD HH:MM:SS      sets the RTC time\n"
             "  get_datetime                          gets the RTC time\n");
+        free(str);
         return;
     }
     match = regexMatch(&regex_set_datetime, str);
@@ -185,6 +132,7 @@ void CDC_Receive_Callback(uint8_t *data, uint32_t *len) {
         RTCDateTime dt = {year, month, day, hour, minute, second};
         rtc_set_datetime(dt);
         printf("Time set!\n");
+        free(str);
         return;
     }
     match = regexMatch(&regex_get_datetime, str);
@@ -192,8 +140,44 @@ void CDC_Receive_Callback(uint8_t *data, uint32_t *len) {
         RTCDateTime dt = rtc_get_datetime(dt);
         printf("Current time: %04ld-%02ld-%02ld %02ld:%02ld:%02ld\n", dt.year,
                dt.month, dt.day, dt.hour, dt.minute, dt.second);
+        free(str);
         return;
     }
 }
 
-void OTG_HS_IRQHandler(void) { HAL_PCD_IRQHandler(&hpcd_USB_OTG_HS); }
+void usb_device_task(void *param) {
+    (void)param;
+
+    // Configure DM DP Pins
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_11 | GPIO_PIN_12;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    HAL_PWREx_EnableUSBVoltageDetector();
+
+    // init device stack on configured roothub port
+    // This should be called after scheduler/kernel is started.
+    // Otherwise it could cause kernel issue since USB IRQ handler does use RTOS
+    // queue API.
+    tud_init(BOARD_TUD_RHPORT);
+
+    s_usb_initialized = true;
+
+    // Allows us to delay a little so the USB host can
+    // establish a connection before we start sending data.
+    s_usb_initialized_time = MILLIS();
+
+    // RTOS forever loop
+    while (1) {
+        // put this thread to waiting state until there is new events
+        tud_task();
+
+        // following code only run if tud_task() process at least 1 event
+        tud_cdc_write_flush();
+    }
+}
+
+void OTG_HS_IRQHandler(void) { tud_int_handler(0); }

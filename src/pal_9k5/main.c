@@ -2,10 +2,12 @@
 
 #include "backup.h"
 #include "button_event.h"
+#include "buttons.h"
 #include "buzzer.h"
 #include "clocks.h"
 #include "data.h"
 #include "gpio/gpio.h"
+#include "malloc.h"
 #include "pspcom.h"
 #include "pyros.h"
 #include "rtc.h"
@@ -15,7 +17,6 @@
 #include "storage.h"
 #include "timer.h"
 #include "usb.h"
-#include "usbd_mtp_if.h"
 
 // FreeRTOS
 #include "FreeRTOS.h"
@@ -75,10 +76,11 @@ void init_task() {
     printf("Starting initialization...\n");
 
     rtc_init();
+    buttons_init();
+    init_error |= (EXPECT_OK(storage_init(), "init storage") != STATUS_OK) << 0;
     init_error |= (EXPECT_OK(button_event_init(), "init button") != STATUS_OK)
-                  << 0;
-    init_error |= (EXPECT_OK(usb_init(), "init usb") != STATUS_OK) << 1;
-    init_error |= (EXPECT_OK(storage_init(), "init storage") != STATUS_OK) << 2;
+                  << 1;
+    init_error |= (EXPECT_OK(usb_init(), "init usb") != STATUS_OK) << 2;
     //  init_error |= (EXPECT_OK(init_sensors(), "init sensors") != STATUS_OK)
     //  << 3; init_error |= (EXPECT_OK(init_pyros(), "init pyros") != STATUS_OK)
     //  << 4; init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") !=
@@ -118,7 +120,7 @@ void init_task() {
     } else {
         // MTP mode data queuing task
         printf("Launching MTP task\n");
-        TASK_CREATE(mtp_readwrite_file_task, +1, 2048);
+        // TASK_CREATE(mtp_readwrite_file_task, +1, 2048);
     }
 
 #ifdef DEBUG_MEMORY_USAGE
@@ -128,7 +130,8 @@ void init_task() {
     xTaskResumeAll();
 
     while (1) {
-        rtc_print_datetime();
+        // rtc_print_datetime();
+        malloc_stats();
         DELAY(1000);
         // DELAY(0xFFFF);
     }

@@ -263,6 +263,6 @@ void buzzer_task() {
                     break;
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(100));
+        portYIELD();
     }
 }

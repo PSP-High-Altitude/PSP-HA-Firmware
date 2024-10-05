@@ -190,26 +190,51 @@ DSTATUS disk_status(BYTE drv /* Physical drive number (0) */
 /* Read sector(s)                                                        */
 /*-----------------------------------------------------------------------*/
 
+static BaseType_t diskioENTER_CRITICAL() {
+    BaseType_t ctx = 0;
+    if (!xPortIsInsideInterrupt()) {
+        portENTER_CRITICAL();
+    } else {
+        ctx = taskENTER_CRITICAL_FROM_ISR();
+    }
+    return ctx;
+}
+
+static void diskioEXIT_CRITICAL(BaseType_t ctx) {
+    if (!xPortIsInsideInterrupt()) {
+        portEXIT_CRITICAL();
+    } else {
+        taskEXIT_CRITICAL_FROM_ISR(ctx);
+    }
+}
+
 DRESULT disk_read(
     BYTE drv,     /* Physical drive number (0) */
     BYTE *buff,   /* Pointer to the data buffer to store read data */
     LBA_t sector, /* Start sector number (LBA) */
     UINT count    /* Number of sectors to read (1..128) */
 ) {
+    // Non reentrant, and USB will try it
+    BaseType_t ctx = diskioENTER_CRITICAL();
+
     DWORD sect = (DWORD)sector;
     if (drv == 1) {
         unsigned int i = 0;
         while (i < count) {
             if (dhara_map_read(&s_map, sect, (uint8_t *)buff, &s_map_error) !=
                 0) {
+                diskioEXIT_CRITICAL(ctx);
                 return RES_ERROR;
             }
             i++;
             sect++;
             buff += (1U << s_nand.log2_page_size);
         }
+        diskioEXIT_CRITICAL(ctx);
         return RES_OK;
     }
+
+    diskioEXIT_CRITICAL(ctx);
     return RES_PARERR;
 }
 
@@ -223,21 +248,27 @@ DRESULT disk_write(BYTE drv,         /* Physical drive number (0) */
                    LBA_t sector,     /* Start sector number (LBA) */
                    UINT count        /* Number of sectors to write (1..128) */
 ) {
-    DWORD sect = (DWORD)sector;
+    // Non reentrant, and USB will try it
+    BaseType_t ctx = diskioENTER_CRITICAL();
 
+    DWORD sect = (DWORD)sector;
     if (drv == 1) {
         unsigned int i = 0;
         while (i < count) {
             if (dhara_map_write(&s_map, sect, (uint8_t *)buff, &s_map_error) !=
                 0) {
+                diskioEXIT_CRITICAL(ctx);
                 return RES_ERROR;
             }
             i++;
             sect++;
             buff += (1U << s_nand.log2_page_size);
         }
+        diskioEXIT_CRITICAL(ctx);
         return RES_OK;
     }
+
+    diskioEXIT_CRITICAL(ctx);
     return RES_PARERR;
 }
 #endif
@@ -253,21 +284,29 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
     DWORD st, ed;
     LBA_t *dp;
 
+    // Non reentrant, and USB will try it
+    BaseType_t ctx = diskioENTER_CRITICAL();
+
     if (drv == 1) {
         switch (cmd) {
             case CTRL_SYNC:
                 if (dhara_map_sync(&s_map, &s_map_error) != 0) {
+                    diskioEXIT_CRITICAL(ctx);
                     return RES_ERROR;
                 }
+                diskioEXIT_CRITICAL(ctx);
                 return RES_OK;
             case GET_SECTOR_COUNT:
                 *(DWORD *)buff = (DWORD)dhara_map_capacity(&s_map);
+                diskioEXIT_CRITICAL(ctx);
                 return RES_OK;
             case GET_SECTOR_SIZE:
                 *(DWORD *)buff = 1U << s_nand.log2_page_size;
+                diskioEXIT_CRITICAL(ctx);
                 return RES_OK;
             case GET_BLOCK_SIZE:
                 *(DWORD *)buff = 1U << s_nand.log2_ppb;
+                diskioEXIT_CRITICAL(ctx);
                 return RES_OK;
             case CTRL_TRIM:
                 dp = buff;
@@ -275,13 +314,17 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
                 ed = (DWORD)dp[1];
                 for (int i = st; i < ed; i++) {
                     if (dhara_map_trim(&s_map, i, &s_map_error) != 0) {
+                        diskioEXIT_CRITICAL(ctx);
                         return RES_ERROR;
                     }
                 }
+                diskioEXIT_CRITICAL(ctx);
                 return RES_OK;
             default:
+                diskioEXIT_CRITICAL(ctx);
                 return RES_PARERR;
         }
     }
+    diskioEXIT_CRITICAL(ctx);
     return RES_PARERR;
 }

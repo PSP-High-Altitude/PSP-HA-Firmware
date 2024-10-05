@@ -1,20 +1,20 @@
 #include "nand_flash.h"
 
+#include "fatfs/diskio.h"
 #include "fatfs/ff.h"
+#include "fifos.h"
 #include "main.h"
 #include "pb_create.h"
 #include "rtc.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "timer.h"
-#include "usbd_mtp_if.h"
 
 #define FNAME_LEN 64
 #define HEADER_LEN 64
 
-static FATFS g_fs;
-
-extern uint8_t mtp_mode;
+FATFS g_fs;
+int g_nand_ready = 0;
 
 // static char s_cfg_dir[FDIR_LEN] = NAND_MOUNT_POINT "/cfg";
 // static char s_filename[FNAME_LEN] = "/dat_00.pb3";
@@ -54,6 +54,14 @@ Status nand_flash_open_binary_file(FIL* fp, const char* fname) {
 
     // Flush the header to disk
     if (f_sync(fp) != 0) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    return STATUS_OK;
+}
+
+Status nand_flash_close_file(FIL* fp) {
+    if (f_close(fp) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -222,6 +230,7 @@ Status nand_flash_dump_prf_stats(char stats[]) {
 }
 
 Status nand_flash_init() {
+    // mt29f4g_erase_chip();
     memset(&g_fs, 0, sizeof(g_fs));
     int status = f_mount(&g_fs, NAND_MOUNT_POINT, 1);
 #ifdef NAND_ALLOW_REFORMAT
@@ -242,6 +251,11 @@ Status nand_flash_init() {
         status = f_mkfs(NAND_MOUNT_POINT, &format_opts, work, FF_MAX_SS);
         if (status != FR_OK) {
             printf("Failed to format NAND: %d\n", status);
+            return STATUS_HARDWARE_ERROR;
+        }
+        status = f_setlabel(NAND_MOUNT_POINT "/" NAND_LABEL);
+        if (status != FR_OK) {
+            printf("Failed to set label: %d\n", status);
             return STATUS_HARDWARE_ERROR;
         }
         status = f_mount(&g_fs, NAND_MOUNT_POINT, 1);
@@ -358,6 +372,7 @@ char** nand_flash_get_file_list(const char* path, size_t* num_files) {
         return ret;
     }
 
+    g_nand_ready = 1;
     return ret;
 }
 
@@ -374,9 +389,16 @@ Status nand_flash_delete_file_list(char** file_list, size_t num_files) {
     return STATUS_OK;
 }
 
-Status nand_flash_reinit() { return STATUS_OK; }
+Status nand_flash_reinit() {
+    g_nand_ready = 0;
+    g_nand_ready = 1;
+    return STATUS_OK;
+}
 
-Status nand_flash_deinit() { return STATUS_OK; }
+Status nand_flash_deinit() {
+    g_nand_ready = 0;
+    return STATUS_OK;
+}
 
 Status nand_flash_load_board_config(BoardConfig* board_config) {
     FIL cfgfile;
@@ -473,4 +495,34 @@ int f_ls(const char* path, int depth) {
     }
 
     return 0;
+}
+
+void nand_flash_capacity(uint32_t* block_count, uint16_t* block_size) {
+    disk_ioctl(1, GET_SECTOR_COUNT, block_count);
+    disk_ioctl(1, GET_SECTOR_SIZE, block_size);
+}
+
+Status nand_flash_raw_write(const BYTE* buff, LBA_t sector, UINT count) {
+    if (disk_write(1, buff, sector, count) == RES_OK) {
+        return STATUS_OK;
+    }
+    return STATUS_ERROR;
+}
+
+Status nand_flash_raw_read(BYTE* buff, LBA_t sector, UINT count) {
+    if (disk_read(1, buff, sector, count) == RES_OK) {
+        return STATUS_OK;
+    }
+    return STATUS_ERROR;
+}
+
+Status nand_flash_mkdir(const char* fname) {
+    char new_path[256];  // Max path length
+    snprintf(new_path, 256, NAND_MOUNT_POINT "%s", fname);
+
+    FRESULT res = f_mkdir(new_path);
+    if (res == FR_OK || res || FR_EXIST) {
+        return STATUS_OK;
+    }
+    return STATUS_ERROR;
 }

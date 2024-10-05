@@ -3,6 +3,9 @@
 #include <sys/types.h>
 
 #include "Regex.h"
+#include "backup.h"
+#include "buttons.h"
+#include "fifos.h"
 #include "main.h"
 #include "rtc.h"
 #include "stdio.h"
@@ -12,13 +15,33 @@
 #define DATA_DIR "/data"
 
 static char s_logfile_path[64];
-
+extern int g_nand_ready;
 static FIL s_logfile;
+
+static uint8_t s_log_buffer[1024];
+static FIFO_t s_log_fifo = {
+    .buffer = s_log_buffer,
+    .size = 1024,
+    .circ = 0,
+    .head = 0,
+    .tail = 0,
+    .count = 0,
+};
+
+void storage_pause_event_handler() {
+    // Handle button press
+    nand_flash_close_file(&s_logfile);
+}
 
 Status storage_init() {
     // Initialize FATFS
     ASSERT_OK(diskio_init(NULL), "diskio init");
     ASSERT_OK(nand_flash_init(), "nand init");
+
+    // Create the data directory
+    if (nand_flash_mkdir(DATA_DIR) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
 
     // Get a list of files in the data directory
     char** file_list = NULL;
@@ -67,9 +90,16 @@ Status storage_init() {
     sprintf(s_logfile_path, DATA_DIR "/log_%04ld-%02ld-%02ld-%d.txt", dt.year,
             dt.month, dt.day, max_num + 1);
 
-    if (nand_flash_open_binary_file(&s_logfile, s_logfile_path) != STATUS_OK) {
-        return STATUS_ERROR;
+    // Open logfile if we are not in MTP mode
+    if (!get_backup_ptr()->flag_mtp_pressed) {
+        if (nand_flash_open_binary_file(&s_logfile, s_logfile_path) !=
+            STATUS_OK) {
+            return STATUS_ERROR;
+        }
     }
+
+    // Set the pause button handler
+    pause_event_callback = storage_pause_event_handler;
 
     return STATUS_OK;
 }
@@ -90,9 +120,33 @@ Status storage_write_log(const char* log, size_t size) {
              dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, size,
              log);
 
+    // Not ready yet, queue the log
+    if (!g_nand_ready) {
+        fifo_enqueuen(&s_log_fifo, (uint8_t*)new_buf, new_size - 1);
+
+        free(new_buf);
+        return STATUS_OK;
+    }
+
+    // Write the queued log to the NAND flash
+    if (s_log_fifo.count > 0) {
+        uint8_t* buf = malloc(s_log_fifo.count);
+        int n_read = fifo_dequeuen(&s_log_fifo, buf, s_log_fifo.count);
+        Status status =
+            nand_flash_write_binary_data(&s_logfile, (uint8_t*)buf, n_read);
+        free(buf);
+
+        if (status != STATUS_OK) {
+            free(new_buf);
+            return status;
+        }
+    }
+
+    // Write the new log to the NAND flash
     Status status = nand_flash_write_binary_data(&s_logfile, (uint8_t*)new_buf,
                                                  new_size - 1);
 
     free(new_buf);
+
     return status;
 }
