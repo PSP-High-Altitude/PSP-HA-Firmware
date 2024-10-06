@@ -20,14 +20,18 @@ static SensorFrame* s_ld_buffer_data;
 static size_t s_ld_buffer_size = 0;
 
 Status fp_init() {
-    s_config_ptr = get_config_ptr();
     s_init_start_ms = MILLIS();
+
+    s_config_ptr = get_config_ptr();
+    if (s_config_ptr == NULL) {
+        ASSERT_OK(STATUS_STATE_ERROR, "unable to get ptr to config\n");
+    }
 
     if (s_config_ptr->launch_detect_replay) {
         // Allocate buffer for storing sensor data during launch detection
         // Dynamic allocation is gross, but it's during init so should be safe
         s_ld_buffer_size = 1 + (s_config_ptr->launch_detect_period_ms /
-                                s_config_ptr->sampling_period_ms);
+                                s_config_ptr->control_loop_period_ms);
 
         s_ld_buffer_data = malloc(sizeof(SensorFrame) * s_ld_buffer_size);
 
@@ -104,7 +108,7 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
         if (s_config_ptr->launch_detect_replay) {
             for (int i = 0; i < s_ld_buffer_entries; i++) {
                 EXPECT_OK(se_update(s_flight_phase, &s_ld_buffer_data[i]),
-                          "state est update failed during launch replay");
+                          "state est update failed during launch replay\n");
             }
         }
         return FP_BOOST;
@@ -115,7 +119,7 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
 
 FlightPhase fp_update_boost(const SensorFrame* sensor_frame) {
     EXPECT_OK(se_update(s_flight_phase, sensor_frame),
-              "state est update failed in boost");
+              "state est update failed in boost\n");
 
     const StateEst* state = se_predict();
 

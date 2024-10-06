@@ -8,7 +8,11 @@
 
 typedef struct {
     // period in ms between state estimation update steps
-    uint32_t sampling_period_ms;
+    uint32_t control_loop_period_ms;
+    // period in ms between sensor reads in the absence of control requests
+    uint32_t sensor_loop_period_ms;
+    // period in ms between file system flushes and pause request checks
+    uint32_t storage_loop_period_ms;
 
     /* STATE ESTIMATION SETTINGS */
     // time in ms during which a baseline value for the sensors is determined

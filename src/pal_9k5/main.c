@@ -3,7 +3,6 @@
 #include "backup.h"
 #include "button_event.h"
 #include "buttons.h"
-#include "buzzer.h"
 #include "clocks.h"
 #include "data.h"
 #include "gpio/gpio.h"
@@ -14,7 +13,8 @@
 #include "status.h"
 #include "stdio.h"
 #include "stm32h7xx.h"
-#include "storage.h"
+#include "tasks/buzzer.h"
+#include "tasks/storage.h"
 #include "timer.h"
 #include "usb.h"
 
@@ -45,7 +45,7 @@ uint8_t mtp_mode = 0;
         if (xTaskCreate(func,                     /* Task function */ \
                         #func,                    /* Task name */     \
                         ss,                       /* Stack size */    \
-                        NULL,                     /* Parameters */    \
+                        &s_##func##_handle,       /* Parameters */    \
                         tskIDLE_PRIORITY + (pri), /* Priority */      \
                         &s_##func##_handle        /* Task handle */   \
                         ) != pdPASS) {                                \
