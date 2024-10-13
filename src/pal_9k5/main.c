@@ -9,7 +9,7 @@
 #include "malloc.h"
 #include "pspcom.h"
 #include "pyros.h"
-#include "rtc.h"
+#include "rtc/rtc.h"
 #include "status.h"
 #include "stdio.h"
 #include "stm32h7xx.h"
@@ -37,8 +37,8 @@ uint8_t mtp_mode = 0;
         gpio_write(PIN_RED, GPIO_LOW);                        \
         DELAY(1000);                                          \
         /* Print might itself cause a fault, so do it last */ \
-        printf("PANIC @ %s:%d: ", __FILE__, __LINE__);        \
-        printf(msg, ##__VA_ARGS__);                           \
+        PAL_LOGE("PANIC @ %s:%d: ", __FILE__, __LINE__);      \
+        PAL_LOGE(msg, ##__VA_ARGS__);                         \
     } while (1)
 
 #define TASK_CREATE(func, pri, ss)                                    \
@@ -75,9 +75,8 @@ void init_task() {
 
     mtp_mode = backup_get_ptr()->flag_mtp_pressed;
 
-    printf("Starting initialization...\n");
+    PAL_LOGI("Starting initialization...\n");
 
-    rtc_init();
     buttons_init();
     init_error |= (EXPECT_OK(storage_init(), "init storage") != STATUS_OK) << 0;
     init_error |= (EXPECT_OK(usb_init(), "init usb") != STATUS_OK) << 1;
@@ -106,12 +105,12 @@ void init_task() {
         }
     }
 
-    printf("Initialization complete\n");
+    PAL_LOGI("Initialization complete\n");
 
     TASK_CREATE(buzzer_task, +1, 512);
     if (!mtp_mode) {
         // Start tasks if we are in normal mode
-        printf("Launching flight tasks\n");
+        PAL_LOGI("Launching flight tasks\n");
         // TASK_CREATE(pyros_task, +7, 2048);
         TASK_CREATE(task_sensors, +6, 2048);
         // TASK_CREATE(state_est_task, +5, 2048);
@@ -120,7 +119,7 @@ void init_task() {
         // TASK_CREATE(read_gps_task, +3, 2048);
         TASK_CREATE(task_storage, +2, 4096);
     } else {
-        printf("Started USB MSC mode\n");
+        PAL_LOGI("Started USB MSC mode\n");
     }
 
 #ifdef DEBUG_MEMORY_USAGE
@@ -146,6 +145,7 @@ int main(void) {
     SystemClock_Config();
     init_timers();
     backup_init();
+    rtc_init();
     button_event_init();
 
     // Light all LEDs to indicate initialization
@@ -160,7 +160,7 @@ int main(void) {
     // Launch FreeRTOS kernel and init task
     TASK_CREATE(init_task, -1, 8192);
 
-    printf("Starting scheduler\n");
+    PAL_LOGI("Starting scheduler\n");
 
     vTaskStartScheduler();
 

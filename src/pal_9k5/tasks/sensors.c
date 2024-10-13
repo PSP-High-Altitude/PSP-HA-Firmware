@@ -147,8 +147,6 @@ void task_sensors(TaskHandle_t* handle_ptr) {
         sensor_frame.rot_i_y = gyro.gyroY;
         sensor_frame.rot_i_z = gyro.gyroZ;
 
-        printf("Accel: %f %f %f\n", accel.accelX, accel.accelY, accel.accelZ);
-
         sensor_frame.mag_i_x = mag.magX;
         sensor_frame.mag_i_y = mag.magY;
         sensor_frame.mag_i_z = mag.magZ;

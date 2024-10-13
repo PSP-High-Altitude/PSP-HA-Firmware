@@ -14,8 +14,16 @@ typedef enum {
     STATUS_TIMEOUT_ERROR,
 } Status;
 
+typedef enum {
+    LOG_INFO,
+    LOG_WARNING,
+    LOG_ERROR,
+} LogType;
+
 Status expect_ok(Status status, const char msg[], const char file[],
                  const int line);
+
+void pal_log(LogType type, const char* format, ...);
 
 // If the provided status is not OK, print out the error (evals to status)
 #define EXPECT_OK(status, msg) (expect_ok((status), (msg), __FILE__, __LINE__))
@@ -37,5 +45,9 @@ Status expect_ok(Status status, const char msg[], const char file[],
     do {                                                              \
         status = ((new_status) > (status) ? (new_status) : (status)); \
     } while (0)
+
+#define PAL_LOGI(...) pal_log(LOG_INFO, __VA_ARGS__)
+#define PAL_LOGW(...) pal_log(LOG_WARNING, __VA_ARGS__)
+#define PAL_LOGE(...) pal_log(LOG_ERROR, __VA_ARGS__)
 
 #endif  // STATUS_H

@@ -59,7 +59,7 @@ Status config_load() {
     if (calc_config_checksum(sram_config) == sram_config->checksum) {
         // If the checksum verifies, do nothing
         s_valid_config_loaded = 1;
-        printf("Config loaded from SRAM\n");
+        PAL_LOGI("Config loaded from SRAM\n");
         return STATUS_OK;
     }
 
@@ -69,7 +69,7 @@ Status config_load() {
         if (calc_config_checksum(sram_config) == sram_config->checksum) {
             // If the checksum verifies, we're done
             s_valid_config_loaded = 2;
-            printf("Config loaded from flash\n");
+            PAL_LOGI("Config loaded from flash\n");
             return STATUS_OK;
         }
     }
@@ -78,7 +78,7 @@ Status config_load() {
     *sram_config = s_default_config;
     sram_config->checksum = calc_config_checksum(sram_config);
     s_valid_config_loaded = 3;
-    printf("Config loaded from defaults\n");
+    PAL_LOGI("Config loaded from defaults\n");
 
     return STATUS_OK;
 }
@@ -91,7 +91,7 @@ Status config_commit() {
     ASSERT_OK(nand_flash_store_board_config(sram_config),
               "failed to store config to flash");
 
-    printf("Config committed to flash\n");
+    PAL_LOGI("Config committed to flash\n");
 
     s_valid_config_loaded = 2;
 
@@ -100,7 +100,7 @@ Status config_commit() {
 
 // Force next load to load from NAND by invalidating SRAM copy
 Status config_invalidate() {
-    printf("Invalidating config\n");
+    PAL_LOGW("Invalidating config\n");
     backup_get_ptr()->board_config.checksum ^= -1;
     s_valid_config_loaded = 0;
 

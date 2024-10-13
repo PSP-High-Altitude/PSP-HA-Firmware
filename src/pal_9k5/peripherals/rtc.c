@@ -1,4 +1,4 @@
-#include "rtc.h"
+#include "rtc/rtc.h"
 
 #include "stdio.h"
 #include "stm32h7xx.h"
@@ -73,6 +73,10 @@ Status rtc_deinit() {
 
 RTCDateTime rtc_get_datetime() {
     RTCDateTime dt = {0};
+
+    if (hrtc.State != HAL_RTC_STATE_READY) {
+        return dt;
+    }
 
     RTC_DateTypeDef date;
     RTC_TimeTypeDef time;

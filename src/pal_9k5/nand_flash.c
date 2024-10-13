@@ -5,7 +5,7 @@
 #include "fifos.h"
 #include "main.h"
 #include "pb_create.h"
-#include "rtc.h"
+#include "rtc/rtc.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "timer.h"
@@ -123,18 +123,18 @@ Status nand_flash_dump_prf_stats(char stats[]) {
 
 Status nand_flash_init() {
     if (mt29f4g_init() != STATUS_OK) {
-        printf("Failed to initialize NAND\n");
+        PAL_LOGE("Failed to initialize NAND\n");
         return STATUS_HARDWARE_ERROR;
     }
     memset(&g_fs, 0, sizeof(g_fs));
     int status = f_mount(&g_fs, NAND_MOUNT_POINT, 1);
 #ifdef NAND_ALLOW_REFORMAT
     if (status == FR_NO_FILESYSTEM) {
-        printf("No file system found. Formatting...\n");
+        PAL_LOGW("No file system found. Formatting...\n");
         // Fully erase the chip before formatting
         status = mt29f4g_erase_chip();
         if (status != STATUS_OK) {
-            printf("Failed to erase NAND: %d\n", status);
+            PAL_LOGE("Failed to erase NAND: %d\n", status);
             return STATUS_HARDWARE_ERROR;
         }
         BYTE work[FF_MAX_SS];
@@ -145,26 +145,26 @@ Status nand_flash_init() {
 
         status = f_mkfs(NAND_MOUNT_POINT, &format_opts, work, FF_MAX_SS);
         if (status != FR_OK) {
-            printf("Failed to format NAND: %d\n", status);
+            PAL_LOGE("Failed to format NAND: %d\n", status);
             return STATUS_HARDWARE_ERROR;
         }
         status = f_setlabel(NAND_MOUNT_POINT "/" NAND_LABEL);
         if (status != FR_OK) {
-            printf("Failed to set label: %d\n", status);
+            PAL_LOGE("Failed to set label: %d\n", status);
             return STATUS_HARDWARE_ERROR;
         }
         status = f_mount(&g_fs, NAND_MOUNT_POINT, 1);
     }
 #endif
     if (status != FR_OK) {
-        printf("Failed to mount NAND: %d\n", status);
+        PAL_LOGE("Failed to mount NAND: %d\n", status);
         return STATUS_HARDWARE_ERROR;
     }
-    printf("NAND mounted successfully!\n");
+    PAL_LOGI("NAND mounted successfully!\n");
 
     // See the files in the root directory
     if (f_ls(NAND_MOUNT_POINT, 0) != 0) {
-        printf("Failed to list files on flash\n");
+        PAL_LOGE("Failed to list files on flash\n");
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -172,7 +172,7 @@ Status nand_flash_init() {
     DWORD clusters;
     FATFS* fs = &g_fs;
     if (f_getfree(NAND_MOUNT_POINT, &clusters, &fs) != FR_OK) {
-        printf("Failed to get nand filesystem space\n");
+        PAL_LOGE("Failed to get nand filesystem space\n");
         return STATUS_HARDWARE_ERROR;
     }
     uint32_t fs_free = clusters * fs->csize * fs->ssize;

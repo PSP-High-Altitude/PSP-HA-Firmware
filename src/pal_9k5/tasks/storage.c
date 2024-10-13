@@ -9,7 +9,7 @@
 #include "main.h"
 #include "nand_flash.h"
 #include "pb_create.h"
-#include "rtc.h"
+#include "rtc/rtc.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "timer.h"
@@ -304,7 +304,7 @@ void task_storage(TaskHandle_t* handle_ptr) {
             if (s_pause_store) {
                 // Gather and dump stats
                 char prf_buf[1024];  // 40 bytes per task
-                printf("Dumping prf stats\n");
+                PAL_LOGI("Dumping prf stats\n");
                 vTaskGetRunTimeStats(prf_buf);
                 sd_dump_prf_stats(prf_buf);
                 nand_flash_dump_prf_stats(prf_buf);
@@ -312,7 +312,7 @@ void task_storage(TaskHandle_t* handle_ptr) {
 
                 // Unmount filesystem
                 nand_flash_deinit();
-                printf("Unmounted filesystem\n");
+                PAL_LOGI("Unmounted filesystem\n");
 
                 // Blink the green LED while waiting
                 while (s_pause_store) {
@@ -323,12 +323,12 @@ void task_storage(TaskHandle_t* handle_ptr) {
                 }
 
                 // Remount filesystem
-                printf("Remounting filesystem\n");
+                PAL_LOGI("Remounting filesystem\n");
                 nand_flash_reinit();
 
                 // Open new files
                 if (storage_open_files() != STATUS_OK) {
-                    printf("Error opening new files\n");
+                    PAL_LOGE("Error opening new files\n");
                     continue;
                 }
             }
@@ -337,26 +337,9 @@ void task_storage(TaskHandle_t* handle_ptr) {
 }
 
 Status storage_write_log(const char* log, size_t size) {
-    RTCDateTime dt = rtc_get_datetime();
-
-    // Determine size of new buffer
-    int new_size =
-        snprintf(NULL, 0, "%04ld-%02ld-%02ld %02ld:%02ld:%02ld     %.*s",
-                 dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, size,
-                 log) +
-        1;
-
-    char* new_buf = malloc(new_size);
-
-    snprintf(new_buf, new_size, "%04ld-%02ld-%02ld %02ld:%02ld:%02ld     %.*s",
-             dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, size,
-             log);
-
     // Not ready yet, queue the log
     if (!g_nand_ready) {
-        fifo_enqueuen(&s_log_fifo, (uint8_t*)new_buf, new_size - 1);
-
-        free(new_buf);
+        fifo_enqueuen(&s_log_fifo, (uint8_t*)log, size - 1);
         return STATUS_OK;
     }
 
@@ -369,16 +352,13 @@ Status storage_write_log(const char* log, size_t size) {
         free(buf);
 
         if (status != STATUS_OK) {
-            free(new_buf);
             return status;
         }
     }
 
     // Write the new log to the NAND flash
-    Status status = nand_flash_write_binary_data(&s_logfile, (uint8_t*)new_buf,
-                                                 new_size - 1);
-
-    free(new_buf);
+    Status status =
+        nand_flash_write_binary_data(&s_logfile, (uint8_t*)log, size - 1);
 
     return status;
 }

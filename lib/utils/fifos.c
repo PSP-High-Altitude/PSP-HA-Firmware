@@ -36,7 +36,6 @@ int fifo_enqueuen(FIFO_t *fifo, uint8_t *items, int n) {
 // Remove an item from the FIFO
 int fifo_dequeue(FIFO_t *fifo, uint8_t *item) {
     if (fifo->count == 0) {
-        printf("Buffer is empty, cannot dequeue\n");
         return 0;  // Buffer empty
     }
 

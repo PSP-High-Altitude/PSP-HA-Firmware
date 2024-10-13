@@ -10,7 +10,7 @@
 #include "fifos.h"
 #include "gpio/gpio.h"
 #include "main.h"
-#include "rtc.h"
+#include "rtc/rtc.h"
 #include "tasks/storage.h"
 #include "timer.h"
 #include "tusb.h"

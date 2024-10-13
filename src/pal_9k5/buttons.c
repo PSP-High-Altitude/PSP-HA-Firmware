@@ -39,7 +39,7 @@ void pause_button_handler() {
 static void mtp_button_timeout(TimerHandle_t timer) {
     // Handle button timeout
     button_event_destroy(&g_mtp_button);
-    printf("MTP mode was not selected!\n");
+    PAL_LOGW("MTP mode was not selected!\n");
 
     // Transition to pause button
     button_event_create(&g_pause_button);

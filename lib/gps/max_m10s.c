@@ -21,9 +21,9 @@ Status max_m10s_init(I2cDevice* device) {
     uint8_t value_lens[] = {1, 1, 1, 1, 1, 1, 1, 1, 2};
     if (ubx_cfg_valset(device, MAX_M10S_LAYER_SET_RAM, keys, values, value_lens,
                        9) == STATUS_OK) {
-        printf("Set nav mode to airborne <4G\n");
-        printf("Disabled NMEA on I2C\n");
-        printf("Navigation measurement rate set to 10 Hz\n");
+        PAL_LOGI("Set nav mode to airborne <4G\n");
+        PAL_LOGI("Disabled NMEA on I2C\n");
+        PAL_LOGI("Navigation measurement rate set to 10 Hz\n");
     } else {
         return STATUS_ERROR;
     }
