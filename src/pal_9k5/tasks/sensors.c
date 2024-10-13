@@ -37,23 +37,23 @@ static I2cDevice s_baro_conf = {
     .sda = PIN_PB7,
 };
 
-//// BMI088 Inertial Measurement Unit (Accelerometer)
-// static I2cDevice s_imu_acc_conf = {
-//     .address = 0x18,
-//     .clk = I2C_SPEED_FAST,
-//     .periph = P_I2C1,
-//     .scl = PIN_PB8,
-//     .sda = PIN_PB7,
-// };
-//
-//// BMI088 Inertial Measurement Unit (Gyroscope)
-// static I2cDevice s_imu_rot_conf = {
-//     .address = 0x68,
-//     .clk = I2C_SPEED_FAST,
-//     .periph = P_I2C1,
-//     .scl = PIN_PB8,
-//     .sda = PIN_PB7,
-// };
+// BMI088 Inertial Measurement Unit (Accelerometer)
+static I2cDevice s_imu_acc_conf = {
+    .address = 0x18,
+    .clk = I2C_SPEED_FAST,
+    .periph = P_I2C1,
+    .scl = PIN_PB8,
+    .sda = PIN_PB7,
+};
+
+// BMI088 Inertial Measurement Unit (Gyroscope)
+static I2cDevice s_imu_rot_conf = {
+    .address = 0x68,
+    .clk = I2C_SPEED_FAST,
+    .periph = P_I2C1,
+    .scl = PIN_PB8,
+    .sda = PIN_PB7,
+};
 
 // KX134 High-G Accelerometer
 static I2cDevice s_acc_conf = {
@@ -92,10 +92,10 @@ Status sensors_init() {
               "Accelerometer initialization failed\n");
     ASSERT_OK(iis2mdc_init(&s_mag_conf, IIS2MDC_ODR_100_HZ),
               "Magnetometer initialization failed\n");
-    // ASSERT_OK(bmi088_init(&s_imu_acc_conf, &s_imu_rot_conf,
-    //                       BMI088_GYRO_RATE_200_HZ, BMI088_ACC_RATE_200_HZ,
-    //                       BMI088_GYRO_RANGE_2000_DPS, BMI088_ACC_RANGE_24_G),
-    //           "IMU initialization failed\n");
+    ASSERT_OK(bmi088_init(&s_imu_acc_conf, &s_imu_rot_conf,
+                          BMI088_GYRO_RATE_200_HZ, BMI088_ACC_RATE_200_HZ,
+                          BMI088_GYRO_RANGE_2000_DPS, BMI088_ACC_RANGE_24_G),
+              "IMU initialization failed\n");
 
     s_config_ptr = config_get_ptr();
     if (s_config_ptr == NULL) {
@@ -127,8 +127,8 @@ void task_sensors(TaskHandle_t* handle_ptr) {
         BaroData baro = ms5637_read(&s_baro_conf, OSR_256);
         uint64_t timestamp = MICROS();
         Accel acch = kx134_read_accel(&s_acc_conf);
-        Accel accel = {0};  // bmi088_acc_read(&s_imu_acc_conf);
-        Gyro gyro = {0};    // bmi088_gyro_read(&s_imu_rot_conf);
+        Accel accel = bmi088_acc_read(&s_imu_acc_conf);
+        Gyro gyro = bmi088_gyro_read(&s_imu_rot_conf);
         Mag mag = iis2mdc_read(&s_mag_conf);
 
         // Copy data into a sensor frame
@@ -146,6 +146,8 @@ void task_sensors(TaskHandle_t* handle_ptr) {
         sensor_frame.rot_i_x = gyro.gyroX;
         sensor_frame.rot_i_y = gyro.gyroY;
         sensor_frame.rot_i_z = gyro.gyroZ;
+
+        printf("Accel: %f %f %f\n", accel.accelX, accel.accelY, accel.accelZ);
 
         sensor_frame.mag_i_x = mag.magX;
         sensor_frame.mag_i_y = mag.magY;

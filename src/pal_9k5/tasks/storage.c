@@ -82,42 +82,7 @@ static void storage_pause_event_handler() {
     }
 }
 
-Status storage_init() {
-    // Initialize FATFS
-    ASSERT_OK(diskio_init(NULL), "diskio init");
-    ASSERT_OK(nand_flash_init(), "nand init");
-
-    // Initialize config
-    ASSERT_OK(config_load(), "load config");
-
-    // Initialize config ptr
-    s_config_ptr = config_get_ptr();
-    if (s_config_ptr == NULL) {
-        ASSERT_OK(STATUS_STATE_ERROR, "unable to get ptr to config\n");
-    }
-
-    // Create the queues
-    s_sensor_queue = xQueueCreate(SENSOR_QUEUE_LENGTH, SENSOR_QUEUE_ITEM_SIZE);
-    s_state_queue = xQueueCreate(STATE_QUEUE_LENGTH, STATE_QUEUE_ITEM_SIZE);
-    s_gps_queue = xQueueCreate(GPS_QUEUE_LENGTH, GPS_QUEUE_ITEM_SIZE);
-    s_queue_set = xQueueCreateSet(QUEUE_SET_LENGTH);
-
-    // Check that everything was successfully created
-    configASSERT(s_sensor_queue);
-    configASSERT(s_state_queue);
-    configASSERT(s_gps_queue);
-    configASSERT(s_queue_set);
-
-    // Add the queues to the set
-    xQueueAddToSet(s_sensor_queue, s_queue_set);
-    xQueueAddToSet(s_state_queue, s_queue_set);
-    xQueueAddToSet(s_gps_queue, s_queue_set);
-
-    // Create the data directory
-    if (nand_flash_mkdir(DATA_DIR) != STATUS_OK) {
-        return STATUS_ERROR;
-    }
-
+static Status storage_open_files() {
     // Get a list of files in the data directory
     char** file_list = NULL;
     size_t num_files = 0;
@@ -189,6 +154,50 @@ Status storage_init() {
             STATUS_OK) {
             return STATUS_ERROR;
         }
+    }
+
+    return STATUS_OK;
+}
+
+Status storage_init() {
+    // Initialize FATFS
+    ASSERT_OK(diskio_init(NULL), "diskio init");
+    ASSERT_OK(nand_flash_init(), "nand init");
+
+    // Initialize config
+    ASSERT_OK(config_load(), "load config");
+
+    // Initialize config ptr
+    s_config_ptr = config_get_ptr();
+    if (s_config_ptr == NULL) {
+        ASSERT_OK(STATUS_STATE_ERROR, "unable to get ptr to config\n");
+    }
+
+    // Create the queues
+    s_sensor_queue = xQueueCreate(SENSOR_QUEUE_LENGTH, SENSOR_QUEUE_ITEM_SIZE);
+    s_state_queue = xQueueCreate(STATE_QUEUE_LENGTH, STATE_QUEUE_ITEM_SIZE);
+    s_gps_queue = xQueueCreate(GPS_QUEUE_LENGTH, GPS_QUEUE_ITEM_SIZE);
+    s_queue_set = xQueueCreateSet(QUEUE_SET_LENGTH);
+
+    // Check that everything was successfully created
+    configASSERT(s_sensor_queue);
+    configASSERT(s_state_queue);
+    configASSERT(s_gps_queue);
+    configASSERT(s_queue_set);
+
+    // Add the queues to the set
+    xQueueAddToSet(s_sensor_queue, s_queue_set);
+    xQueueAddToSet(s_state_queue, s_queue_set);
+    xQueueAddToSet(s_gps_queue, s_queue_set);
+
+    // Create the data directory
+    if (nand_flash_mkdir(DATA_DIR) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    // Open files
+    if (storage_open_files() != STATUS_OK) {
+        return STATUS_ERROR;
     }
 
     // Set the pause button handler
@@ -317,22 +326,10 @@ void task_storage(TaskHandle_t* handle_ptr) {
                 printf("Remounting filesystem\n");
                 nand_flash_reinit();
 
-                // Reopen files
-                if (nand_flash_open_binary_file(&s_logfile, s_logfile_path) !=
-                    STATUS_OK) {
-                    printf("Failed to reopen log file\n");
-                }
-                if (nand_flash_open_binary_file(&s_sensfile, s_sensfile_path) !=
-                    STATUS_OK) {
-                    printf("Failed to reopen sensor file\n");
-                }
-                if (nand_flash_open_binary_file(
-                        &s_statefile, s_statefile_path) != STATUS_OK) {
-                    printf("Failed to reopen state file\n");
-                }
-                if (nand_flash_open_binary_file(&s_gpsfile, s_gpsfile_path) !=
-                    STATUS_OK) {
-                    printf("Failed to reopen gps file\n");
+                // Open new files
+                if (storage_open_files() != STATUS_OK) {
+                    printf("Error opening new files\n");
+                    continue;
                 }
             }
         }

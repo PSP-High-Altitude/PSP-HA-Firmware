@@ -57,7 +57,7 @@ static Status kx134_write(I2cDevice* device, uint8_t address, uint8_t* tx_buf,
 
     // Create tx buffer for address
     uint8_t tx_buf_new[len + 1];
-    tx_buf[0] = address;                  // Add address to tx buffer
+    tx_buf_new[0] = address;              // Add address to tx buffer
     memcpy(tx_buf_new + 1, tx_buf, len);  // Add data to tx buffer
 
     // Write address and len bytes

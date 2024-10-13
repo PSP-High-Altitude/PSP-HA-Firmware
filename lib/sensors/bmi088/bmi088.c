@@ -39,7 +39,7 @@ Status bmi088_init(I2cDevice* acc_device, I2cDevice* gyro_device,
     if (i2c_read(gyro_device, buf, 1) != STATUS_OK) {
         return STATUS_ERROR;
     }
-    if (buf[0] != 0x1f) {
+    if (buf[0] != 0x0f) {
         return STATUS_ERROR;
     }
 
@@ -50,31 +50,23 @@ Status bmi088_init(I2cDevice* acc_device, I2cDevice* gyro_device,
         return STATUS_ERROR;
     }
 
-    return STATUS_OK;
-
     buf[0] = BMI088_ACC_RANGE;
     buf[1] = acc_range;
     if (i2c_write(acc_device, buf, 2) != STATUS_OK) {
         return STATUS_ERROR;
     }
 
-    return STATUS_OK;
-
     buf[0] = BMI088_ACC_PWR_CONF;
     buf[1] = 0x00;
-    if (i2c_write(gyro_device, buf, 2) != STATUS_OK) {
+    if (i2c_write(acc_device, buf, 2) != STATUS_OK) {
         return STATUS_ERROR;
     }
-
-    return STATUS_OK;
 
     buf[0] = BMI088_ACC_PWR_CTRL;
     buf[1] = 0x04;
-    if (i2c_write(gyro_device, buf, 2) != STATUS_OK) {
+    if (i2c_write(acc_device, buf, 2) != STATUS_OK) {
         return STATUS_ERROR;
     }
-
-    return STATUS_OK;
 
     // Perform configurations for Gyro
     buf[0] = BMI088_GYRO_RANGE;
@@ -82,8 +74,6 @@ Status bmi088_init(I2cDevice* acc_device, I2cDevice* gyro_device,
     if (i2c_write(gyro_device, buf, 2) != STATUS_OK) {
         return STATUS_ERROR;
     }
-
-    return STATUS_OK;
 
     buf[0] = BMI088_GYRO_BANDWIDTH;
     buf[1] = 0x80 | gyro_rate;

@@ -131,7 +131,6 @@ void init_task() {
 
     while (1) {
         // rtc_print_datetime();
-        malloc_stats();
         sensors_start_read();
         DELAY(1000);
         // DELAY(0xFFFF);
