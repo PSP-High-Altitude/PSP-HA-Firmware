@@ -16,17 +16,8 @@
 FATFS g_fs;
 int g_nand_ready = 0;
 
-// static char s_cfg_dir[FDIR_LEN] = NAND_MOUNT_POINT "/cfg";
-// static char s_filename[FNAME_LEN] = "/dat_00.pb3";
-// static char s_gpsfname[FNAME_LEN] = "/gps_00.pb3";
-// static char s_statefname[FNAME_LEN] = "/fsl_00.pb3";
-static char s_cfgfname[FNAME_LEN] = "/cfg.bin";
-// static char s_logfname[FNAME_LEN] = "/log_00.txt";
-static char s_prffname[FNAME_LEN] = "/prf_00.txt";
-
-// static pb_byte_t s_sensor_buffer[SENSOR_BUF_LEN];
-// static pb_byte_t s_gps_buffer[GPS_BUF_LEN];
-// static pb_byte_t s_state_buffer[STATE_BUF_LEN];
+static char s_cfgfname[FNAME_LEN] = NAND_MOUNT_POINT "/board.conf";
+static char s_prffname[FNAME_LEN] = NAND_MOUNT_POINT "/prf.txt";
 
 static const char s_header[HEADER_LEN] = FIRMWARE_SPECIFIER "\n";
 
@@ -300,11 +291,11 @@ Status nand_flash_load_board_config(BoardConfig* board_config) {
     }
 
     UINT br;
-    if (f_read(&cfgfile, board_config, sizeof(board_config), &br) != FR_OK) {
+    if (f_read(&cfgfile, board_config, sizeof(*board_config), &br) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
-    if (br != sizeof(board_config)) {
+    if (br != sizeof(*board_config)) {
         return STATUS_HARDWARE_ERROR;
     }
 

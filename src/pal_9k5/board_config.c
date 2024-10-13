@@ -48,13 +48,8 @@ BoardConfig* config_get_ptr() {
 
 // Ensure that a valid config is loaded into SRAM
 Status config_load() {
-    // Verify checksum of the config stored in  the backup SRAM
+    // Verify checksum of the config stored in the backup SRAM
     BoardConfig* sram_config = &(backup_get_ptr()->board_config);
-    s_valid_config_loaded = 1;  // TEMP
-    config_print();
-
-    printf("%08lx\n", sram_config->checksum);
-    printf("%08lx\n", calc_config_checksum(sram_config));
 
     if (calc_config_checksum(sram_config) == sram_config->checksum) {
         // If the checksum verifies, do nothing
@@ -79,6 +74,8 @@ Status config_load() {
     sram_config->checksum = calc_config_checksum(sram_config);
     s_valid_config_loaded = 3;
     PAL_LOGI("Config loaded from defaults\n");
+
+    config_print();
 
     return STATUS_OK;
 }
@@ -114,7 +111,7 @@ void config_print() {
     printf("Sensor loop period: %lu ms\n", config->sensor_loop_period_ms);
     printf("State init time: %lu ms\n", config->state_init_time_ms);
     printf("Launch detect period: %lu ms\n", config->launch_detect_period_ms);
-    printf("Launch detect replay: %d\n", config->launch_detect_replay);
+    printf("Launch detect replay: %lu\n", config->launch_detect_replay);
     printf("Min fast vel: %f m/s\n", config->min_fast_vel_mps);
     printf("Min boost acc: %f m/s^2\n", config->min_boost_acc_mps2);
     printf("Max coast acc: %f m/s^2\n", config->max_coast_acc_mps2);
