@@ -41,15 +41,18 @@ typedef struct {
 } BoardConfig;
 
 // Get a pointer to the config object
-BoardConfig* get_config_ptr();
+BoardConfig* config_get_ptr();
 
 // Ensure that a valid config is loaded
-Status load_config();
+Status config_load();
 
 // Save the changes to the config
-Status commit_config();
+Status config_commit();
 
 // Invalidate the config so it's reloaded from flash
-Status invalidate_config();
+Status config_invalidate();
+
+// Print the config
+void config_print();
 
 #endif  // BOARD_CONFIG_H

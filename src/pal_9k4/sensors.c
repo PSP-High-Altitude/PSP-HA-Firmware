@@ -112,7 +112,7 @@ GpsFrame gps_fix_to_pb_frame(uint64_t timestamp,
 /*****************/
 /* API FUNCTIONS */
 /*****************/
-Status init_sensors() {
+Status sensors_init() {
     ASSERT_OK(iis2mdc_init(&s_mag_conf, IIS2MDC_ODR_100_HZ), "mag init");
     ASSERT_OK(ms5637_init(&s_baro_conf), "baro init");
     ASSERT_OK(lsm6dsox_init(&s_imu_conf), "IMU init");

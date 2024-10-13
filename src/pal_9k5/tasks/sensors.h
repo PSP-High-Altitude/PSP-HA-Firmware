@@ -7,9 +7,9 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-Status init_sensors();
+Status sensors_init();
 
-Status start_sensor_read();
+Status sensors_start_read();
 
 void task_sensors(TaskHandle_t* handle_ptr);
 

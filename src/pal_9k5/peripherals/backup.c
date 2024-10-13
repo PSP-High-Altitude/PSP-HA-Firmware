@@ -15,4 +15,4 @@ Status backup_init() {
     return STATUS_OK;
 }
 
-Backup* get_backup_ptr() { return (Backup*)D3_BKPSRAM_BASE; }
+Backup* backup_get_ptr() { return (Backup*)D3_BKPSRAM_BASE; }

@@ -3,8 +3,6 @@
 
 #include "board.h"
 
-volatile int uxTopUsedPriority;
-
 #define DEBUG
 // #define DEBUG_STORAGE
 // #define PSPCOM_SENSORS

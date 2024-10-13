@@ -68,114 +68,6 @@ Status nand_flash_close_file(FIL* fp) {
     return STATUS_OK;
 }
 
-/*
-static Status nand_flash_open_files() {
-    // Traverse the directory to find the oldest and newest files
-    DIR dir;
-    if (f_opendir(&dir, s_fltdata_dir) != FR_OK) {
-        // If we can't open the directory, make it and try again
-        if (f_mkdir(s_fltdata_dir) != FR_OK) {
-            return STATUS_ERROR;
-        }
-        if (f_opendir(&dir, s_fltdata_dir) != FR_OK) {
-            return STATUS_ERROR;
-        }
-    }
-
-    int32_t min_file_suffix = 100;
-    int32_t max_file_suffix = -1;
-
-    FILINFO info;
-    while (true) {
-        if (f_readdir(&dir, &info) != FR_OK) {
-            f_closedir(&dir);
-            return STATUS_ERROR;
-        }
-        if (info.fname[0] == '\0') {
-            break;
-        }
-
-        if (info.fattrib & AM_DIR) {
-            continue;
-        }
-
-        if (strncmp(info.fname, "dat_", 4) == 0) {
-            int32_t suffix = atoi(info.fname + 4);
-            if (suffix > max_file_suffix) {
-                max_file_suffix = suffix;
-            }
-            if (suffix < min_file_suffix) {
-                min_file_suffix = suffix;
-            }
-        }
-    }
-
-    f_closedir(&dir);
-
-    // Remove files if there are more than NAND_MAX_FLIGHTS
-    while (max_file_suffix - min_file_suffix > NAND_MAX_FLIGHTS - 1) {
-        snprintf(s_filename, FNAME_LEN + FDIR_LEN, "%s/dat_%02ld.pb3",
-                 s_fltdata_dir, min_file_suffix);
-        snprintf(s_gpsfname, FNAME_LEN + FDIR_LEN, "%s/gps_%02ld.pb3",
-                 s_fltdata_dir, min_file_suffix);
-        snprintf(s_statefname, FNAME_LEN + FDIR_LEN, "%s/fsl_%02ld.pb3",
-                 s_fltdata_dir, min_file_suffix);
-        snprintf(s_prffname, FNAME_LEN + FDIR_LEN, "%s/prf_%02ld.txt",
-                 s_fltdata_dir, min_file_suffix);
-        snprintf(s_logfname, FNAME_LEN + FDIR_LEN, "%s/log_%02ld.txt",
-                 s_fltdata_dir, min_file_suffix);
-        f_unlink(s_filename);
-        f_unlink(s_gpsfname);
-        f_unlink(s_statefname);
-        f_unlink(s_prffname);
-        f_unlink(s_logfname);
-        min_file_suffix++;
-    }
-
-    // Roll around if we reach 99
-    if (max_file_suffix > 99) {
-        max_file_suffix = 0;
-    }
-
-    // Create new file names
-    snprintf(s_filename, FNAME_LEN + FDIR_LEN, "%s/dat_%02ld.pb3",
-             s_fltdata_dir, max_file_suffix + 1);
-    snprintf(s_gpsfname, FNAME_LEN + FDIR_LEN, "%s/gps_%02ld.pb3",
-             s_fltdata_dir, max_file_suffix + 1);
-    snprintf(s_statefname, FNAME_LEN + FDIR_LEN, "%s/fsl_%02ld.pb3",
-             s_fltdata_dir, max_file_suffix + 1);
-    snprintf(s_prffname, FNAME_LEN + FDIR_LEN, "%s/prf_%02ld.txt",
-             s_fltdata_dir, max_file_suffix + 1);
-    snprintf(s_logfname, FNAME_LEN + FDIR_LEN, "%s/log_%02ld.txt",
-             s_fltdata_dir, max_file_suffix + 1);
-
-    // Initialize the sensor file and stream
-    Status sensor_status = nand_flash_create_sensor_file();
-    if (sensor_status != STATUS_OK) {
-        return sensor_status;
-    }
-
-    // Initialize the GPS file and stream
-    Status gps_status = nand_flash_create_gps_file();
-    if (gps_status != STATUS_OK) {
-        return gps_status;
-    }
-
-    // Initialize the flight state file and stream
-    Status state_status = nand_flash_create_state_file();
-    if (state_status != STATUS_OK) {
-        return state_status;
-    }
-
-    // Initialize the log file
-    Status log_status = nand_flash_create_log_file();
-    if (log_status != STATUS_OK) {
-        return log_status;
-    }
-
-    return STATUS_OK;
-}*/
-
 Status nand_flash_write_binary_data(FIL* fp, uint8_t* data, size_t size) {
     // Check if data pointer is valid
     if (data == NULL) {
@@ -230,7 +122,10 @@ Status nand_flash_dump_prf_stats(char stats[]) {
 }
 
 Status nand_flash_init() {
-    // mt29f4g_erase_chip();
+    if (mt29f4g_init() != STATUS_OK) {
+        printf("Failed to initialize NAND\n");
+        return STATUS_HARDWARE_ERROR;
+    }
     memset(&g_fs, 0, sizeof(g_fs));
     int status = f_mount(&g_fs, NAND_MOUNT_POINT, 1);
 #ifdef NAND_ALLOW_REFORMAT
@@ -266,17 +161,6 @@ Status nand_flash_init() {
         return STATUS_HARDWARE_ERROR;
     }
     printf("NAND mounted successfully!\n");
-
-    /*
-    if (mtp_mode == 0) {
-        // Open the files
-        Status open_file_stat = nand_flash_open_files();
-        if (open_file_stat != STATUS_OK) {
-            printf("Failed to open files on flash\n");
-            return open_file_stat;
-        }
-    }
-    */
 
     // See the files in the root directory
     if (f_ls(NAND_MOUNT_POINT, 0) != 0) {
@@ -397,6 +281,14 @@ Status nand_flash_reinit() {
 
 Status nand_flash_deinit() {
     g_nand_ready = 0;
+    return STATUS_OK;
+}
+
+Status nand_flash_flush(FIL* fp) {
+    if (f_sync(fp) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
     return STATUS_OK;
 }
 

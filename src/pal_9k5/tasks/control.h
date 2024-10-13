@@ -8,7 +8,7 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-Status init_control();
+Status control_init();
 
 Status update_sensors_for_control(const SensorFrame* sensor_frame);
 

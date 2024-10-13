@@ -2,6 +2,7 @@
 
 #include <stdio.h>
 
+#include "board.h"
 #include "board_config.h"
 #include "control.h"
 #include "spi/spi.h"
@@ -26,31 +27,50 @@
 /*********************/
 /* PERIPHERAL CONFIG */
 /*********************/
-/// TODO: FIX THESE
+
+// MS5637 Barometer
 static I2cDevice s_baro_conf = {
     .address = 0x76,
     .clk = I2C_SPEED_FAST,
-    .periph = P_I2C1,  // FIXME
+    .periph = P_I2C1,
+    .scl = PIN_PB8,
+    .sda = PIN_PB7,
 };
-static I2cDevice s_imu_acc_conf = {
-    .address = 0x00,  // FIXME
-    .clk = I2C_SPEED_FAST,
-    .periph = P_SPI1,  // FIXME
-};
-static I2cDevice s_imu_rot_conf = {
-    .address = 0x00,  // FIXME
-    .clk = I2C_SPEED_FAST,
-    .periph = P_SPI1,  // FIXME
-};
+
+//// BMI088 Inertial Measurement Unit (Accelerometer)
+// static I2cDevice s_imu_acc_conf = {
+//     .address = 0x18,
+//     .clk = I2C_SPEED_FAST,
+//     .periph = P_I2C1,
+//     .scl = PIN_PB8,
+//     .sda = PIN_PB7,
+// };
+//
+//// BMI088 Inertial Measurement Unit (Gyroscope)
+// static I2cDevice s_imu_rot_conf = {
+//     .address = 0x68,
+//     .clk = I2C_SPEED_FAST,
+//     .periph = P_I2C1,
+//     .scl = PIN_PB8,
+//     .sda = PIN_PB7,
+// };
+
+// KX134 High-G Accelerometer
 static I2cDevice s_acc_conf = {
-    .address = 0x00,  // FIXME
+    .address = 0x1F,
     .clk = I2C_SPEED_FAST,
-    .periph = P_SPI2,  // FIXME
+    .periph = P_I2C1,
+    .scl = PIN_PB8,
+    .sda = PIN_PB7,
 };
+
+// IIS2MDC Magnetometer
 static I2cDevice s_mag_conf = {
     .address = 0x1E,
     .clk = I2C_SPEED_FAST,
-    .periph = P_I2C1,  // FIXME
+    .periph = P_I2C1,
+    .scl = PIN_PB8,
+    .sda = PIN_PB7,
 };
 
 /********************/
@@ -66,18 +86,18 @@ static BoardConfig* s_config_ptr = NULL;
 /*****************/
 /* API FUNCTIONS */
 /*****************/
-Status init_sensors() {
+Status sensors_init() {
     ASSERT_OK(ms5637_init(&s_baro_conf), "Barometer initialization failed\n");
     ASSERT_OK(kx134_init(&s_acc_conf, KX134_OUT_RATE_200_HZ, KX134_RANGE_64_G),
               "Accelerometer initialization failed\n");
     ASSERT_OK(iis2mdc_init(&s_mag_conf, IIS2MDC_ODR_100_HZ),
               "Magnetometer initialization failed\n");
-    ASSERT_OK(bmi088_init(&s_imu_acc_conf, &s_imu_rot_conf,
-                          BMI088_GYRO_RATE_200_HZ, BMI088_ACC_RATE_200_HZ,
-                          BMI088_GYRO_RANGE_2000_DPS, BMI088_ACC_RANGE_24_G),
-              "IMU initialization failed\n");
+    // ASSERT_OK(bmi088_init(&s_imu_acc_conf, &s_imu_rot_conf,
+    //                       BMI088_GYRO_RATE_200_HZ, BMI088_ACC_RATE_200_HZ,
+    //                       BMI088_GYRO_RANGE_2000_DPS, BMI088_ACC_RANGE_24_G),
+    //           "IMU initialization failed\n");
 
-    s_config_ptr = get_config_ptr();
+    s_config_ptr = config_get_ptr();
     if (s_config_ptr == NULL) {
         ASSERT_OK(STATUS_STATE_ERROR, "unable to get ptr to config\n");
     }
@@ -85,7 +105,10 @@ Status init_sensors() {
     return STATUS_OK;
 }
 
-Status start_sensor_read() {
+Status sensors_start_read() {
+    if (s_handle_ptr == NULL) {
+        return STATUS_ERROR;
+    }
     xTaskNotifyGive(*s_handle_ptr);
     return STATUS_OK;
 }
@@ -104,8 +127,8 @@ void task_sensors(TaskHandle_t* handle_ptr) {
         BaroData baro = ms5637_read(&s_baro_conf, OSR_256);
         uint64_t timestamp = MICROS();
         Accel acch = kx134_read_accel(&s_acc_conf);
-        Accel accel = bmi088_acc_read(&s_imu_acc_conf);
-        Gyro gyro = bmi088_gyro_read(&s_imu_rot_conf);
+        Accel accel = {0};  // bmi088_acc_read(&s_imu_acc_conf);
+        Gyro gyro = {0};    // bmi088_gyro_read(&s_imu_rot_conf);
         Mag mag = iis2mdc_read(&s_mag_conf);
 
         // Copy data into a sensor frame
@@ -142,5 +165,6 @@ void task_sensors(TaskHandle_t* handle_ptr) {
 #endif  // HWIL_TEST
 
         update_sensors_for_control(&sensor_frame);
+        queue_sensors_for_storage(&sensor_frame);
     }
 }

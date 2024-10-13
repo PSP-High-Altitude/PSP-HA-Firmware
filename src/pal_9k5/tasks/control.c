@@ -24,16 +24,16 @@ static BoardConfig* s_config_ptr;
 /*****************/
 /* API FUNCTIONS */
 /*****************/
-Status init_control() {
+Status control_init() {
     ASSERT_OK(fp_init(), "failed to init control logic\n");
-    ASSERT_OK(se_init(), "failed to init state est\n");
+    // ASSERT_OK(se_init(), "failed to init state est\n");
 
     // Each iteration of the control loop triggers one sensor read, so there
     // can't be more than one frame in the queue. The reason to use a queue is
     // for synchronization guarantees rather than actual buffering.
     s_sensor_queue = xQueueCreate(1, sizeof(SensorFrame));
 
-    s_config_ptr = get_config_ptr();
+    s_config_ptr = config_get_ptr();
     if (s_config_ptr == NULL) {
         ASSERT_OK(STATUS_STATE_ERROR, "unable to get ptr to config\n");
     }
@@ -60,7 +60,7 @@ void task_control(TaskHandle_t* handle_ptr) {
             fp_update(&sensor_frame);
         }
 
-        start_sensor_read();
+        sensors_start_read();
 
         vTaskDelayUntil(&last_iteration_start_tick,
                         pdMS_TO_TICKS(s_config_ptr->control_loop_period_ms));

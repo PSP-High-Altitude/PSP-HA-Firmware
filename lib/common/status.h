@@ -28,4 +28,14 @@ Status expect_ok(Status status, const char msg[], const char file[],
         if (retstatus != STATUS_OK) return retstatus; \
     } while (0)
 
+// Combine status codes
+#define COMBINE_STATUS(status1, status2) \
+    ((status1) > (status2) ? (status1) : (status2))
+
+// Update status variable
+#define UPDATE_STATUS(status, new_status)                             \
+    do {                                                              \
+        status = ((new_status) > (status) ? (new_status) : (status)); \
+    } while (0)
+
 #endif  // STATUS_H

@@ -22,7 +22,7 @@ static size_t s_ld_buffer_size = 0;
 Status fp_init() {
     s_init_start_ms = MILLIS();
 
-    s_config_ptr = get_config_ptr();
+    s_config_ptr = config_get_ptr();
     if (s_config_ptr == NULL) {
         ASSERT_OK(STATUS_STATE_ERROR, "unable to get ptr to config\n");
     }

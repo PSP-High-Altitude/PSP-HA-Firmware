@@ -24,7 +24,7 @@
 #define STATE_QUEUE_ITEM_SIZE (sizeof(StateFrame))
 #define GPS_QUEUE_ITEM_SIZE (sizeof(GpsFrame))
 
-Status init_storage();
+Status storage_init();
 
 void pause_storage();
 void start_storage();

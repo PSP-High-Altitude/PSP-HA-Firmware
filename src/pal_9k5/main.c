@@ -14,6 +14,8 @@
 #include "stdio.h"
 #include "stm32h7xx.h"
 #include "tasks/buzzer.h"
+#include "tasks/control.h"
+#include "tasks/sensors.h"
 #include "tasks/storage.h"
 #include "timer.h"
 #include "usb.h"
@@ -42,7 +44,7 @@ uint8_t mtp_mode = 0;
 #define TASK_CREATE(func, pri, ss)                                    \
     do {                                                              \
         static TaskHandle_t s_##func##_handle;                        \
-        if (xTaskCreate(func,                     /* Task function */ \
+        if (xTaskCreate((void *)func,             /* Task function */ \
                         #func,                    /* Task name */     \
                         ss,                       /* Stack size */    \
                         &s_##func##_handle,       /* Parameters */    \
@@ -71,22 +73,22 @@ void init_task() {
     uint32_t init_error = 0;  // Set if error occurs during initialization
     uint32_t num_inits = 4;   // Number of inits the error code refers to
 
-    mtp_mode = get_backup_ptr()->flag_mtp_pressed;
+    mtp_mode = backup_get_ptr()->flag_mtp_pressed;
 
     printf("Starting initialization...\n");
 
     rtc_init();
     buttons_init();
     init_error |= (EXPECT_OK(storage_init(), "init storage") != STATUS_OK) << 0;
-    init_error |= (EXPECT_OK(button_event_init(), "init button") != STATUS_OK)
-                  << 1;
-    init_error |= (EXPECT_OK(usb_init(), "init usb") != STATUS_OK) << 2;
-    //  init_error |= (EXPECT_OK(init_sensors(), "init sensors") != STATUS_OK)
-    //  << 3; init_error |= (EXPECT_OK(init_pyros(), "init pyros") != STATUS_OK)
-    //  << 4; init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") !=
-    //  STATUS_OK)
-    //  << 5;
-    init_error |= (EXPECT_OK(buzzer_init(), "init buzzer") != STATUS_OK) << 3;
+    init_error |= (EXPECT_OK(usb_init(), "init usb") != STATUS_OK) << 1;
+    init_error |= (EXPECT_OK(sensors_init(), "init sensors") != STATUS_OK) << 2;
+    init_error |= (EXPECT_OK(control_init(), "init control") != STATUS_OK) << 3;
+    // init_error |= (EXPECT_OK(init_pyros(), "init pyros") !=
+    //   STATUS_OK)
+    //   << 4; init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") !=
+    //   STATUS_OK)
+    //   << 5;
+    init_error |= (EXPECT_OK(buzzer_init(), "init buzzer") != STATUS_OK) << 4;
 
     // Play init tune
     gpio_write(PIN_RED, GPIO_LOW);
@@ -110,17 +112,15 @@ void init_task() {
     if (!mtp_mode) {
         // Start tasks if we are in normal mode
         printf("Launching flight tasks\n");
-        // TASK_CREATE(pyros_task, +5, 2048);
-        // TASK_CREATE(read_sensors_task, +4, 2048);
-        // TASK_CREATE(state_est_task, +3, 2048);
-        // TASK_CREATE(pspcom_process_bytes, +3, 2048);
-        // TASK_CREATE(pspcom_send_standard, +2, 2048);
-        // TASK_CREATE(read_gps_task, +2, 2048);
-        // TASK_CREATE(storage_task, +1, 4096);
+        // TASK_CREATE(pyros_task, +7, 2048);
+        TASK_CREATE(task_sensors, +6, 2048);
+        // TASK_CREATE(state_est_task, +5, 2048);
+        // TASK_CREATE(pspcom_process_bytes, +4, 2048);
+        // TASK_CREATE(pspcom_send_standard, +3, 2048);
+        // TASK_CREATE(read_gps_task, +3, 2048);
+        TASK_CREATE(task_storage, +2, 4096);
     } else {
-        // MTP mode data queuing task
-        printf("Launching MTP task\n");
-        // TASK_CREATE(mtp_readwrite_file_task, +1, 2048);
+        printf("Started USB MSC mode\n");
     }
 
 #ifdef DEBUG_MEMORY_USAGE
@@ -132,6 +132,7 @@ void init_task() {
     while (1) {
         // rtc_print_datetime();
         malloc_stats();
+        sensors_start_read();
         DELAY(1000);
         // DELAY(0xFFFF);
     }
@@ -146,6 +147,7 @@ int main(void) {
     SystemClock_Config();
     init_timers();
     backup_init();
+    button_event_init();
 
     // Light all LEDs to indicate initialization
     gpio_write(PIN_RED, GPIO_HIGH);
@@ -157,8 +159,6 @@ int main(void) {
     gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLUP);
 
     // Launch FreeRTOS kernel and init task
-    uxTopUsedPriority = configMAX_PRIORITIES - 1;
-
     TASK_CREATE(init_task, -1, 8192);
 
     printf("Starting scheduler\n");

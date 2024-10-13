@@ -11,7 +11,7 @@
 #include "gpio/gpio.h"
 #include "main.h"
 #include "rtc.h"
-#include "storage.h"
+#include "tasks/storage.h"
 #include "timer.h"
 #include "tusb.h"
 
@@ -30,6 +30,8 @@ static FIFO_t s_usb_serial_fifo = {
     .tail = 0,
     .count = 0,
 };
+uint8_t ser_out_buf[CFG_TUD_CDC_TX_BUFSIZE];
+
 #endif
 
 Status usb_init() {
@@ -68,7 +70,8 @@ int _write(int file, char *data, int len) {
 
     // If the USB isn't yet initialized, buffer the writes in an internal buffer
     // so that they can be output when the interface actually gets initialized
-    if (!s_usb_initialized || (MILLIS() - s_usb_initialized_time < 1000)) {
+    if (!s_usb_initialized || (MILLIS() - s_usb_initialized_time < 1000) ||
+        xPortIsInsideInterrupt()) {
         int32_t copy_size =
             fifo_enqueuen(&s_usb_serial_fifo, (uint8_t *)data, len);
         return copy_size;
@@ -77,10 +80,8 @@ int _write(int file, char *data, int len) {
     // If the USB is initialized, write the data to the USB interface
     // and flush the buffer.
     int new_len = s_usb_serial_fifo.count;
-    uint8_t buf[CFG_TUD_CDC_TX_BUFSIZE];
-    fifo_dequeuen(&s_usb_serial_fifo, buf, new_len);
-    tud_cdc_write(buf, new_len);
-    tud_cdc_write_flush();
+    fifo_dequeuen(&s_usb_serial_fifo, ser_out_buf, new_len);
+    tud_cdc_write(ser_out_buf, new_len);
 
     // Send data
     tud_cdc_write(data, len);

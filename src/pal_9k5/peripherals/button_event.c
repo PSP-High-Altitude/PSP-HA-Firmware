@@ -39,10 +39,14 @@ Status button_event_create(ButtonEventConfig *config) {
     gpio_mode(config->pin, GPIO_INPUT);
 
     // Enable interrupt on requested edge transitions
+    EXTI->RTSR1 &= ~(1 << (config->pin & 0xF));
+    EXTI->FTSR1 &= ~(1 << (config->pin & 0xF));
     EXTI->RTSR1 |= (config->rising << (config->pin & 0xF));
     EXTI->FTSR1 |= (config->falling << (config->pin & 0xF));
 
     // Direct the right port to the EXTI peripheral
+    SYSCFG->EXTICR[(config->pin & 0xF) >> 2] &=
+        ~(0xF << ((config->pin & 0x3) << 2));
     SYSCFG->EXTICR[(config->pin & 0xF) >> 2] |= (config->pin >> 4)
                                                 << ((config->pin & 0x3) << 2);
 

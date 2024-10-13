@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "data.h"
-#include "spi/spi.h"
+#include "i2c/i2c.h"
 #include "status.h"
 
 /*
@@ -227,14 +227,14 @@ typedef enum {
 } Kx134Range;
 
 // Initalize the sensor
-Status kx134_init(SpiDevice* device, Kx134OutputDataRate rate,
+Status kx134_init(I2cDevice* device, Kx134OutputDataRate rate,
                   Kx134Range range);
 
 // Read the acceleration registers
-Accel kx134_read_accel(SpiDevice* device);
+Accel kx134_read_accel(I2cDevice* device);
 
 // Set the accelerometer range and measurement rate
-Status kx134_config(SpiDevice* device, Kx134OutputDataRate rate,
+Status kx134_config(I2cDevice* device, Kx134OutputDataRate rate,
                     Kx134Range range);
 
 #endif  // KX134_H

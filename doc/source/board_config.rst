@@ -7,7 +7,7 @@ The validity of the configuration in SRAM is verified with a checksum stored wit
 If the checksum is invalid, that implies that the SRAM must have lost power, so the config is loaded from non-volatile flash instead.
 The module also defines a default config that is loaded in case both the copy in SRAM and in flash have problems.
 
-Users of the module can get a pointer to the config object by calling :c:func:`get_config_ptr()`.
+Users of the module can get a pointer to the config object by calling :c:func:`config_get_ptr()`.
 Modifications can be made to the in-memory copy of the config through this pointer, but in order for changes to persist through a reboot, :c:func:`commit_config()` must be called.
 In order to force loading from flash, :c:func:`invalidate_config()` can be called to manually invalidate the in-memory copy of the config.
 
@@ -54,7 +54,7 @@ Types
 Functions
 ---------
 
-.. c:function:: BoardConfig* get_config_ptr()
+.. c:function:: BoardConfig* config_get_ptr()
 
     Returns a pointer to the currently loaded board configuration.
 

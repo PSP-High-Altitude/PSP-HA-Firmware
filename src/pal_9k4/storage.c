@@ -45,7 +45,7 @@ uint8_t g_usb_mode;
 /*****************/
 /* API FUNCTIONS */
 /*****************/
-Status init_storage(uint8_t usb_mode) {
+Status storage_init(uint8_t usb_mode) {
     // Set USB mode
     g_usb_mode = usb_mode;
 

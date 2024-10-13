@@ -2,6 +2,7 @@
 
 #include "backup.h"
 #include "nand_flash.h"
+#include "stdio.h"
 
 static uint32_t s_valid_config_loaded = 0;
 
@@ -37,22 +38,28 @@ static uint32_t calc_config_checksum(const BoardConfig* config) {
     return sum;
 }
 
-BoardConfig* get_config_ptr() {
+BoardConfig* config_get_ptr() {
     if (s_valid_config_loaded) {
-        return &(get_backup_ptr()->board_config);
+        return &(backup_get_ptr()->board_config);
     }
 
     return NULL;
 }
 
 // Ensure that a valid config is loaded into SRAM
-Status load_config() {
+Status config_load() {
     // Verify checksum of the config stored in  the backup SRAM
-    BoardConfig* sram_config = &(get_backup_ptr()->board_config);
+    BoardConfig* sram_config = &(backup_get_ptr()->board_config);
+    s_valid_config_loaded = 1;  // TEMP
+    config_print();
+
+    printf("%08lx\n", sram_config->checksum);
+    printf("%08lx\n", calc_config_checksum(sram_config));
 
     if (calc_config_checksum(sram_config) == sram_config->checksum) {
         // If the checksum verifies, do nothing
         s_valid_config_loaded = 1;
+        printf("Config loaded from SRAM\n");
         return STATUS_OK;
     }
 
@@ -62,6 +69,7 @@ Status load_config() {
         if (calc_config_checksum(sram_config) == sram_config->checksum) {
             // If the checksum verifies, we're done
             s_valid_config_loaded = 2;
+            printf("Config loaded from flash\n");
             return STATUS_OK;
         }
     }
@@ -70,17 +78,20 @@ Status load_config() {
     *sram_config = s_default_config;
     sram_config->checksum = calc_config_checksum(sram_config);
     s_valid_config_loaded = 3;
+    printf("Config loaded from defaults\n");
 
     return STATUS_OK;
 }
 
 // Save changes to the config by updating checksum and storing to flash
-Status commit_config() {
-    BoardConfig* sram_config = &(get_backup_ptr()->board_config);
+Status config_commit() {
+    BoardConfig* sram_config = &(backup_get_ptr()->board_config);
     sram_config->checksum = calc_config_checksum(sram_config);
 
     ASSERT_OK(nand_flash_store_board_config(sram_config),
               "failed to store config to flash");
+
+    printf("Config committed to flash\n");
 
     s_valid_config_loaded = 2;
 
@@ -88,9 +99,28 @@ Status commit_config() {
 }
 
 // Force next load to load from NAND by invalidating SRAM copy
-Status invalidate_config() {
-    get_backup_ptr()->board_config.checksum ^= -1;
+Status config_invalidate() {
+    printf("Invalidating config\n");
+    backup_get_ptr()->board_config.checksum ^= -1;
     s_valid_config_loaded = 0;
 
     return STATUS_OK;
+}
+
+void config_print() {
+    BoardConfig* config = config_get_ptr();
+    printf("===== BOARD CONFIG =====\n");
+    printf("Control loop period: %lu ms\n", config->control_loop_period_ms);
+    printf("Sensor loop period: %lu ms\n", config->sensor_loop_period_ms);
+    printf("State init time: %lu ms\n", config->state_init_time_ms);
+    printf("Launch detect period: %lu ms\n", config->launch_detect_period_ms);
+    printf("Launch detect replay: %d\n", config->launch_detect_replay);
+    printf("Min fast vel: %f m/s\n", config->min_fast_vel_mps);
+    printf("Min boost acc: %f m/s^2\n", config->min_boost_acc_mps2);
+    printf("Max coast acc: %f m/s^2\n", config->max_coast_acc_mps2);
+    printf("Main height: %f m\n", config->main_height_m);
+    printf("Drogue delay: %lu ms\n", config->drogue_delay_ms);
+    printf("Deploy lockout: %lu ms\n", config->deploy_lockout_ms);
+    printf("Checksum: %08lx\n", config->checksum);
+    printf("========================\n");
 }

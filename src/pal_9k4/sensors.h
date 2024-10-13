@@ -12,7 +12,7 @@
 #define GPS_NORMAL_READ_INTERVAL_MS 100
 #define GPS_SLEEP_READ_INTERVAL_MS 10000
 
-Status init_sensors();
+Status sensors_init();
 
 void pause_sensors();
 void start_sensors();

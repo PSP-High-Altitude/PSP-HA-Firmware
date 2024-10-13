@@ -7,6 +7,7 @@
 #include "buttons.h"
 #include "fifos.h"
 #include "main.h"
+#include "nand_flash.h"
 #include "pb_create.h"
 #include "rtc.h"
 #include "stdio.h"
@@ -28,9 +29,17 @@ static QueueHandle_t s_gps_queue;
 
 static QueueSetHandle_t s_queue_set;
 
+static bool s_pause_store = false;
+
 static char s_logfile_path[64];
+static char s_sensfile_path[64];
+static char s_statefile_path[64];
+static char s_gpsfile_path[64];
 extern int g_nand_ready;
 static FIL s_logfile;
+static FIL s_sensfile;
+static FIL s_statefile;
+static FIL s_gpsfile;
 
 static uint8_t s_log_buffer[1024];
 static FIFO_t s_log_fifo = {
@@ -47,16 +56,42 @@ static FIFO_t s_log_fifo = {
 /*****************/
 static void storage_pause_event_handler() {
     // Handle button press
-    nand_flash_close_file(&s_logfile);
+    uint32_t debounce_val = 0x55555555;
+    uint64_t start_time = MILLIS();
+
+    // Debounce the button press (with a timeout)
+    while (debounce_val != 0x0 && debounce_val != 0xFFFFFFFF) {
+        // Timeout
+        if (MILLIS() - start_time >= 100) {
+            start_storage();  // Default to keeping storage running
+            return;
+        }
+
+        GpioValue pause_val = gpio_read(PIN_PAUSE);
+        if (pause_val == GPIO_ERR) return;
+
+        debounce_val = (debounce_val << 1) | pause_val;
+        DELAY_MICROS(100);
+    }
+
+    // Decide what to do based on the button transition
+    if (debounce_val) {
+        pause_storage();
+    } else {
+        start_storage();
+    }
 }
 
-Status init_storage() {
+Status storage_init() {
     // Initialize FATFS
     ASSERT_OK(diskio_init(NULL), "diskio init");
     ASSERT_OK(nand_flash_init(), "nand init");
 
+    // Initialize config
+    ASSERT_OK(config_load(), "load config");
+
     // Initialize config ptr
-    s_config_ptr = get_config_ptr();
+    s_config_ptr = config_get_ptr();
     if (s_config_ptr == NULL) {
         ASSERT_OK(STATUS_STATE_ERROR, "unable to get ptr to config\n");
     }
@@ -129,10 +164,28 @@ Status init_storage() {
     // Create the file paths
     sprintf(s_logfile_path, DATA_DIR "/log_%04ld-%02ld-%02ld-%d.txt", dt.year,
             dt.month, dt.day, max_num + 1);
+    sprintf(s_sensfile_path, DATA_DIR "/dat_%04ld-%02ld-%02ld-%d.txt", dt.year,
+            dt.month, dt.day, max_num + 1);
+    sprintf(s_statefile_path, DATA_DIR "/fsl_%04ld-%02ld-%02ld-%d.txt", dt.year,
+            dt.month, dt.day, max_num + 1);
+    sprintf(s_gpsfile_path, DATA_DIR "/gps_%04ld-%02ld-%02ld-%d.txt", dt.year,
+            dt.month, dt.day, max_num + 1);
 
-    // Open logfile if we are not in MTP mode
-    if (!get_backup_ptr()->flag_mtp_pressed) {
+    // Open files if we are not in MTP mode
+    if (!backup_get_ptr()->flag_mtp_pressed) {
         if (nand_flash_open_binary_file(&s_logfile, s_logfile_path) !=
+            STATUS_OK) {
+            return STATUS_ERROR;
+        }
+        if (nand_flash_open_binary_file(&s_sensfile, s_sensfile_path) !=
+            STATUS_OK) {
+            return STATUS_ERROR;
+        }
+        if (nand_flash_open_binary_file(&s_statefile, s_statefile_path) !=
+            STATUS_OK) {
+            return STATUS_ERROR;
+        }
+        if (nand_flash_open_binary_file(&s_gpsfile, s_gpsfile_path) !=
             STATUS_OK) {
             return STATUS_ERROR;
         }
@@ -172,10 +225,10 @@ Status queue_gps_for_storage(const GpsFrame* gps_frame) {
     return STATUS_OK;
 }
 
-void storage_task() {
+void task_storage(TaskHandle_t* handle_ptr) {
     // Initialize LEDs
-    // gpio_write(PIN_YELLOW, GPIO_LOW);
-    // gpio_write(PIN_GREEN, GPIO_LOW);
+    gpio_write(PIN_YELLOW, GPIO_LOW);
+    gpio_write(PIN_GREEN, GPIO_LOW);
 
     while (1) {
         uint64_t iteration_start_ms = MILLIS();
@@ -197,7 +250,8 @@ void storage_task() {
                 size_t sensor_buf_size;
                 pb_byte_t* sensor_buf =
                     create_sensor_buffer(&sensor_frame, &sensor_buf_size);
-                nand_flash_write_sensor_data(sensor_buf, sensor_buf_size);
+                nand_flash_write_binary_data(&s_sensfile, sensor_buf,
+                                             sensor_buf_size);
             } else if (activated_queue == s_state_queue) {
                 StateFrame state_frame;
                 xQueueReceive(s_state_queue, &state_frame, 0);
@@ -205,7 +259,8 @@ void storage_task() {
                 size_t state_buf_size;
                 pb_byte_t* state_buf =
                     create_state_buffer(&state_frame, &state_buf_size);
-                nand_flash_write_state_data(state_buf, state_buf_size);
+                nand_flash_write_binary_data(&s_statefile, state_buf,
+                                             state_buf_size);
             } else if (activated_queue == s_gps_queue) {
                 GpsFrame gps_frame;
                 xQueueReceive(s_gps_queue, &gps_frame, 0);
@@ -213,47 +268,73 @@ void storage_task() {
                 size_t gps_buf_size;
                 pb_byte_t* gps_buf =
                     create_gps_buffer(&gps_frame, &gps_buf_size);
-                nand_flash_write_gps_data(gps_buf, gps_buf_size);
+                nand_flash_write_binary_data(&s_gpsfile, gps_buf, gps_buf_size);
             } else {
                 // Should print an error but don't want to spam log
             }
-        }
 
-        // Set disk activity warning LED
-        // gpio_write(PIN_YELLOW, GPIO_HIGH);
+            // Set disk activity warning LED
+            gpio_write(PIN_YELLOW, GPIO_HIGH);
 
-        // Flush everything to disk
-        Status flush_status = EXPECT_OK(nand_flash_flush(), "NAND flush");
-        // gpio_write(PIN_GREEN, flush_status == STATUS_OK);
+            // Flush everything to disk
+            Status flush_status =
+                EXPECT_OK(nand_flash_flush(&s_sensfile), "Sensor flush");
+            UPDATE_STATUS(
+                flush_status,
+                EXPECT_OK(nand_flash_flush(&s_statefile), "State flush"));
+            UPDATE_STATUS(flush_status,
+                          EXPECT_OK(nand_flash_flush(&s_gpsfile), "GPS flush"));
+            UPDATE_STATUS(flush_status,
+                          EXPECT_OK(nand_flash_flush(&s_logfile), "Log flush"));
+            gpio_write(PIN_GREEN, flush_status == STATUS_OK);
 
-        // Unset disk activity warning LED
-        // gpio_write(PIN_YELLOW, GPIO_LOW);
+            // Unset disk activity warning LED
+            gpio_write(PIN_YELLOW, GPIO_LOW);
 
-        // Check if the pause flag is set
-        if (s_pause_store) {
-            // Gather and dump stats
-            char prf_buf[1024];  // 40 bytes per task
-            printf("Dumping prf stats\n");
-            vTaskGetRunTimeStats(prf_buf);
-            sd_dump_prf_stats(prf_buf);
-            nand_flash_dump_prf_stats(prf_buf);
-            printf(prf_buf);
+            // Check if the pause flag is set
+            if (s_pause_store) {
+                // Gather and dump stats
+                char prf_buf[1024];  // 40 bytes per task
+                printf("Dumping prf stats\n");
+                vTaskGetRunTimeStats(prf_buf);
+                sd_dump_prf_stats(prf_buf);
+                nand_flash_dump_prf_stats(prf_buf);
+                printf(prf_buf);
 
-            // Unmount filesystem
-            nand_flash_deinit();
-            printf("Unmounted filesystem\n");
+                // Unmount filesystem
+                nand_flash_deinit();
+                printf("Unmounted filesystem\n");
 
-            // Blink the green LED while waiting
-            while (s_pause_store) {
-                // gpio_write(PIN_GREEN, GPIO_HIGH);
-                DELAY(500);
-                // gpio_write(PIN_GREEN, GPIO_LOW);
-                DELAY(500);
+                // Blink the green LED while waiting
+                while (s_pause_store) {
+                    gpio_write(PIN_GREEN, GPIO_HIGH);
+                    DELAY(500);
+                    gpio_write(PIN_GREEN, GPIO_LOW);
+                    DELAY(500);
+                }
+
+                // Remount filesystem
+                printf("Remounting filesystem\n");
+                nand_flash_reinit();
+
+                // Reopen files
+                if (nand_flash_open_binary_file(&s_logfile, s_logfile_path) !=
+                    STATUS_OK) {
+                    printf("Failed to reopen log file\n");
+                }
+                if (nand_flash_open_binary_file(&s_sensfile, s_sensfile_path) !=
+                    STATUS_OK) {
+                    printf("Failed to reopen sensor file\n");
+                }
+                if (nand_flash_open_binary_file(
+                        &s_statefile, s_statefile_path) != STATUS_OK) {
+                    printf("Failed to reopen state file\n");
+                }
+                if (nand_flash_open_binary_file(&s_gpsfile, s_gpsfile_path) !=
+                    STATUS_OK) {
+                    printf("Failed to reopen gps file\n");
+                }
             }
-
-            // Remount SD card
-            printf("Remounting filesystem\n");
-            nand_flash_reinit();
         }
     }
 }

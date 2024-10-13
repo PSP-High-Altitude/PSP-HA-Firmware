@@ -77,6 +77,7 @@
 #define configUSE_RECURSIVE_MUTEXES 1
 #define configUSE_COUNTING_SEMAPHORES 1
 #define configUSE_PORT_OPTIMISED_TASK_SELECTION 0
+#define configUSE_QUEUE_SETS 1
 
   // Added stuff BEGIN
   extern uint64_t MICROS();
@@ -108,7 +109,7 @@
 #define configUSE_TIMERS 1
 #define configTIMER_TASK_PRIORITY (2)
 #define configTIMER_QUEUE_LENGTH 10
-#define configTIMER_TASK_STACK_DEPTH 256
+#define configTIMER_TASK_STACK_DEPTH 512
 
   /* The following flag must be enabled only when using newlib */
   // #define configUSE_NEWLIB_REENTRANT          1

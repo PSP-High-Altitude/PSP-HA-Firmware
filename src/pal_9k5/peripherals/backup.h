@@ -19,6 +19,6 @@ _Static_assert(sizeof(Backup) < BKPSRAM_SIZE, "Backup does not fit in BKPSRAM");
 
 Status backup_init();
 
-Backup* get_backup_ptr();
+Backup* backup_get_ptr();
 
 #endif  // BACKUP_H
