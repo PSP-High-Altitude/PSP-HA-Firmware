@@ -41,10 +41,10 @@ static FIL s_sensfile;
 static FIL s_statefile;
 static FIL s_gpsfile;
 
-static uint8_t s_log_buffer[1024];
+static uint8_t s_log_buffer[4096];
 static FIFO_t s_log_fifo = {
     .buffer = s_log_buffer,
-    .size = 1024,
+    .size = 4096,
     .circ = 0,
     .head = 0,
     .tail = 0,
@@ -251,6 +251,10 @@ void task_storage(TaskHandle_t* handle_ptr) {
             QueueSetMemberHandle_t activated_queue =
                 xQueueSelectFromSet(s_queue_set, max_wait_ticks);
 
+            int nmessages = uxQueueMessagesWaiting(s_sensor_queue);
+            nmessages += uxQueueMessagesWaiting(s_state_queue);
+            nmessages += uxQueueMessagesWaiting(s_gps_queue);
+
             // Receive from the selected queue and store it
             if (activated_queue == s_sensor_queue) {
                 SensorFrame sensor_frame;
@@ -285,6 +289,8 @@ void task_storage(TaskHandle_t* handle_ptr) {
             // Set disk activity warning LED
             gpio_write(PIN_YELLOW, GPIO_HIGH);
 
+            uint64_t start = MICROS();
+
             // Flush everything to disk
             Status flush_status =
                 EXPECT_OK(nand_flash_flush(&s_sensfile), "Sensor flush");
@@ -295,6 +301,10 @@ void task_storage(TaskHandle_t* handle_ptr) {
                           EXPECT_OK(nand_flash_flush(&s_gpsfile), "GPS flush"));
             UPDATE_STATUS(flush_status,
                           EXPECT_OK(nand_flash_flush(&s_logfile), "Log flush"));
+
+            PAL_LOGI("Flush of %d items took %lu us\n", nmessages,
+                     (uint32_t)(MICROS() - start));
+
             gpio_write(PIN_GREEN, flush_status == STATUS_OK);
 
             // Unset disk activity warning LED
@@ -339,7 +349,7 @@ void task_storage(TaskHandle_t* handle_ptr) {
 Status storage_write_log(const char* log, size_t size) {
     // Not ready yet, queue the log
     if (!g_nand_ready) {
-        fifo_enqueuen(&s_log_fifo, (uint8_t*)log, size - 1);
+        fifo_enqueuen(&s_log_fifo, (uint8_t*)log, size);
         return STATUS_OK;
     }
 
@@ -358,7 +368,7 @@ Status storage_write_log(const char* log, size_t size) {
 
     // Write the new log to the NAND flash
     Status status =
-        nand_flash_write_binary_data(&s_logfile, (uint8_t*)log, size - 1);
+        nand_flash_write_binary_data(&s_logfile, (uint8_t*)log, size);
 
     return status;
 }

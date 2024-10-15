@@ -8,7 +8,7 @@
 
 Status usb_init();
 
-void usb_device_task(void *param);
+void task_usb(void *param);
 
 extern int _write(int file, char *data, int len);
 

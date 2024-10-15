@@ -41,12 +41,6 @@ Status usb_init() {
     NVIC_SetPriority(OTG_HS_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY);
 
     USB_OTG_HS->GCCFG &= ~USB_OTG_GCCFG_VBDEN;
-
-    // Init USB stack
-    if (xTaskCreate(usb_device_task, "usb_device_task", 4096, NULL,
-                    tskIDLE_PRIORITY + 1, &s_usb_device_handle) != pdPASS) {
-        return STATUS_ERROR;
-    }
 #endif
     return STATUS_OK;
 }
@@ -114,6 +108,10 @@ void tud_cdc_rx_cb(uint8_t itf) {
     Regex regex_get_datetime;
     regexCompile(&regex_get_datetime, "^get_datetime[\n]*$");
 
+    // Help command
+    Regex regex_invalidate_config;
+    regexCompile(&regex_invalidate_config, "^invalidate_config[\n]*$");
+
     // Test all commands
     Matcher match = regexMatch(&regex_help, str);
     if (match.isFound) {
@@ -121,7 +119,8 @@ void tud_cdc_rx_cb(uint8_t itf) {
             "Commands:\n"
             "  help                                  this command\n"
             "  set_datetime YYYY-MM-DD HH:MM:SS      sets the RTC time\n"
-            "  get_datetime                          gets the RTC time\n");
+            "  get_datetime                          gets the RTC time\n"
+            "  invalidate_config                     invalidates the config\n");
         free(str);
         return;
     }
@@ -144,9 +143,15 @@ void tud_cdc_rx_cb(uint8_t itf) {
         free(str);
         return;
     }
+    match = regexMatch(&regex_invalidate_config, str);
+    if (match.isFound) {
+        config_invalidate();
+        free(str);
+        return;
+    }
 }
 
-void usb_device_task(void *param) {
+void task_usb(void *param) {
     (void)param;
 
     // Configure DM DP Pins

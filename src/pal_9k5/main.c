@@ -108,19 +108,21 @@ void init_task() {
 
     PAL_LOGI("Initialization complete\n");
 
-    TASK_CREATE(buzzer_task, +1, 512);
+    TASK_CREATE(buzzer_task, +4, 512);
     if (!mtp_mode) {
         // Start tasks if we are in normal mode
         PAL_LOGI("Launching flight tasks\n");
         // TASK_CREATE(pyros_task, +7, 2048);
-        TASK_CREATE(task_sensors, +6, 2048);
-        // TASK_CREATE(state_est_task, +5, 2048);
+        TASK_CREATE(task_control, +6, 2048);
+        TASK_CREATE(task_sensors, +5, 2048);
         // TASK_CREATE(pspcom_process_bytes, +4, 2048);
         // TASK_CREATE(pspcom_send_standard, +3, 2048);
         TASK_CREATE(task_gps, +3, 2048);
         TASK_CREATE(task_storage, +2, 4096);
+        TASK_CREATE(task_usb, +1, 4096);
     } else {
         PAL_LOGI("Started USB MSC mode\n");
+        TASK_CREATE(task_usb, +1, 4096);
     }
 
 #ifdef DEBUG_MEMORY_USAGE
@@ -131,9 +133,7 @@ void init_task() {
 
     while (1) {
         // rtc_print_datetime();
-        sensors_start_read();
-        DELAY(1000);
-        // DELAY(0xFFFF);
+        DELAY(0xFFFF);
     }
 }
 

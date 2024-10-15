@@ -57,6 +57,7 @@ Status config_load() {
         // If the checksum verifies, do nothing
         s_valid_config_loaded = 1;
         PAL_LOGI("Config loaded from SRAM\n");
+        config_print();
         return STATUS_OK;
     }
 
@@ -67,6 +68,7 @@ Status config_load() {
             // If the checksum verifies, we're done
             s_valid_config_loaded = 2;
             PAL_LOGI("Config loaded from flash\n");
+            config_print();
             return STATUS_OK;
         }
     }

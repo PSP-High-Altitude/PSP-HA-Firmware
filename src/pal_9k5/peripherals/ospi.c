@@ -462,6 +462,7 @@ Status ospi_write(OSpiDevice* dev, OSpiCommand* cmd, uint8_t* tx_buf,
         if (MILLIS() - start_time > timeout) {
             return STATUS_TIMEOUT_ERROR;
         }
+        DELAY(0);
     }
     return STATUS_OK;
 }
@@ -480,6 +481,7 @@ Status ospi_read(OSpiDevice* dev, OSpiCommand* cmd, uint8_t* rx_buf,
         if (MILLIS() - start_time > timeout) {
             return STATUS_TIMEOUT_ERROR;
         }
+        DELAY(0);
     }
     return STATUS_OK;
 }
