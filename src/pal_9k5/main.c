@@ -92,6 +92,9 @@ void init_task() {
 
     // Play init tune
     gpio_write(PIN_RED, GPIO_LOW);
+    gpio_write(PIN_YELLOW, GPIO_LOW);
+    gpio_write(PIN_GREEN, GPIO_LOW);
+    gpio_write(PIN_BLUE, GPIO_LOW);
     buzzer_play(BUZZER_SOUND_INIT);
     // buzzer_play(BUZZER_SOUND_SONG);
 
@@ -132,8 +135,21 @@ void init_task() {
     xTaskResumeAll();
 
     while (1) {
-        // rtc_print_datetime();
-        DELAY(0xFFFF);
+        if (mtp_mode) {
+            gpio_write(PIN_RED, GPIO_HIGH);
+            gpio_write(PIN_YELLOW, GPIO_HIGH);
+            gpio_write(PIN_GREEN, GPIO_HIGH);
+            gpio_write(PIN_BLUE, GPIO_HIGH);
+            DELAY(1000);
+            gpio_write(PIN_RED, GPIO_LOW);
+            gpio_write(PIN_YELLOW, GPIO_LOW);
+            gpio_write(PIN_GREEN, GPIO_LOW);
+            gpio_write(PIN_BLUE, GPIO_LOW);
+            DELAY(1000);
+        } else {
+            // rtc_print_datetime();
+            DELAY(0xFFFF);
+        }
     }
 }
 

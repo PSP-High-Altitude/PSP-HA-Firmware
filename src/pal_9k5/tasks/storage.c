@@ -242,6 +242,9 @@ void task_storage(TaskHandle_t* handle_ptr) {
     while (1) {
         uint64_t iteration_start_ms = MILLIS();
 
+        // Set disk activity warning LED
+        gpio_write(PIN_YELLOW, GPIO_HIGH);
+
         while (MILLIS() - iteration_start_ms <
                s_config_ptr->storage_loop_period_ms) {
             // Wait for something to be pushed to a queue
@@ -250,10 +253,6 @@ void task_storage(TaskHandle_t* handle_ptr) {
                               s_config_ptr->storage_loop_period_ms - MILLIS());
             QueueSetMemberHandle_t activated_queue =
                 xQueueSelectFromSet(s_queue_set, max_wait_ticks);
-
-            int nmessages = uxQueueMessagesWaiting(s_sensor_queue);
-            nmessages += uxQueueMessagesWaiting(s_state_queue);
-            nmessages += uxQueueMessagesWaiting(s_gps_queue);
 
             // Receive from the selected queue and store it
             if (activated_queue == s_sensor_queue) {
@@ -285,62 +284,60 @@ void task_storage(TaskHandle_t* handle_ptr) {
             } else {
                 // Should print an error but don't want to spam log
             }
+        }
 
-            // Set disk activity warning LED
-            gpio_write(PIN_YELLOW, GPIO_HIGH);
+        uint64_t start = MICROS();
 
-            uint64_t start = MICROS();
+        int nmessages = uxQueueMessagesWaiting(s_sensor_queue);
+        nmessages += uxQueueMessagesWaiting(s_state_queue);
+        nmessages += uxQueueMessagesWaiting(s_gps_queue);
 
-            // Flush everything to disk
-            Status flush_status =
-                EXPECT_OK(nand_flash_flush(&s_sensfile), "Sensor flush");
-            UPDATE_STATUS(
-                flush_status,
-                EXPECT_OK(nand_flash_flush(&s_statefile), "State flush"));
-            UPDATE_STATUS(flush_status,
-                          EXPECT_OK(nand_flash_flush(&s_gpsfile), "GPS flush"));
-            UPDATE_STATUS(flush_status,
-                          EXPECT_OK(nand_flash_flush(&s_logfile), "Log flush"));
+        // Flush everything to disk
+        Status flush_status =
+            EXPECT_OK(nand_flash_flush(&s_sensfile), "Sensor flush");
+        UPDATE_STATUS(flush_status,
+                      EXPECT_OK(nand_flash_flush(&s_statefile), "State flush"));
+        UPDATE_STATUS(flush_status,
+                      EXPECT_OK(nand_flash_flush(&s_gpsfile), "GPS flush"));
+        UPDATE_STATUS(flush_status,
+                      EXPECT_OK(nand_flash_flush(&s_logfile), "Log flush"));
 
-            PAL_LOGI("Flush of %d items took %lu us\n", nmessages,
-                     (uint32_t)(MICROS() - start));
+        PAL_LOGI("Flush of %d items took %lu us\n", nmessages,
+                 (uint32_t)(MICROS() - start));
 
-            gpio_write(PIN_GREEN, flush_status == STATUS_OK);
+        gpio_write(PIN_GREEN, flush_status == STATUS_OK);
 
-            // Unset disk activity warning LED
-            gpio_write(PIN_YELLOW, GPIO_LOW);
+        // Unset disk activity warning LED
+        gpio_write(PIN_YELLOW, GPIO_LOW);
 
-            // Check if the pause flag is set
-            if (s_pause_store) {
-                // Gather and dump stats
-                char prf_buf[1024];  // 40 bytes per task
-                PAL_LOGI("Dumping prf stats\n");
-                vTaskGetRunTimeStats(prf_buf);
-                sd_dump_prf_stats(prf_buf);
-                nand_flash_dump_prf_stats(prf_buf);
-                printf(prf_buf);
+        // Check if the pause flag is set
+        if (s_pause_store) {
+            // Gather and dump stats
+            char prf_buf[1024];  // 40 bytes per task
+            PAL_LOGI("Dumping prf stats\n");
+            vTaskGetRunTimeStats(prf_buf);
+            PAL_LOGI("%s\n", prf_buf);
 
-                // Unmount filesystem
-                nand_flash_deinit();
-                PAL_LOGI("Unmounted filesystem\n");
+            // Unmount filesystem
+            nand_flash_deinit();
+            PAL_LOGI("Unmounted filesystem\n");
 
-                // Blink the green LED while waiting
-                while (s_pause_store) {
-                    gpio_write(PIN_GREEN, GPIO_HIGH);
-                    DELAY(500);
-                    gpio_write(PIN_GREEN, GPIO_LOW);
-                    DELAY(500);
-                }
+            // Blink the green LED while waiting
+            while (s_pause_store) {
+                gpio_write(PIN_GREEN, GPIO_HIGH);
+                DELAY(500);
+                gpio_write(PIN_GREEN, GPIO_LOW);
+                DELAY(500);
+            }
 
-                // Remount filesystem
-                PAL_LOGI("Remounting filesystem\n");
-                nand_flash_reinit();
+            // Remount filesystem
+            PAL_LOGI("Remounting filesystem\n");
+            nand_flash_reinit();
 
-                // Open new files
-                if (storage_open_files() != STATUS_OK) {
-                    PAL_LOGE("Error opening new files\n");
-                    continue;
-                }
+            // Open new files
+            if (storage_open_files() != STATUS_OK) {
+                PAL_LOGE("Error opening new files\n");
+                continue;
             }
         }
     }
