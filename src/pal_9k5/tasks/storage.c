@@ -242,7 +242,7 @@ void task_storage(TaskHandle_t* handle_ptr) {
     while (1) {
         uint64_t iteration_start_ms = MILLIS();
 
-        while (MILLIS() - iteration_start_ms >
+        while (MILLIS() - iteration_start_ms <
                s_config_ptr->storage_loop_period_ms) {
             // Wait for something to be pushed to a queue
             TickType_t max_wait_ticks =
