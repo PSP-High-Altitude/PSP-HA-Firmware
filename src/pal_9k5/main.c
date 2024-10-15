@@ -15,6 +15,7 @@
 #include "stm32h7xx.h"
 #include "tasks/buzzer.h"
 #include "tasks/control.h"
+#include "tasks/gps.h"
 #include "tasks/sensors.h"
 #include "tasks/storage.h"
 #include "timer.h"
@@ -116,7 +117,7 @@ void init_task() {
         // TASK_CREATE(state_est_task, +5, 2048);
         // TASK_CREATE(pspcom_process_bytes, +4, 2048);
         // TASK_CREATE(pspcom_send_standard, +3, 2048);
-        // TASK_CREATE(read_gps_task, +3, 2048);
+        TASK_CREATE(task_gps, +3, 2048);
         TASK_CREATE(task_storage, +2, 4096);
     } else {
         PAL_LOGI("Started USB MSC mode\n");

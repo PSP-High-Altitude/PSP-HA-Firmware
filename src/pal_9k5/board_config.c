@@ -7,8 +7,10 @@
 static uint32_t s_valid_config_loaded = 0;
 
 const static BoardConfig s_default_config = {
-    .control_loop_period_ms = 10,  // ms
-    .sensor_loop_period_ms = 100,  // ms
+    .control_loop_period_ms = 10,    // ms
+    .sensor_loop_period_ms = 100,    // ms
+    .storage_loop_period_ms = 1000,  // ms
+    .gps_loop_period_ms = 500,       // ms
 
     // State estimation settings
     .state_init_time_ms = 10000,     // ms

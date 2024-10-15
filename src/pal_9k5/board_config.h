@@ -13,6 +13,8 @@ typedef struct {
     uint32_t sensor_loop_period_ms;
     // period in ms between file system flushes and pause request checks
     uint32_t storage_loop_period_ms;
+    // period in ms between polling the GPS
+    uint32_t gps_loop_period_ms;
 
     /* STATE ESTIMATION SETTINGS */
     // time in ms during which a baseline value for the sensors is determined
