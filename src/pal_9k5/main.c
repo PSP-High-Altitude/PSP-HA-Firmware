@@ -67,12 +67,12 @@ uint8_t mtp_mode = 0;
  * After initialization, this task runs periodically to perform
  * maintenance functions and handle outside events.
  */
-void init_task() {
+void task_init() {
     // Suspend all tasks until initialization is complete
     vTaskSuspendAll();
 
     uint32_t init_error = 0;  // Set if error occurs during initialization
-    uint32_t num_inits = 4;   // Number of inits the error code refers to
+    uint32_t num_inits = 5;   // Number of inits the error code refers to
 
     mtp_mode = backup_get_ptr()->flag_mtp_pressed;
 
@@ -175,7 +175,7 @@ int main(void) {
     gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLUP);
 
     // Launch FreeRTOS kernel and init task
-    TASK_CREATE(init_task, -1, 8192);
+    TASK_CREATE(task_init, -1, 8192);
 
     PAL_LOGI("Starting scheduler\n");
 
