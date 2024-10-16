@@ -224,8 +224,11 @@ void buzzer_task() {
     }
 
     while (1) {
+        // Receive a sound to play
         BuzzerSound sound;
-        xQueueReceive(buzzer_queue, &sound, 0xFFFF);
+        BaseType_t ret = xQueueReceive(buzzer_queue, &sound, 0xFFFF);
+        if (ret != pdPASS) continue;
+
         switch (sound) {
             case BUZZER_SOUND_BEEP:
                 sound_beep(200);

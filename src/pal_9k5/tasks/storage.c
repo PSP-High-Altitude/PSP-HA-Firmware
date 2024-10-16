@@ -286,12 +286,6 @@ void task_storage(TaskHandle_t* handle_ptr) {
             }
         }
 
-        uint64_t start = MICROS();
-
-        int nmessages = uxQueueMessagesWaiting(s_sensor_queue);
-        nmessages += uxQueueMessagesWaiting(s_state_queue);
-        nmessages += uxQueueMessagesWaiting(s_gps_queue);
-
         // Flush everything to disk
         Status flush_status =
             EXPECT_OK(nand_flash_flush(&s_sensfile), "Sensor flush");
@@ -301,9 +295,6 @@ void task_storage(TaskHandle_t* handle_ptr) {
                       EXPECT_OK(nand_flash_flush(&s_gpsfile), "GPS flush"));
         UPDATE_STATUS(flush_status,
                       EXPECT_OK(nand_flash_flush(&s_logfile), "Log flush"));
-
-        PAL_LOGI("Flush of %d items took %lu us\n", nmessages,
-                 (uint32_t)(MICROS() - start));
 
         gpio_write(PIN_GREEN, flush_status == STATUS_OK);
 
