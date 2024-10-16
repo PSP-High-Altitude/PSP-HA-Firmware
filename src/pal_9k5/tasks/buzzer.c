@@ -57,9 +57,7 @@ Status buzzer_init() {
 
     // Configure queue
     buzzer_queue = xQueueCreate(BUZZER_QUEUE_LEN, sizeof(BuzzerSound));
-    if (buzzer_queue == NULL) {
-        return STATUS_ERROR;
-    }
+    configASSERT(buzzer_queue);
 
     return STATUS_OK;
 }
@@ -211,24 +209,21 @@ static void sound_song() {
 }
 
 void buzzer_play(BuzzerSound sound) {
-    if (buzzer_queue == NULL) {
+    // Initialize if not initialized
+    if (tim15_handle.State == 0) {
         buzzer_init();
-        return;
     }
+
     xQueueSend(buzzer_queue, &sound, 0);
 }
 
 void buzzer_task() {
-    if (buzzer_queue == NULL) {
-        return;
-    }
+    BuzzerSound sound;
 
     while (1) {
-        // Receive a sound to play
-        BuzzerSound sound;
-        BaseType_t ret = xQueueReceive(buzzer_queue, &sound, 0xFFFF);
-        if (ret != pdPASS) continue;
-
+        if (xQueueReceive(buzzer_queue, &sound, 0xFFFFFFFF) != pdPASS) {
+            continue;
+        }
         switch (sound) {
             case BUZZER_SOUND_BEEP:
                 sound_beep(200);

@@ -19,13 +19,17 @@ Status nand_flash_deinit();
 
 Status nand_flash_flush(FIL* fp);
 
-Status nand_flash_write_binary_data(FIL* fp, uint8_t* data, size_t size);
+Status nand_flash_read_data(FIL* fp, uint8_t* data, size_t size);
+
+Status nand_flash_write_data(FIL* fp, uint8_t* data, size_t size);
 
 Status nand_flash_raw_write(const BYTE* buff, LBA_t sector, UINT count);
 
 Status nand_flash_raw_read(BYTE* buff, LBA_t sector, UINT count);
 
-Status nand_flash_open_binary_file(FIL* fp, const char* fname);
+Status nand_flash_open_file_for_write(FIL* fp, const char* fname);
+
+Status nand_flash_open_file_for_read(FIL* fp, const char* fname);
 
 Status nand_flash_close_file(FIL* fp);
 
@@ -36,10 +40,6 @@ char** nand_flash_get_file_list(const char* path, size_t* num_files);
 Status nand_flash_delete_file_list(char** file_list, size_t num_files);
 
 Status nand_flash_dump_prf_stats(char stats[]);
-
-Status nand_flash_load_board_config(BoardConfig* board_config);
-
-Status nand_flash_store_board_config(BoardConfig* board_config);
 
 void nand_flash_capacity(uint32_t* block_count, uint16_t* block_size);
 

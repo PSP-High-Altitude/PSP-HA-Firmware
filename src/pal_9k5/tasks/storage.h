@@ -10,7 +10,10 @@
 #include "FreeRTOS.h"
 #include "task.h"
 
-#define DATA_DIR "/data"
+#define LOG_DIR "/log"
+#define SENSOR_DIR "/sensor"
+#define STATE_DIR "/state"
+#define GPS_DIR "/gps"
 
 // Queue lengths
 #define SENSOR_QUEUE_LENGTH (256UL)

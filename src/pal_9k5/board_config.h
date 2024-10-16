@@ -6,6 +6,9 @@
 
 #include "status.h"
 
+#define CONFIG_DIR "/config"
+#define CONFIG_FILENAME "board.conf"
+
 typedef struct {
     // period in ms between state estimation update steps
     uint32_t control_loop_period_ms;

@@ -6,6 +6,9 @@
 
 static uint32_t s_valid_config_loaded = 0;
 
+static FIL s_configfile;
+static char s_configfile_path[] = CONFIG_DIR "/" CONFIG_FILENAME;
+
 const static BoardConfig s_default_config = {
     .control_loop_period_ms = 10,    // ms
     .sensor_loop_period_ms = 100,    // ms
@@ -40,6 +43,20 @@ static uint32_t calc_config_checksum(const BoardConfig* config) {
     return sum;
 }
 
+static Status load_config_from_flash(BoardConfig* config) {
+    ASSERT_OK(nand_flash_open_file_for_read(&s_configfile, s_configfile_path),
+              "failed to open config file\n");
+
+    ASSERT_OK(nand_flash_read_data(&s_configfile, (uint8_t*)config,
+                                   sizeof(BoardConfig)),
+              "failed to read data from config file\n");
+
+    EXPECT_OK(nand_flash_close_file(&s_configfile),
+              "failed to close config file\n");
+
+    return STATUS_OK;
+}
+
 BoardConfig* config_get_ptr() {
     if (s_valid_config_loaded) {
         return &(backup_get_ptr()->board_config);
@@ -62,7 +79,7 @@ Status config_load() {
     }
 
     // Otherwise, load the config from flash
-    if (nand_flash_load_board_config(sram_config) == STATUS_OK) {
+    if (load_config_from_flash(sram_config) == STATUS_OK) {
         // Verify checksum of the config we just loaded
         if (calc_config_checksum(sram_config) == sram_config->checksum) {
             // If the checksum verifies, we're done
@@ -89,8 +106,17 @@ Status config_commit() {
     BoardConfig* sram_config = &(backup_get_ptr()->board_config);
     sram_config->checksum = calc_config_checksum(sram_config);
 
-    ASSERT_OK(nand_flash_store_board_config(sram_config),
-              "failed to store config to flash");
+    ASSERT_OK(nand_flash_mkdir(CONFIG_DIR), "failed to create config dir\n");
+
+    ASSERT_OK(nand_flash_open_file_for_write(&s_configfile, s_configfile_path),
+              "failed to open config file\n");
+
+    ASSERT_OK(nand_flash_write_data(&s_configfile, (uint8_t*)sram_config,
+                                    sizeof(BoardConfig)),
+              "failed to write data to config file\n");
+
+    ASSERT_OK(nand_flash_close_file(&s_configfile),
+              "failed to close config file\n");
 
     PAL_LOGI("Config committed to flash\n");
 

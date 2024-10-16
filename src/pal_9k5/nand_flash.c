@@ -16,35 +16,24 @@
 FATFS g_fs;
 int g_nand_ready = 0;
 
-static char s_cfgfname[FNAME_LEN] = NAND_MOUNT_POINT "/board.conf";
-static char s_prffname[FNAME_LEN] = NAND_MOUNT_POINT "/prf.txt";
-
-static const char s_header[HEADER_LEN] = FIRMWARE_SPECIFIER "\n";
-
 extern uint32_t mtp_file_idx;
 
-Status nand_flash_open_binary_file(FIL* fp, const char* fname) {
+Status nand_flash_open_file_for_write(FIL* fp, const char* fname) {
     char new_path[256];  // Max path length
     snprintf(new_path, 256, NAND_MOUNT_POINT "%s", fname);
 
-    // Create sensor data file
     if (f_open(fp, new_path, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
-    // Write the header
-    UINT bw = 0;
-    if (f_write(fp, s_header, strlen(s_header), &bw) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
+    return STATUS_OK;
+}
 
-    // Check the correct number of bytes was written
-    if (bw != strlen(s_header)) {
-        return STATUS_HARDWARE_ERROR;
-    }
+Status nand_flash_open_file_for_read(FIL* fp, const char* fname) {
+    char new_path[256];  // Max path length
+    snprintf(new_path, 256, NAND_MOUNT_POINT "%s", fname);
 
-    // Flush the header to disk
-    if (f_sync(fp) != 0) {
+    if (f_open(fp, new_path, FA_OPEN_EXISTING | FA_READ) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -59,7 +48,7 @@ Status nand_flash_close_file(FIL* fp) {
     return STATUS_OK;
 }
 
-Status nand_flash_write_binary_data(FIL* fp, uint8_t* data, size_t size) {
+Status nand_flash_write_data(FIL* fp, uint8_t* data, size_t size) {
     // Check if data pointer is valid
     if (data == NULL) {
         return STATUS_ERROR;
@@ -76,36 +65,31 @@ Status nand_flash_write_binary_data(FIL* fp, uint8_t* data, size_t size) {
         return STATUS_HARDWARE_ERROR;
     }
 
+    if (bw != size) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
     return STATUS_OK;
 }
 
-Status nand_flash_dump_prf_stats(char stats[]) {
-    FIL prffile;
-    UINT bw = 0;
+Status nand_flash_read_data(FIL* fp, uint8_t* data, size_t size) {
+    // Check if data pointer is valid
+    if (data == NULL) {
+        return STATUS_ERROR;
+    }
 
-    // Create performance dump file
-    if (f_open(&prffile, s_prffname, FA_OPEN_APPEND | FA_WRITE) != FR_OK) {
+    // Check if the file pointer is valid
+    if (fp == NULL || fp->obj.fs == NULL) {
+        return STATUS_ERROR;
+    }
+
+    // Read the data from the file
+    UINT br;
+    if (f_read(fp, data, size, &br) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
-    // Write a timestamp
-    char timestamp[32];
-    int size = snprintf(timestamp, 32, "%lu ms:\n", (uint32_t)MILLIS());
-    if (size > 0) {
-        bw += f_write(&prffile, timestamp, size, &bw);
-    }
-
-    // Write the stats
-    size = strlen(stats);
-    bw += f_write(&prffile, stats, size, &bw);
-
-    // Check that something was written
-    if (bw == 0) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Close the file
-    if (f_close(&prffile) != 0) {
+    if (br != size) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -277,44 +261,6 @@ Status nand_flash_deinit() {
 
 Status nand_flash_flush(FIL* fp) {
     if (f_sync(fp) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    return STATUS_OK;
-}
-
-Status nand_flash_load_board_config(BoardConfig* board_config) {
-    FIL cfgfile;
-
-    if (f_open(&cfgfile, s_cfgfname, FA_OPEN_EXISTING | FA_READ) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    UINT br;
-    if (f_read(&cfgfile, board_config, sizeof(*board_config), &br) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    if (br != sizeof(*board_config)) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    return STATUS_OK;
-}
-
-Status nand_flash_store_board_config(BoardConfig* board_config) {
-    FIL cfgfile;
-
-    if (f_open(&cfgfile, s_cfgfname, FA_OPEN_ALWAYS | FA_WRITE) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    UINT bw;
-    if (f_write(&cfgfile, board_config, sizeof(board_config), &bw) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    if (bw != sizeof(board_config)) {
         return STATUS_HARDWARE_ERROR;
     }
 
