@@ -15,8 +15,6 @@
 #include "timer.h"
 #include "tusb.h"
 
-TaskHandle_t s_usb_device_handle;
-
 static bool s_usb_initialized = false;
 static uint32_t s_usb_initialized_time = 0;
 

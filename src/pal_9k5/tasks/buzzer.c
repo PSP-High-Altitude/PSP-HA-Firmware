@@ -224,45 +224,42 @@ void buzzer_task() {
     }
 
     while (1) {
-        while (uxQueueMessagesWaiting(buzzer_queue)) {
-            BuzzerSound sound;
-            xQueueReceive(buzzer_queue, &sound, 0);
-            switch (sound) {
-                case BUZZER_SOUND_BEEP:
-                    sound_beep(200);
-                    break;
-                case BUZZER_SOUND_DOUBLE_BEEP:
-                    sound_beep(200);
-                    sound_beep(200);
-                    break;
-                case BUZZER_SOUND_LONG_BEEP:
-                    sound_beep(1000);
-                    break;
-                case BUZZER_SOUND_DESCENDING_BEEP:
-                    sound_descending_beep(200);
-                    break;
-                case BUZZER_SOUND_LONG_DESCENDING_BEEP:
-                    sound_descending_beep(1000);
-                    break;
-                case BUZZER_SOUND_INIT:
-                    sound_init();
-                    break;
-                case BUZZER_SOUND_SONG:
-                    sound_song();
-                    break;
-                case BUZZER_SOUND_REST_1S:
-                    DELAY(1000);
-                    break;
-                case BUZZER_SOUND_REST_500MS:
-                    DELAY(500);
-                    break;
-                case BUZZER_SOUND_REST_200MS:
-                    DELAY(200);
-                    break;
-                default:
-                    break;
-            }
+        BuzzerSound sound;
+        xQueueReceive(buzzer_queue, &sound, 0xFFFF);
+        switch (sound) {
+            case BUZZER_SOUND_BEEP:
+                sound_beep(200);
+                break;
+            case BUZZER_SOUND_DOUBLE_BEEP:
+                sound_beep(200);
+                sound_beep(200);
+                break;
+            case BUZZER_SOUND_LONG_BEEP:
+                sound_beep(1000);
+                break;
+            case BUZZER_SOUND_DESCENDING_BEEP:
+                sound_descending_beep(200);
+                break;
+            case BUZZER_SOUND_LONG_DESCENDING_BEEP:
+                sound_descending_beep(1000);
+                break;
+            case BUZZER_SOUND_INIT:
+                sound_init();
+                break;
+            case BUZZER_SOUND_SONG:
+                sound_song();
+                break;
+            case BUZZER_SOUND_REST_1S:
+                DELAY(1000);
+                break;
+            case BUZZER_SOUND_REST_500MS:
+                DELAY(500);
+                break;
+            case BUZZER_SOUND_REST_200MS:
+                DELAY(200);
+                break;
+            default:
+                break;
         }
-        portYIELD();
     }
 }
