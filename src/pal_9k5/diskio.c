@@ -24,6 +24,7 @@
 #include "mt29f4g.h"
 #include "sd.h"
 #include "sdmmc/sdmmc.h"
+#include "semphr.h"
 #include "spi/spi.h"
 #include "stdio.h"
 #include "task.h"
@@ -118,6 +119,8 @@ struct dhara_map s_map;
 static uint8_t s_map_buffer[1U << MT29F4G_PAGE_SIZE_LOG2];
 static dhara_error_t s_map_error = DHARA_E_NONE;
 
+static SemaphoreHandle_t s_mutex = NULL;
+
 /* Initialize NAND interface */
 Status diskio_init(SdDevice *device) {
     generate_crc_table();
@@ -137,6 +140,10 @@ Status diskio_init(SdDevice *device) {
     s_nand.log2_page_size = MT29F4G_PAGE_SIZE_LOG2;
     s_nand.log2_ppb = MT29F4G_PAGE_PER_BLOCK_LOG2;
     s_nand.num_blocks = MT29F4G_BLOCK_COUNT;
+
+    // Create mutex
+    s_mutex = xSemaphoreCreateRecursiveMutex();
+    configASSERT(s_mutex);
 
     return STATUS_OK;
 }
@@ -187,26 +194,30 @@ DSTATUS disk_status(BYTE drv /* Physical drive number (0) */
 }
 
 /*-----------------------------------------------------------------------*/
-/* Read sector(s)                                                        */
+/* Locking functions                                                     */
 /*-----------------------------------------------------------------------*/
 
 static BaseType_t diskioENTER_CRITICAL() {
     BaseType_t ctx = 0;
-    if (!xPortIsInsideInterrupt()) {
-        portENTER_CRITICAL();
-    } else {
-        ctx = taskENTER_CRITICAL_FROM_ISR();
+
+    // Acquire the mutex before proceeding if the scheduler is running
+    if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+        while (xSemaphoreTakeRecursive(s_mutex, 1) != pdPASS);
     }
+
     return ctx;
 }
 
 static void diskioEXIT_CRITICAL(BaseType_t ctx) {
-    if (!xPortIsInsideInterrupt()) {
-        portEXIT_CRITICAL();
-    } else {
-        taskEXIT_CRITICAL_FROM_ISR(ctx);
-    }
+    // Release the mutex regardless of whether the scheduler is running, since
+    // it's technically possible for the scheduler to be stopped with held
+    // locks, and we don't want a lockup in that case
+    xSemaphoreGiveRecursive(s_mutex);
 }
+
+/*-----------------------------------------------------------------------*/
+/* Read sector(s)                                                        */
+/*-----------------------------------------------------------------------*/
 
 DRESULT disk_read(
     BYTE drv,     /* Physical drive number (0) */

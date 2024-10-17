@@ -149,8 +149,8 @@ void task_init() {
             gpio_write(PIN_BLUE, GPIO_LOW);
             DELAY(1000);
         } else {
-            // rtc_print_datetime();
-            DELAY(0xFFFF);
+            DELAY(1000 * 60);
+            PAL_LOGI("<3\n");
         }
     }
 }
