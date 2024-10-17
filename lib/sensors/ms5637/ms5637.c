@@ -93,17 +93,21 @@ static uint32_t read_D1(I2cDevice* device, AdcSpeed speed) {
     }
     DELAY(conversion_delay_ms[speed / 2] + 1);
     tx_buf[0] = 0x00;
-    while (!D1) {
-        // Send ADC read command
-        if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
-            return D_READ_ERROR;
-        }
-        if (i2c_read(device, rx_buf, 3) != STATUS_OK) {
-            return D_READ_ERROR;
-        }
-        D1 = ((uint32_t)rx_buf[0] << 16) | ((uint32_t)rx_buf[1] << 8) |
-             rx_buf[2];
+
+    // Send ADC read command
+    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
+        return D_READ_ERROR;
     }
+    if (i2c_read(device, rx_buf, 3) != STATUS_OK) {
+        return D_READ_ERROR;
+    }
+    D1 = ((uint32_t)rx_buf[0] << 16) | ((uint32_t)rx_buf[1] << 8) | rx_buf[2];
+
+    // If we read nothing return an error
+    if (D1 == 0) {
+        return D_READ_ERROR;
+    }
+
     return D1;
 }
 
@@ -117,17 +121,21 @@ static uint32_t read_D2(I2cDevice* device, AdcSpeed speed) {
     }
     DELAY(conversion_delay_ms[speed / 2] + 1);
     tx_buf[0] = 0x00;
-    while (!D2) {
-        // Send ADC read command
-        if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
-            return D_READ_ERROR;
-        }
-        if (i2c_read(device, rx_buf, 3) != STATUS_OK) {
-            return D_READ_ERROR;
-        }
-        D2 = ((uint32_t)rx_buf[0] << 16) | ((uint32_t)rx_buf[1] << 8) |
-             rx_buf[2];
+
+    // Send ADC read command
+    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
+        return D_READ_ERROR;
     }
+    if (i2c_read(device, rx_buf, 3) != STATUS_OK) {
+        return D_READ_ERROR;
+    }
+    D2 = ((uint32_t)rx_buf[0] << 16) | ((uint32_t)rx_buf[1] << 8) | rx_buf[2];
+
+    // If we read nothing return an error
+    if (D2 == 0) {
+        return D_READ_ERROR;
+    }
+
     return D2;
 }
 

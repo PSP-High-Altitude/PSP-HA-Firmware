@@ -102,13 +102,22 @@ void task_gps(TaskHandle_t* handle_ptr) {
 
     while (1) {
         GPS_Fix_TypeDef fix;
-        max_m10s_poll_fix(&s_gps_conf, &fix);
+        if (max_m10s_poll_fix(&s_gps_conf, &fix) == STATUS_OK) {
+            GpsFrame gps_frame = gps_fix_to_pb_frame(MILLIS(), &fix);
 
-        GpsFrame gps_frame = gps_fix_to_pb_frame(MILLIS(), &fix);
+            // Set LED to indicate GPS fix
+            gpio_write(PIN_BLUE, (fix.fix_valid && !fix.invalid_llh)
+                                     ? GPIO_HIGH
+                                     : GPIO_LOW);
 
-        // update_gps_for_control(&gps_frame);
-        queue_gps_for_storage(&gps_frame);
+            // update_gps_for_control(&gps_frame);
+            queue_gps_for_storage(&gps_frame);
+        } else {
+            // Set LED low
+            gpio_write(PIN_BLUE, GPIO_LOW);
+        }
 
+        // Delay until next time
         vTaskDelayUntil(&last_iteration_start_tick,
                         pdMS_TO_TICKS(s_config_ptr->gps_loop_period_ms));
     }

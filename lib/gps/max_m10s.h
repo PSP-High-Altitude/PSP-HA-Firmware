@@ -73,6 +73,7 @@ typedef struct {
 
 Status max_m10s_init(I2cDevice* device);
 
+Status max_m10s_read_fix(I2cDevice* device, GPS_Fix_TypeDef* fix);
 Status max_m10s_poll_fix(I2cDevice* device, GPS_Fix_TypeDef* fix);
 
 #endif

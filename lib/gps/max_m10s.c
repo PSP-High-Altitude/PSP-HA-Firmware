@@ -14,16 +14,25 @@ static Status ubx_cfg_valset(I2cDevice* device, Max_M10S_Layer_TypeDef layer,
                              uint8_t* value_lens, size_t num_items);
 
 Status max_m10s_init(I2cDevice* device) {
-    uint32_t keys[] = {0x20110021, 0x10720002, 0x209100ba,
-                       0x209100c9, 0x209100bf, 0x209100c4,
-                       0x209100ab, 0x209100b0, 0x30210001};
-    uint64_t values[] = {8, 0, 0, 0, 0, 0, 0, 0, 100};
-    uint8_t value_lens[] = {1, 1, 1, 1, 1, 1, 1, 1, 2};
+    uint32_t gps_fix_period = 125;  // 8Hz
+
+    uint32_t keys[] = {
+        0x20110021, 0x10720002, 0x209100ba, 0x209100c9, 0x209100bf, 0x209100c4,
+        0x209100ab, 0x209100b0, 0x30210001, 0x1031001f, 0x10310001, 0x10310020,
+        0x10310005, 0x10310021, 0x10310007, 0x10310022, 0x1031000d, 0x1031000f,
+    };
+    uint64_t values[] = {
+        8, 0, 0, 0, 0, 0, 0, 0, gps_fix_period, 1, 1, 1, 1, 1, 1, 1, 0, 1,
+    };
+    uint8_t value_lens[] = {
+        1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+    };
     if (ubx_cfg_valset(device, MAX_M10S_LAYER_SET_RAM, keys, values, value_lens,
                        9) == STATUS_OK) {
         PAL_LOGI("Set nav mode to airborne <4G\n");
         PAL_LOGI("Disabled NMEA on I2C\n");
-        PAL_LOGI("Navigation measurement rate set to 10 Hz\n");
+        PAL_LOGI("Navigation measurement rate set to 8 Hz\n");
+        PAL_LOGI("Enabled GPS, GAL, BeiDou, and SBAS\n");
     } else {
         return STATUS_ERROR;
     }
@@ -218,6 +227,93 @@ static Status ubx_cfg_valset(I2cDevice* device, Max_M10S_Layer_TypeDef layer,
     return STATUS_DATA_ERROR;
 }
 
+Status max_m10s_read_fix(I2cDevice* device, GPS_Fix_TypeDef* fix) {
+    uint8_t message_header[] = {0xB5, 0x62, 0x01, 0x07};
+    uint8_t message_buf[800];
+    uint16_t message_len = 0;
+
+    if (ubx_read_msg(device, message_header, message_buf, &message_len, 10) !=
+        STATUS_OK) {
+        return STATUS_TIMEOUT_ERROR;
+    }
+
+    if (message_len != 92) {
+        ASSERT_OK(STATUS_DATA_ERROR, "UBX msg read length");
+    }
+
+    fix->year = message_buf[4] + (message_buf[5] << 8);
+    fix->month = message_buf[6];
+    fix->day = message_buf[7];
+    fix->hour = message_buf[8];
+    fix->min = message_buf[9];
+    fix->sec = message_buf[10];
+    fix->date_valid = message_buf[11] & 0x1;
+    fix->time_valid = (message_buf[11] & 0x2) >> 1;
+    fix->time_resolved = (message_buf[11] & 0x4) >> 2;
+    fix->fix_type = message_buf[20];
+    fix->fix_valid = message_buf[21] & 0x1;
+    fix->diff_used = (message_buf[21] & 0x2) >> 1;
+    fix->psm_state = (message_buf[21] & 0x1C) >> 2;
+    fix->hdg_veh_valid = (message_buf[21] & 0x20) >> 5;
+    fix->carrier_phase = (message_buf[21] & 0xC0) >> 6;
+    fix->num_sats = message_buf[23];
+    fix->lon =
+        (float)((int32_t)(message_buf[24] + (message_buf[25] << 8) +
+                          (message_buf[26] << 16) + (message_buf[27] << 24))) /
+        10000000.0;
+    fix->lat =
+        (float)((int32_t)(message_buf[28] + (message_buf[29] << 8) +
+                          (message_buf[30] << 16) + (message_buf[31] << 24))) /
+        10000000.0;
+    fix->height =
+        (float)((int32_t)(message_buf[32] + (message_buf[33] << 8) +
+                          (message_buf[34] << 16) + (message_buf[35] << 24))) /
+        1000.0;
+    fix->height_msl =
+        (float)((int32_t)(message_buf[36] + (message_buf[37] << 8) +
+                          (message_buf[38] << 16) + (message_buf[39] << 24))) /
+        1000.0;
+    fix->accuracy_horiz =
+        (float)((uint32_t)(message_buf[40] + (message_buf[41] << 8) +
+                           (message_buf[42] << 16) + (message_buf[43] << 24))) /
+        1000.0;
+    fix->accuracy_vertical =
+        (float)((uint32_t)(message_buf[44] + (message_buf[45] << 8) +
+                           (message_buf[46] << 16) + (message_buf[47] << 24))) /
+        1000.0;
+    fix->vel_north =
+        (float)((int32_t)(message_buf[48] + (message_buf[49] << 8) +
+                          (message_buf[50] << 16) + (message_buf[51] << 24))) /
+        1000.0;
+    fix->vel_east =
+        (float)((int32_t)(message_buf[52] + (message_buf[53] << 8) +
+                          (message_buf[54] << 16) + (message_buf[55] << 24))) /
+        1000.0;
+    fix->vel_down =
+        (float)((int32_t)(message_buf[56] + (message_buf[57] << 8) +
+                          (message_buf[58] << 16) + (message_buf[59] << 24))) /
+        1000.0;
+    fix->ground_speed =
+        (float)((int32_t)(message_buf[60] + (message_buf[61] << 8) +
+                          (message_buf[62] << 16) + (message_buf[63] << 24))) /
+        1000.0;
+    fix->hdg =
+        (float)((int32_t)(message_buf[64] + (message_buf[65] << 8) +
+                          (message_buf[66] << 16) + (message_buf[67] << 24))) /
+        100000.0;
+    fix->accuracy_speed =
+        (float)((int32_t)(message_buf[68] + (message_buf[69] << 8) +
+                          (message_buf[70] << 16) + (message_buf[71] << 24))) /
+        1000.0;
+    fix->accuracy_hdg =
+        (float)((int32_t)(message_buf[72] + (message_buf[73] << 8) +
+                          (message_buf[74] << 16) + (message_buf[75] << 24))) /
+        1000.0;
+    fix->invalid_llh = message_buf[78] & 0x1;
+
+    return STATUS_OK;
+}
+
 Status max_m10s_poll_fix(I2cDevice* device, GPS_Fix_TypeDef* fix) {
     size_t tx_buf_len = 8;
     uint8_t tx_buf[tx_buf_len];
@@ -243,9 +339,10 @@ Status max_m10s_poll_fix(I2cDevice* device, GPS_Fix_TypeDef* fix) {
     uint8_t message_buf[800];
     uint16_t message_len = 0;
 
-    ASSERT_OK(
-        ubx_read_msg(device, message_header, message_buf, &message_len, 1000),
-        "UBX msg read");
+    if (ubx_read_msg(device, message_header, message_buf, &message_len, 10) !=
+        STATUS_OK) {
+        return STATUS_TIMEOUT_ERROR;
+    }
 
     if (message_len != 92) {
         ASSERT_OK(STATUS_DATA_ERROR, "UBX msg read length");

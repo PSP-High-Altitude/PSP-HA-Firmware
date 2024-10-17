@@ -69,8 +69,7 @@ int _write(int file, char *data, int len) {
         return copy_size;
     }
 
-    // If the USB is initialized, write the data to the USB interface
-    // and flush the buffer.
+    // If the USB is initialized, write the data to the USB interface.
     int new_len = s_usb_serial_fifo.count;
     fifo_dequeuen(&s_usb_serial_fifo, ser_out_buf, new_len);
     tud_cdc_write(ser_out_buf, new_len);

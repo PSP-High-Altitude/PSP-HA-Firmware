@@ -13,7 +13,7 @@ const static BoardConfig s_default_config = {
     .control_loop_period_ms = 10,    // ms
     .sensor_loop_period_ms = 100,    // ms
     .storage_loop_period_ms = 1000,  // ms
-    .gps_loop_period_ms = 500,       // ms
+    .gps_loop_period_ms = 200,       // ms
 
     // State estimation settings
     .state_init_time_ms = 10000,     // ms
@@ -139,6 +139,8 @@ void config_print() {
     printf("===== BOARD CONFIG =====\n");
     printf("Control loop period: %lu ms\n", config->control_loop_period_ms);
     printf("Sensor loop period: %lu ms\n", config->sensor_loop_period_ms);
+    printf("Storage loop period: %lu ms\n", config->storage_loop_period_ms);
+    printf("GPS loop period: %lu ms\n", config->gps_loop_period_ms);
     printf("State init time: %lu ms\n", config->state_init_time_ms);
     printf("Launch detect period: %lu ms\n", config->launch_detect_period_ms);
     printf("Launch detect replay: %lu\n", config->launch_detect_replay);

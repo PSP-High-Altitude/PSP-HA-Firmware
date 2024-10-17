@@ -72,7 +72,7 @@ void task_init() {
     vTaskSuspendAll();
 
     uint32_t init_error = 0;  // Set if error occurs during initialization
-    uint32_t num_inits = 5;   // Number of inits the error code refers to
+    uint32_t num_inits = 6;   // Number of inits the error code refers to
 
     mtp_mode = backup_get_ptr()->flag_mtp_pressed;
 
@@ -81,14 +81,16 @@ void task_init() {
     buttons_init();
     init_error |= (EXPECT_OK(storage_init(), "init storage") != STATUS_OK) << 0;
     init_error |= (EXPECT_OK(usb_init(), "init usb") != STATUS_OK) << 1;
-    init_error |= (EXPECT_OK(sensors_init(), "init sensors") != STATUS_OK) << 2;
-    init_error |= (EXPECT_OK(control_init(), "init control") != STATUS_OK) << 3;
+    init_error |= (EXPECT_OK(buzzer_init(), "init buzzer") != STATUS_OK) << 2;
+    init_error |= (EXPECT_OK(sensors_init(), "init sensors") != STATUS_OK) << 3;
+    init_error |= (EXPECT_OK(gps_init(), "init GPS") != STATUS_OK) << 4;
+    init_error |= (EXPECT_OK(control_init(), "init control") != STATUS_OK) << 5;
+
     // init_error |= (EXPECT_OK(init_pyros(), "init pyros") !=
     //   STATUS_OK)
     //   << 4; init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") !=
     //   STATUS_OK)
     //   << 5;
-    init_error |= (EXPECT_OK(buzzer_init(), "init buzzer") != STATUS_OK) << 4;
 
     // Play init tune
     gpio_write(PIN_RED, GPIO_LOW);
