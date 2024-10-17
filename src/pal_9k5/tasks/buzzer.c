@@ -221,7 +221,7 @@ void buzzer_task() {
     BuzzerSound sound;
 
     while (1) {
-        if (xQueueReceive(buzzer_queue, &sound, 0xFFFFFFFF) != pdPASS) {
+        if (xQueueReceive(buzzer_queue, &sound, portMAX_DELAY) != pdPASS) {
             continue;
         }
         switch (sound) {

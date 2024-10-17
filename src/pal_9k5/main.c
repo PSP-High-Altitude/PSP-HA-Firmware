@@ -113,13 +113,13 @@ void task_init() {
 
     PAL_LOGI("Initialization complete\n");
 
-    TASK_CREATE(buzzer_task, +4, 512);
     if (!mtp_mode) {
         // Start tasks if we are in normal mode
         PAL_LOGI("Launching flight tasks\n");
         // TASK_CREATE(pyros_task, +7, 2048);
         TASK_CREATE(task_control, +6, 2048);
         TASK_CREATE(task_sensors, +5, 2048);
+        TASK_CREATE(buzzer_task, +4, 512);
         // TASK_CREATE(pspcom_process_bytes, +4, 2048);
         // TASK_CREATE(pspcom_send_standard, +3, 2048);
         TASK_CREATE(task_gps, +3, 2048);
@@ -127,6 +127,7 @@ void task_init() {
         TASK_CREATE(task_usb, +1, 4096);
     } else {
         PAL_LOGI("Started USB MSC mode\n");
+        TASK_CREATE(buzzer_task, +2, 512);
         TASK_CREATE(task_usb, +1, 4096);
     }
 

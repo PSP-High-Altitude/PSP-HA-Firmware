@@ -405,7 +405,12 @@ Status ospi_cmd(OSpiDevice* dev, OSpiCommand* cmd) {
     if (ospi_setup(dev) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
     }
-    if (HAL_OSPI_Command(ospi_handles[dev->periph], &hal_cmd, 100) != HAL_OK) {
+    // Non-blocking wait for the device to be ready
+    while (__HAL_OSPI_GET_FLAG(ospi_handles[dev->periph], HAL_OSPI_FLAG_BUSY) !=
+           RESET) {
+        DELAY(0);
+    }
+    if (HAL_OSPI_Command(ospi_handles[dev->periph], &hal_cmd, 5) != HAL_OK) {
         return STATUS_HARDWARE_ERROR;
     }
     return STATUS_OK;
@@ -435,6 +440,9 @@ Status ospi_auto_poll_cmd(OSpiDevice* dev, OSpiCommand* cmd, OSpiAutopoll* cfg,
         // Wait for the data to come
         while (HAL_OSPI_GetState(ospi_handles[dev->periph]) !=
                HAL_OSPI_STATE_READY) {
+            if (MILLIS() - start_time > timeout) {
+                return STATUS_TIMEOUT_ERROR;
+            }
             DELAY(cfg->interval);
         }
 
@@ -444,6 +452,8 @@ Status ospi_auto_poll_cmd(OSpiDevice* dev, OSpiCommand* cmd, OSpiAutopoll* cfg,
         if (rx_buf == cfg->match) {
             return STATUS_OK;
         }
+
+        DELAY(0);
     }
     return STATUS_TIMEOUT_ERROR;
 }
