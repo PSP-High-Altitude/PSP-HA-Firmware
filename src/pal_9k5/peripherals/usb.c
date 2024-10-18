@@ -7,11 +7,13 @@
 #include "Regex.h"
 #include "backup.h"
 #include "button_event.h"
+#include "commands.h"
 #include "fifos.h"
 #include "gpio/gpio.h"
 #include "main.h"
 #include "rtc/rtc.h"
 #include "tasks/storage.h"
+#include "terminal/terminal.h"
 #include "timer.h"
 #include "tusb.h"
 
@@ -39,7 +41,16 @@ Status usb_init() {
     NVIC_SetPriority(OTG_HS_IRQn, configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY);
 
     USB_OTG_HS->GCCFG &= ~USB_OTG_GCCFG_VBDEN;
+
+    // Initialize terminal interface and add commands
+    terminal_init();
+    terminal_add_cmd(regex_help, cmd_help);
+    terminal_add_cmd(regex_set_datetime, cmd_set_datetime);
+    terminal_add_cmd(regex_get_datetime, cmd_get_datetime);
+    terminal_add_cmd(regex_invalidate_config, cmd_invalidate_config);
+    terminal_add_cmd(regex_set_frequency, cmd_set_frequency);
 #endif
+
     return STATUS_OK;
 }
 
@@ -91,61 +102,9 @@ void tud_cdc_rx_cb(uint8_t itf) {
     tud_cdc_read(str, len);
     str[len] = '\0';
 
-    // Help command
-    Regex regex_help;
-    regexCompile(&regex_help, "^help[\n]*$");
+    terminal_process(str);
 
-    // Set datetime command
-    Regex regex_set_datetime;
-    regexCompile(&regex_set_datetime,
-                 "^set_datetime [0-9]{4}\\-[0-9]{2}\\-[0-9]{2} "
-                 "[0-9]{2}:[0-9]{2}:[0-9]{2}[\n]*$");
-
-    // Get datetime command
-    Regex regex_get_datetime;
-    regexCompile(&regex_get_datetime, "^get_datetime[\n]*$");
-
-    // Help command
-    Regex regex_invalidate_config;
-    regexCompile(&regex_invalidate_config, "^invalidate_config[\n]*$");
-
-    // Test all commands
-    Matcher match = regexMatch(&regex_help, str);
-    if (match.isFound) {
-        printf(
-            "Commands:\n"
-            "  help                                  this command\n"
-            "  set_datetime YYYY-MM-DD HH:MM:SS      sets the RTC time\n"
-            "  get_datetime                          gets the RTC time\n"
-            "  invalidate_config                     invalidates the config\n");
-        free(str);
-        return;
-    }
-    match = regexMatch(&regex_set_datetime, str);
-    if (match.isFound) {
-        int year, month, day, hour, minute, second;
-        sscanf(str, "set_datetime %d-%d-%d %d:%d:%d", &year, &month, &day,
-               &hour, &minute, &second);
-        RTCDateTime dt = {year, month, day, hour, minute, second};
-        rtc_set_datetime(dt);
-        printf("Time set!\n");
-        free(str);
-        return;
-    }
-    match = regexMatch(&regex_get_datetime, str);
-    if (match.isFound) {
-        RTCDateTime dt = rtc_get_datetime(dt);
-        printf("Current time: %04ld-%02ld-%02ld %02ld:%02ld:%02ld\n", dt.year,
-               dt.month, dt.day, dt.hour, dt.minute, dt.second);
-        free(str);
-        return;
-    }
-    match = regexMatch(&regex_invalidate_config, str);
-    if (match.isFound) {
-        config_invalidate();
-        free(str);
-        return;
-    }
+    free(str);
 }
 
 void task_usb(void *param) {

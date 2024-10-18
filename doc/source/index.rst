@@ -20,7 +20,7 @@ and peripheral devices:
     * BMI088 6-axis IMU for rotation and low-acceleration
     * KX134-1211 3-axis accelerometer for high-acceleration
     * MS5637 barometer for altitude determination
-    * IIS2MDC magentometer for compass heading
+    * IIS2MDC magnetometer
     * MAX-M10S-00B GPS module
     * MT29F4G 4Gbit SPI flash memory
     * STM32WLE5 MCU with LoRa for telemetry
