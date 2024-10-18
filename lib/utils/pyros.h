@@ -18,13 +18,15 @@
 typedef enum {
     PYRO_MAIN,
     PYRO_DRG,
-    PYRO_AUX,
+    PYRO_A1,
+    PYRO_A2,
+    PYRO_A3,
 } Pyro;
 
-Status init_pyros();
+Status pyros_init();
 
-Status fire_pyro(Pyro pyro);
+Status pyros_fire(Pyro pyro);
 
-void pyros_task();
+void task_pyros();
 
 #endif

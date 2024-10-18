@@ -18,6 +18,14 @@ typedef struct {
     uint32_t storage_loop_period_ms;
     // period in ms between polling the GPS
     uint32_t gps_loop_period_ms;
+    // period in ms between checking for incoming telemetry messages
+    uint32_t pspcom_rx_loop_period_ms;
+    // period in ms between sending the standard telemetry message when on the
+    // ground
+    uint32_t pspcom_tx_ground_loop_period_ms;
+    // period in ms between sending the standard telemetry message when in
+    // flight
+    uint32_t pspcom_tx_flight_loop_period_ms;
 
     /* STATE ESTIMATION SETTINGS */
     // time in ms during which a baseline value for the sensors is determined

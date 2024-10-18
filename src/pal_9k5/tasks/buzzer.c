@@ -217,7 +217,7 @@ void buzzer_play(BuzzerSound sound) {
     xQueueSend(buzzer_queue, &sound, 0);
 }
 
-void buzzer_task() {
+void task_buzzer() {
     BuzzerSound sound;
 
     while (1) {

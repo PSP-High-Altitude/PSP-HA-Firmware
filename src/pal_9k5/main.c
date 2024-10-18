@@ -72,7 +72,7 @@ void task_init() {
     vTaskSuspendAll();
 
     uint32_t init_error = 0;  // Set if error occurs during initialization
-    uint32_t num_inits = 6;   // Number of inits the error code refers to
+    uint32_t num_inits = 8;   // Number of inits the error code refers to
 
     mtp_mode = backup_get_ptr()->flag_mtp_pressed;
 
@@ -85,12 +85,8 @@ void task_init() {
     init_error |= (EXPECT_OK(sensors_init(), "init sensors") != STATUS_OK) << 3;
     init_error |= (EXPECT_OK(gps_init(), "init GPS") != STATUS_OK) << 4;
     init_error |= (EXPECT_OK(control_init(), "init control") != STATUS_OK) << 5;
-
-    // init_error |= (EXPECT_OK(init_pyros(), "init pyros") !=
-    //   STATUS_OK)
-    //   << 4; init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") !=
-    //   STATUS_OK)
-    //   << 5;
+    init_error |= (EXPECT_OK(pyros_init(), "init pyros") != STATUS_OK) << 6;
+    init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK) << 7;
 
     // Play init tune
     gpio_write(PIN_RED, GPIO_LOW);
@@ -104,8 +100,6 @@ void task_init() {
     for (int i = 0; i < num_inits; i++) {
         if ((init_error >> i) & 1) {
             buzzer_play(BUZZER_SOUND_LONG_DESCENDING_BEEP);
-            // buzzer_play(BUZZER_SOUND_DOUBLE_BEEP);
-            // buzzer_play(BUZZER_SOUND_REST_200MS);
         } else {
             buzzer_play(BUZZER_SOUND_LONG_BEEP);
         }
@@ -116,18 +110,18 @@ void task_init() {
     if (!mtp_mode) {
         // Start tasks if we are in normal mode
         PAL_LOGI("Launching flight tasks\n");
-        // TASK_CREATE(pyros_task, +7, 2048);
-        TASK_CREATE(task_control, +6, 2048);
-        TASK_CREATE(task_sensors, +5, 2048);
-        TASK_CREATE(buzzer_task, +4, 512);
-        // TASK_CREATE(pspcom_process_bytes, +4, 2048);
-        // TASK_CREATE(pspcom_send_standard, +3, 2048);
-        TASK_CREATE(task_gps, +3, 2048);
-        TASK_CREATE(task_storage, +2, 4096);
+        TASK_CREATE(task_pyros, +9, 2048);
+        TASK_CREATE(task_control, +8, 2048);
+        TASK_CREATE(task_sensors, +7, 2048);
+        TASK_CREATE(task_pspcom_tx, +6, 2048);
+        TASK_CREATE(task_gps, +5, 2048);
+        TASK_CREATE(task_storage, +4, 4096);
+        TASK_CREATE(task_pspcom_rx, +3, 2048);
+        TASK_CREATE(task_buzzer, +2, 512);
         TASK_CREATE(task_usb, +1, 4096);
     } else {
         PAL_LOGI("Started USB MSC mode\n");
-        TASK_CREATE(buzzer_task, +2, 512);
+        TASK_CREATE(task_buzzer, +2, 512);
         TASK_CREATE(task_usb, +1, 4096);
     }
 

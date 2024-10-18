@@ -10,10 +10,13 @@ static FIL s_configfile;
 static char s_configfile_path[] = CONFIG_DIR "/" CONFIG_FILENAME;
 
 const static BoardConfig s_default_config = {
-    .control_loop_period_ms = 10,    // ms
-    .sensor_loop_period_ms = 100,    // ms
-    .storage_loop_period_ms = 1000,  // ms
-    .gps_loop_period_ms = 200,       // ms
+    .control_loop_period_ms = 10,             // ms
+    .sensor_loop_period_ms = 100,             // ms
+    .storage_loop_period_ms = 1000,           // ms
+    .gps_loop_period_ms = 200,                // ms
+    .pspcom_rx_loop_period_ms = 100,          // ms
+    .pspcom_tx_ground_loop_period_ms = 5000,  // ms
+    .pspcom_tx_flight_loop_period_ms = 1000,  // ms
 
     // State estimation settings
     .state_init_time_ms = 10000,     // ms
@@ -141,6 +144,11 @@ void config_print() {
     printf("Sensor loop period: %lu ms\n", config->sensor_loop_period_ms);
     printf("Storage loop period: %lu ms\n", config->storage_loop_period_ms);
     printf("GPS loop period: %lu ms\n", config->gps_loop_period_ms);
+    printf("PSPCOM RX loop period: %lu ms\n", config->pspcom_rx_loop_period_ms);
+    printf("PSPCOM TX ground loop period: %lu ms\n",
+           config->pspcom_tx_ground_loop_period_ms);
+    printf("PSPCOM TX flight loop period: %lu ms\n",
+           config->pspcom_tx_flight_loop_period_ms);
     printf("State init time: %lu ms\n", config->state_init_time_ms);
     printf("Launch detect period: %lu ms\n", config->launch_detect_period_ms);
     printf("Launch detect replay: %lu\n", config->launch_detect_replay);

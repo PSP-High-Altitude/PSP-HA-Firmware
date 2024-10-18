@@ -76,8 +76,7 @@ void SystemClock_Config() {
     PeriphClkInitStruct.Spi45ClockSelection = RCC_SPI45CLKSOURCE_PLL2;
     PeriphClkInitStruct.I2c1235ClockSelection = RCC_I2C1235CLKSOURCE_HSI;
     PeriphClkInitStruct.I2c4ClockSelection = RCC_I2C4CLKSOURCE_HSI;
-    PeriphClkInitStruct.Usart234578ClockSelection =
-        RCC_USART234578CLKSOURCE_HSI;
+    PeriphClkInitStruct.Usart16ClockSelection = RCC_USART16910CLKSOURCE_HSI;
     PeriphClkInitStruct.SdmmcClockSelection = RCC_SDMMCCLKSOURCE_PLL;
     PeriphClkInitStruct.UsbClockSelection = RCC_USBCLKSOURCE_HSI48;
 
@@ -94,9 +93,6 @@ void SystemClock_Config() {
     __HAL_RCC_GPIOH_CLK_ENABLE();
     __HAL_RCC_GPIOJ_CLK_ENABLE();
     __HAL_RCC_GPIOK_CLK_ENABLE();
-
-    // Initialize UART clocks
-    __HAL_RCC_UART7_CLK_ENABLE();
 
     // Initialize DMA
     __HAL_RCC_DMA1_CLK_ENABLE();

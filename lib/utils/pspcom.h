@@ -32,6 +32,7 @@ enum {
     SYS_STAT = 0x8C,
     PYRO_STAT = 0x8D,
     STD_TELEM_1 = 0xE0,
+    STD_TELEM_2 = 0xE1,
 };
 
 typedef struct {
@@ -63,13 +64,15 @@ uint16_t crc(uint16_t checksum, pspcommsg msg);
 
 Status pspcom_init();
 
-void pspcom_process_bytes();
+void task_pspcom_rx();
 
 void pspcom_send_msg(pspcommsg msg);
 
 void pspcom_send_sensor(void *sensor_frame);
 
 void pspcom_send_gps(void *gps_fix);
+
+void task_pspcom_tx();
 
 void pspcom_send_status();
 

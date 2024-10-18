@@ -8,7 +8,7 @@
 
 #define CRC16_POLY 0x1021
 #define CRC16_INIT 0xFFFF
-#define DEVICE_ID 0x01
+#define DEVICE_ID 0x10
 
 enum {
     NACK = 0x00,

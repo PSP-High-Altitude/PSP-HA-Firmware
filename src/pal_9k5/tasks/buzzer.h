@@ -83,7 +83,7 @@ __attribute__((unused)) static uint32_t note_table[] = {
 
 Status buzzer_init();
 
-void buzzer_task();
+void task_buzzer();
 
 Status buzzer_set(uint32_t freq);
 
