@@ -125,11 +125,11 @@ FlightPhase fp_update_boost(const SensorFrame* sensor_frame) {
 
     const StateEst* state = se_predict();
 
-    if (-state->velNED.z > s_config_ptr->min_fast_vel_mps) {
+    if (-state->velGeo.z > s_config_ptr->min_fast_vel_mps) {
         return FP_FAST;
     }
 
-    if (-state->accNED.z < s_config_ptr->max_coast_acc_mps2) {
+    if (-state->accGeo.z < s_config_ptr->max_coast_acc_mps2) {
         return FP_COAST;
     }
 
