@@ -71,7 +71,7 @@ static void storage_pause_event_handler() {
     while (debounce_val != 0x0 && debounce_val != 0xFFFFFFFF) {
         // Timeout
         if (MILLIS() - start_time >= 100) {
-            start_storage();  // Default to keeping storage running
+            storage_start();  // Default to keeping storage running
             return;
         }
 
@@ -84,9 +84,9 @@ static void storage_pause_event_handler() {
 
     // Decide what to do based on the button transition
     if (debounce_val) {
-        pause_storage();
+        storage_pause();
     } else {
-        start_storage();
+        storage_start();
     }
 }
 
@@ -226,11 +226,11 @@ Status storage_init() {
     return STATUS_OK;
 }
 
-void pause_storage() { s_pause_store = true; }
+void storage_pause() { s_pause_store = true; }
 
-void start_storage() { s_pause_store = false; }
+void storage_start() { s_pause_store = false; }
 
-Status queue_sensors_for_storage(const SensorFrame* sensor_frame) {
+Status storage_queue_sensors(const SensorFrame* sensor_frame) {
     if (xQueueSend(s_sensor_queue, sensor_frame, 0) != pdPASS) {
         s_sensor_overflows += 1;
         return STATUS_BUSY;
@@ -239,7 +239,7 @@ Status queue_sensors_for_storage(const SensorFrame* sensor_frame) {
     return STATUS_OK;
 }
 
-Status queue_state_for_storage(const StateFrame* state_frame) {
+Status storage_queue_state(const StateFrame* state_frame) {
     if (xQueueSend(s_state_queue, state_frame, 0) != pdPASS) {
         s_state_overflows += 1;
         return STATUS_BUSY;
@@ -248,7 +248,7 @@ Status queue_state_for_storage(const StateFrame* state_frame) {
     return STATUS_OK;
 }
 
-Status queue_gps_for_storage(const GpsFrame* gps_frame) {
+Status storage_queue_gps(const GpsFrame* gps_frame) {
     if (xQueueSend(s_gps_queue, gps_frame, 0) != pdPASS) {
         s_gps_overflows += 1;
         return STATUS_BUSY;

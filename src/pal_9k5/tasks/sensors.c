@@ -5,6 +5,7 @@
 #include "board.h"
 #include "board_config.h"
 #include "control.h"
+#include "pspcom.h"
 #include "spi/spi.h"
 #include "storage.h"
 #include "timer.h"
@@ -164,7 +165,8 @@ void task_sensors(TaskHandle_t* handle_ptr) {
         }
 #endif  // HWIL_TEST
 
-        update_sensors_for_control(&sensor_frame);
-        queue_sensors_for_storage(&sensor_frame);
+        control_update_sensors(&sensor_frame);
+        storage_queue_sensors(&sensor_frame);
+        pspcom_update_sensors(&sensor_frame);
     }
 }

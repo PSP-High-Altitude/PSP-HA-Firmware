@@ -29,12 +29,12 @@
 
 Status storage_init();
 
-void pause_storage();
-void start_storage();
+void storage_pause();
+void storage_start();
 
-Status queue_sensors_for_storage(const SensorFrame* sensor_frame);
-Status queue_state_for_storage(const StateFrame* state_frame);
-Status queue_gps_for_storage(const GpsFrame* gps_frame);
+Status storage_queue_sensors(const SensorFrame* sensor_frame);
+Status storage_queue_state(const StateFrame* state_frame);
+Status storage_queue_gps(const GpsFrame* gps_frame);
 
 void task_storage(TaskHandle_t* handle_ptr);
 

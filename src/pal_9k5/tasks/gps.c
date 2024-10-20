@@ -5,6 +5,7 @@
 #include "gps.pb.h"
 #include "i2c/i2c.h"
 #include "max_m10s.h"
+#include "pspcom.h"
 #include "storage.h"
 #include "timer.h"
 
@@ -111,7 +112,8 @@ void task_gps(TaskHandle_t* handle_ptr) {
                                      : GPIO_LOW);
 
             // update_gps_for_control(&gps_frame);
-            queue_gps_for_storage(&gps_frame);
+            storage_queue_gps(&gps_frame);
+            pspcom_update_gps(&fix);
         } else {
             // Set LED low
             gpio_write(PIN_BLUE, GPIO_LOW);

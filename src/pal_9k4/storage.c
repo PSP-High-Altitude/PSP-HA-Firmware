@@ -100,9 +100,9 @@ Status queue_gps_store(GpsFrame* gps_frame) {
     return STATUS_OK;
 }
 
-void pause_storage() { s_pause_store = true; }
+void storage_pause() { s_pause_store = true; }
 
-void start_storage() { s_pause_store = false; }
+void storage_start() { s_pause_store = false; }
 
 void storage_task() {
     // Initialize LEDs

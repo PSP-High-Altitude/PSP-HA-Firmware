@@ -10,7 +10,7 @@
 
 Status control_init();
 
-Status update_sensors_for_control(const SensorFrame* sensor_frame);
+Status control_update_sensors(const SensorFrame* sensor_frame);
 
 void task_control(TaskHandle_t* handle_ptr);
 

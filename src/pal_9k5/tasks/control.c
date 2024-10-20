@@ -2,6 +2,7 @@
 
 #include "board_config.h"
 #include "flight_control.h"
+#include "pspcom.h"
 #include "sensors.h"
 #include "state_estimation.h"
 #include "timer.h"
@@ -41,7 +42,7 @@ Status control_init() {
     return STATUS_OK;
 }
 
-Status update_sensors_for_control(const SensorFrame* sensor_frame) {
+Status control_update_sensors(const SensorFrame* sensor_frame) {
     xQueueOverwrite(s_sensor_queue, sensor_frame);
     return STATUS_OK;
 }
@@ -61,6 +62,7 @@ void task_control(TaskHandle_t* handle_ptr) {
         }
 
         sensors_start_read();
+        pspcom_update_fp(fp_get());
 
         vTaskDelayUntil(&last_iteration_start_tick,
                         pdMS_TO_TICKS(s_config_ptr->control_loop_period_ms));

@@ -6,6 +6,7 @@
 #include "gpio/gpio.h"
 #include "main.h"
 #include "pyros.h"
+#include "queue.h"
 #include "sensors.h"
 #include "stdio.h"
 #include "stdlib.h"
@@ -31,6 +32,10 @@ UART_HandleTypeDef huart9;
 DMA_HandleTypeDef hdma_uart9_rx;
 DMA_HandleTypeDef hdma_uart9_tx;
 TimerHandle_t arm_timer;
+
+static QueueHandle_t s_sensor_queue;
+static QueueHandle_t s_gps_queue;
+static QueueHandle_t s_fp_queue;
 
 uint8_t user_armed[5] = {0, 0, 0, 0, 0};
 
@@ -175,6 +180,15 @@ Status pspcom_init() {
     // Initialize arm timeout timer
     arm_timer = xTimerCreate("ArmTimer", 1000 / portTICK_PERIOD_MS, pdFALSE,
                              (void *)0, arm_timeout_callback);
+
+    // Queues for synchronization, not buffering
+    s_sensor_queue = xQueueCreate(1, sizeof(SensorFrame));
+    s_gps_queue = xQueueCreate(1, sizeof(GPS_Fix_TypeDef));
+    s_fp_queue = xQueueCreate(1, sizeof(FlightPhase));
+
+    configASSERT(s_sensor_queue);
+    configASSERT(s_gps_queue);
+    configASSERT(s_fp_queue);
 
     return STATUS_OK;
 }
@@ -348,7 +362,7 @@ void pspcom_send_msg(pspcommsg msg) {
     }
 }
 
-void pspcom_send_sensor(void *sensor_frame) {
+void pspcom_send_sensor(SensorFrame *sensor_frame) {
     SensorFrame *sens = (SensorFrame *)sensor_frame;
     while (1) {
         // Accelerometer
@@ -385,7 +399,7 @@ void pspcom_send_sensor(void *sensor_frame) {
     }
 }
 
-void pspcom_send_gps(void *gps_fix) {
+void pspcom_send_gps(GPS_Fix_TypeDef *gps_fix) {
     GPS_Fix_TypeDef *gps = (GPS_Fix_TypeDef *)gps_fix;
     while (1) {
         // Position
@@ -409,6 +423,18 @@ void pspcom_send_gps(void *gps_fix) {
 
         vTaskDelay(GPS_TELEM_PERIOD / portTICK_PERIOD_MS);
     }
+}
+
+void pspcom_update_sensors(SensorFrame *sensor_frame) {
+    xQueueOverwrite(s_sensor_queue, sensor_frame);
+}
+
+void pspcom_update_gps(GPS_Fix_TypeDef *gps_fix) {
+    xQueueOverwrite(s_gps_queue, gps_fix);
+}
+
+void pspcom_update_fp(FlightPhase flight_phase) {
+    xQueueOverwrite(s_fp_queue, &flight_phase);
 }
 
 void pspcom_send_status() {
@@ -435,10 +461,23 @@ void pspcom_send_status() {
 }
 
 void pspcom_send_standard() {
-    // Get pointers to latest data
-    SensorFrame *sensor_frame = {0};      // get_last_sensor_frame();
-    GPS_Fix_TypeDef *gps_fix = {0};       // get_last_gps_fix();
-    FlightPhase flight_phase = FP_READY;  // *get_last_flight_phase();
+    static SensorFrame s_sensor_frame;
+    static GPS_Fix_TypeDef s_gps_fix;
+    static FlightPhase s_flight_phase;
+
+    // Get latest data
+    if (xQueueReceive(s_sensor_queue, &s_sensor_frame, 0) != pdPASS) {
+        PAL_LOGW("PSPCOM didn't get new sensor data\n");
+        // We didn't have new data available; set error flag
+    }
+    if (xQueueReceive(s_gps_queue, &s_gps_fix, 0) != pdPASS) {
+        PAL_LOGW("PSPCOM didn't get new GPS data\n");
+        // We didn't have new data available; set error flag
+    }
+    if (xQueueReceive(s_fp_queue, &s_flight_phase, 0) != pdPASS) {
+        PAL_LOGW("PSPCOM didn't get new flight phase data\n");
+        // We didn't have new data available; set error flag
+    }
 
     // Standard telemetry
     pspcommsg tx_msg = {
@@ -449,21 +488,21 @@ void pspcom_send_standard() {
 
     // GPS_POS
     gps_pos_packed gps_pos;
-    gps_pos.num_sats = gps_fix->num_sats & 0x1F;
-    gps_pos.lat = ((int32_t)(gps_fix->lat / 0.0000108)) & 0x00FFFFFF;
-    gps_pos.lon = ((int32_t)(gps_fix->lon / 0.0000108)) & 0x01FFFFFF;
-    gps_pos.alt = ((uint32_t)(gps_fix->height_msl + 1000)) & 0x0003FFFF;
+    gps_pos.num_sats = s_gps_fix.num_sats & 0x1F;
+    gps_pos.lat = ((int32_t)(s_gps_fix.lat / 0.0000108)) & 0x00FFFFFF;
+    gps_pos.lon = ((int32_t)(s_gps_fix.lon / 0.0000108)) & 0x01FFFFFF;
+    gps_pos.alt = ((uint32_t)(s_gps_fix.height_msl + 1000)) & 0x0003FFFF;
     memcpy(tx_msg.payload, &gps_pos, sizeof(gps_pos_packed));
 
     // GPS_VEL
     gps_vel_packed gps_vel;
-    gps_vel.veln = ((int16_t)(gps_fix->vel_north)) & 0x1FFF;
-    gps_vel.vele = ((int16_t)(gps_fix->vel_east)) & 0x1FFF;
-    gps_vel.veld = ((int16_t)(gps_fix->vel_down)) & 0x3FFF;
+    gps_vel.veln = ((int16_t)(s_gps_fix.vel_north)) & 0x1FFF;
+    gps_vel.vele = ((int16_t)(s_gps_fix.vel_east)) & 0x1FFF;
+    gps_vel.veld = ((int16_t)(s_gps_fix.vel_down)) & 0x3FFF;
     memcpy(tx_msg.payload + 9, &gps_vel, sizeof(gps_vel_packed));
 
     // PRES
-    uint16_t pres = (uint16_t)(sensor_frame->pressure / 0.025);
+    uint16_t pres = (uint16_t)(s_sensor_frame.pressure / 0.025);
     tx_msg.payload[14] = pres & 0xFF;
     tx_msg.payload[15] = (pres >> 8) & 0xFF;
 
@@ -479,8 +518,8 @@ void pspcom_send_standard() {
     tx_msg.payload[17] = (a3_cont << 1) | 0x1;
 
     // SYS_STAT
-    tx_msg.payload[18] = gps_fix->fix_valid & 0x1;
-    tx_msg.payload[18] |= ((uint8_t)flight_phase & 0xF) << 3;
+    tx_msg.payload[18] = s_gps_fix.fix_valid & 0x1;
+    tx_msg.payload[18] |= ((uint8_t)s_flight_phase & 0xF) << 3;
 
     pspcom_send_msg(tx_msg);
 }

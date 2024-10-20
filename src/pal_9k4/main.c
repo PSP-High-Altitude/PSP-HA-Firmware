@@ -98,9 +98,9 @@ void handle_pause() {
         s_last_paused = true;
 
         // pause_sensors();
-        pause_storage();
+        storage_pause();
     } else if (s_last_paused) {
-        start_storage();
+        storage_start();
         // start_sensors();
 
         s_last_paused = false;

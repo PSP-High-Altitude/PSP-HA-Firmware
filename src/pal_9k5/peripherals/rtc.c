@@ -55,11 +55,9 @@ Status rtc_init() {
     };
     hrtc.Instance = RTC;
     hrtc.Init = rtc_init;
-    if ((RCC->BDCR & RCC_BDCR_RTCEN) == 0) {
-        if (HAL_RTC_Init(&hrtc) != HAL_OK) {
-            return STATUS_ERROR;
+    if (HAL_RTC_Init(&hrtc) != HAL_OK) {
+        return STATUS_ERROR;
         }
-    }
     return STATUS_OK;
 }
 

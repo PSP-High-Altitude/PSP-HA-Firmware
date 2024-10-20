@@ -43,6 +43,8 @@ Status fp_init() {
     return STATUS_OK;
 }
 
+FlightPhase fp_get() { return s_flight_phase; }
+
 Status fp_update(const SensorFrame* sensor_frame) {
     switch (s_flight_phase) {
         case FP_INIT:

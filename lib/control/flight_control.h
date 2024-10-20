@@ -17,6 +17,8 @@ typedef enum {
 
 Status fp_init();
 
+FlightPhase fp_get();
+
 Status fp_update(const SensorFrame* sensor_frame);
 
 FlightPhase fp_update_init(const SensorFrame* sensor_frame);

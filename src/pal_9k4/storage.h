@@ -23,8 +23,8 @@
 
 Status storage_init(uint8_t usb_mode);
 
-void pause_storage();
-void start_storage();
+void storage_pause();
+void storage_start();
 
 void storage_task();
 

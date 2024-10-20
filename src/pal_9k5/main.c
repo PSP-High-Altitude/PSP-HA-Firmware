@@ -133,13 +133,13 @@ void task_init() {
     xTaskResumeAll();
 
     // After starting tasks, set the transmit frequency
-    if (pspcom_change_frequency(config_get_ptr()->telemetry_frequency_hz) !=
-        STATUS_OK) {
-        PAL_LOGE("Failed to set telemetry frequency!\n");
-    } else {
-        PAL_LOGI("Telemetry frequency set to %.3f MHz!\n",
-                 config_get_ptr()->telemetry_frequency_hz / 1e6);
-    }
+    // if (pspcom_change_frequency(config_get_ptr()->telemetry_frequency_hz) !=
+    //     STATUS_OK) {
+    //     PAL_LOGE("Failed to set telemetry frequency!\n");
+    // } else {
+    //     PAL_LOGI("Telemetry frequency set to %.3f MHz!\n",
+    //              config_get_ptr()->telemetry_frequency_hz / 1e6);
+    // }
 
     while (1) {
         if (mtp_mode) {

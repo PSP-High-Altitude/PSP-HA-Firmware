@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "flight_control.h"
 #include "max_m10s.h"
 #include "sensor.pb.h"
 #include "status.h"
@@ -71,9 +72,15 @@ void task_pspcom_rx();
 
 void pspcom_send_msg(pspcommsg msg);
 
-void pspcom_send_sensor(void *sensor_frame);
+void pspcom_send_sensor(SensorFrame* sensor_frame);
 
-void pspcom_send_gps(void *gps_fix);
+void pspcom_send_gps(GPS_Fix_TypeDef* gps_fix);
+
+void pspcom_update_sensors(SensorFrame* sensor_frame);
+
+void pspcom_update_gps(GPS_Fix_TypeDef* gps_fix);
+
+void pspcom_update_fp(FlightPhase flight_phase);
 
 void task_pspcom_tx();
 
