@@ -120,6 +120,7 @@ void process_packet_from_uart() {
     if(pspcom_read_msg_from_uart(&uart1, &rx_msg) != STATUS_OK) {
     	return;
     }
+
     // Reset receive timeout
     last_msg_from_uart = MILLIS();
 
@@ -127,7 +128,19 @@ void process_packet_from_uart() {
         return;
     }
     printf("UART: %d %d %d\n", rx_msg.msg_id, rx_msg.device_id, rx_msg.payload_len);
+
     switch (rx_msg.msg_id) {
+    	case SET_LOCAL_FREQ:
+			rx_msg.msg_id = ACK;
+			rx_msg.device_id = DEVICE_ID;
+			rx_msg.payload_len = 0;
+			pspcom_send_msg_over_uart(&uart1, rx_msg);
+			while (lora_state == TX)
+				;
+			Radio.SetChannel(*((uint32_t *)(rx_msg.payload + 1)));
+			Radio.Rx(RX_TIMEOUT_VALUE);
+			lora_state = RX;
+			break;
         default:
             rx_msg.device_id = DEVICE_ID;
             pspcom_send_msg_over_air(rx_msg);

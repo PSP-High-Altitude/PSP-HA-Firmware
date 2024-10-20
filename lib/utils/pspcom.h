@@ -11,6 +11,9 @@
 #define CRC16_INIT 0xFFFF
 
 enum {
+    NACK = 0x00,
+    ACK = 0x01,
+    SET_LOCAL_FREQ = 0x5,
     ARMMAIN = 0x12,
     ARMDRG = 0x13,
     ARMAUX = 0x14,
@@ -77,5 +80,7 @@ void task_pspcom_tx();
 void pspcom_send_status();
 
 void pspcom_send_standard();
+
+Status pspcom_change_frequency(uint32_t frequency_hz);
 
 #endif

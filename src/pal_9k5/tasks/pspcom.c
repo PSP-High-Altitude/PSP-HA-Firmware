@@ -41,12 +41,15 @@ uint8_t user_armed[5] = {0, 0, 0, 0, 0};
       ((DMA_Stream_TypeDef *)huart9.hdmarx->Instance)->NDTR) & \
      (UART_BUFFER_SIZE - 1))
 
-struct {
+RAM_D2 struct {
     uint8_t buffer[UART_BUFFER_SIZE];
     size_t rd_ptr;
 } cb;
 
 static BoardConfig *s_config_ptr = NULL;
+
+static uint32_t s_global_nack = 0;
+static uint32_t s_global_ack = 0;
 
 static Status start_uart_reading();
 // static Status stop_uart_reading();
@@ -86,9 +89,14 @@ Status pspcom_init() {
     s_config_ptr = config_get_ptr();
 
     __HAL_RCC_UART9_CLK_ENABLE();
+    __HAL_RCC_DMA1_CLK_ENABLE();
 
     HAL_NVIC_SetPriority(UART9_IRQn, 3, 0);
     HAL_NVIC_EnableIRQ(UART9_IRQn);
+    HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 3, 0);
+    HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
+    HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 3, 0);
+    HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
 
     GPIO_InitTypeDef GPIO_InitStruct = {0};
     GPIO_InitStruct.Pin = GPIO_PIN_14 | GPIO_PIN_15;
@@ -134,7 +142,7 @@ Status pspcom_init() {
     hdma_uart9_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
     hdma_uart9_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
     hdma_uart9_rx.Init.Mode = DMA_CIRCULAR;
-    hdma_uart9_rx.Init.Priority = DMA_PRIORITY_MEDIUM;
+    hdma_uart9_rx.Init.Priority = DMA_PRIORITY_LOW;
     hdma_uart9_rx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
     if (HAL_DMA_Init(&hdma_uart9_rx) != HAL_OK) {
         return STATUS_ERROR;
@@ -241,11 +249,19 @@ Status pspcom_read_msg_from_uart(pspcommsg *msg) {
 
 void task_pspcom_rx() {
     pspcommsg msg;
+    TickType_t last_wake_time = xTaskGetTickCount();
+
     while (1) {
         if (pspcom_read_msg_from_uart(&msg) == STATUS_OK) {
             PAL_LOGI("Received message: %d %d %d\n", msg.payload_len,
                      msg.device_id, msg.msg_id);
             switch (msg.msg_id) {
+                case ACK:
+                    s_global_ack = 1;
+                    break;
+                case NACK:
+                    s_global_nack = 1;
+                    break;
                 case ARMMAIN:
                 case ARMDRG:
                     user_armed[msg.msg_id - ARMMAIN] = 1;
@@ -309,13 +325,14 @@ void task_pspcom_rx() {
                     break;
             }
         }
-        vTaskDelay(s_config_ptr->pspcom_rx_loop_period_ms / portTICK_PERIOD_MS);
+        vTaskDelayUntil(&last_wake_time,
+                        pdMS_TO_TICKS(s_config_ptr->pspcom_rx_loop_period_ms));
     }
 }
 
 void pspcom_send_msg(pspcommsg msg) {
     uint16_t checksum = crc(CRC16_INIT, msg);
-    char *buf = (char *)malloc(7 + msg.payload_len);
+    char buf[7 + msg.payload_len];
 
     sprintf(buf, "!$%c%c%c", msg.payload_len, msg.device_id, msg.msg_id);
     memcpy(buf + 5, msg.payload, msg.payload_len);
@@ -329,7 +346,6 @@ void pspcom_send_msg(pspcommsg msg) {
         }
         vTaskDelay(1);
     }
-    free(buf);
 }
 
 void pspcom_send_sensor(void *sensor_frame) {
@@ -562,8 +578,55 @@ static void arm_timeout_callback(TimerHandle_t xTimer) {
     }
 }
 
-void DMA1_Stream0_IRQHandler(void) { HAL_DMA_IRQHandler(&hdma_uart9_rx); }
+Status pspcom_change_frequency(uint32_t frequency_hz) {
+    // Save to the config
+    s_config_ptr->telemetry_frequency_hz = frequency_hz;
+    config_commit();
 
-void DMA1_Stream1_IRQHandler(void) { HAL_DMA_IRQHandler(&hdma_uart9_tx); }
+    s_global_ack = 0;
+    s_global_nack = 0;
+
+    pspcommsg msg = {
+        .payload_len = 5,
+        .device_id = PSPCOM_DEVICE_ID,
+        .msg_id = SET_LOCAL_FREQ,
+    };
+
+    // Radio 0
+    msg.payload[0] = 0;
+
+    // Frequency
+    memcpy(msg.payload + 1, &frequency_hz, sizeof(uint32_t));
+    pspcom_send_msg(msg);
+
+    uint64_t timeout = MILLIS();
+    while (MILLIS() - timeout < 10000) {
+        DELAY(500);
+
+        if (s_global_ack) {
+            s_global_ack = 0;
+            s_global_nack = 0;
+            return STATUS_OK;
+        } else if (s_global_nack) {
+            s_global_ack = 0;
+            s_global_nack = 0;
+            return STATUS_ERROR;
+        }
+
+        pspcom_send_msg(msg);
+    }
+
+    return STATUS_ERROR;
+}
+
+void DMA1_Stream0_IRQHandler(void) {
+    HAL_NVIC_ClearPendingIRQ(DMA1_Stream0_IRQn);
+    HAL_DMA_IRQHandler(&hdma_uart9_rx);
+}
+
+void DMA1_Stream1_IRQHandler(void) {
+    HAL_NVIC_ClearPendingIRQ(DMA1_Stream1_IRQn);
+    HAL_DMA_IRQHandler(&hdma_uart9_tx);
+}
 
 void UART9_IRQHandler(void) { HAL_UART_IRQHandler(&huart9); }

@@ -49,6 +49,10 @@ typedef struct {
     // time in ms from launch detection during which pyros cannot fire
     uint32_t deploy_lockout_ms;
 
+    /* TELEMETRY SETTINGS */
+    // Radio frequency in Hz at which telemetry is sent and received
+    uint32_t telemetry_frequency_hz;
+
     // CRC-32 checksum of the config
     uint32_t checksum;
 } BoardConfig;

@@ -30,6 +30,9 @@ const static BoardConfig s_default_config = {
     .main_height_m = 300.0,      // m
     .drogue_delay_ms = 1000,     // ms
     .deploy_lockout_ms = 10000,  // ms
+
+    // Telemetry settings
+    .telemetry_frequency_hz = 433000000,  // Hz
 };
 
 // Simple summing checksum with non-zero initialization
@@ -158,6 +161,7 @@ void config_print() {
     printf("Main height: %f m\n", config->main_height_m);
     printf("Drogue delay: %lu ms\n", config->drogue_delay_ms);
     printf("Deploy lockout: %lu ms\n", config->deploy_lockout_ms);
+    printf("Telemetry frequency: %lu Hz\n", config->telemetry_frequency_hz);
     printf("Checksum: %08lx\n", config->checksum);
     printf("========================\n");
 }

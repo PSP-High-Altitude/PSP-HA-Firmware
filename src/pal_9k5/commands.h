@@ -2,6 +2,7 @@
 #define COMMANDS_H
 
 #include "board_config.h"
+#include "pspcom.h"
 #include "regex.h"
 #include "rtc/rtc.h"
 #include "status.h"
@@ -51,6 +52,10 @@ char regex_set_frequency[] = "^set_frequency [0-9]{1,10}[\n]*$";
 void cmd_set_frequency(char *str) {
     uint32_t frequency;
     sscanf(str, "set_frequency %ld", &frequency);
+    if (pspcom_change_frequency(frequency) != STATUS_OK) {
+        PAL_LOGE("Failed to change telemetry frequency!\n");
+        return;
+    }
     PAL_LOGW("Changed telemetry frequency to %.3f MHz!\n", frequency / 1e6);
 }
 

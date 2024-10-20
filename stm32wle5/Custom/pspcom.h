@@ -16,6 +16,7 @@ enum {
     GETDEVS = 0x02,
     POLLDEV = 0x03,
     GETMSGS = 0x04,
+	SET_LOCAL_FREQ = 0x05,
     SETFREQ = 0x11,
     ARMMAIN = 0x12,
     ARMDRG = 0x13,
