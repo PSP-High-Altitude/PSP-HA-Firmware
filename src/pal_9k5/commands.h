@@ -2,6 +2,7 @@
 #define COMMANDS_H
 
 #include "board_config.h"
+#include "mt29f4g.h"
 #include "pspcom.h"
 #include "regex.h"
 #include "rtc/rtc.h"
@@ -16,6 +17,7 @@ void cmd_help(char *str) {
         "  set_datetime YYYY-MM-DD HH:MM:SS      sets the RTC time\n"
         "  get_datetime                          gets the RTC time\n"
         "  invalidate_config                     invalidates the config\n"
+        "  erase_flash_chip                      full block-level flash erase\n"
         "  set_frequency [frequency in Hz]       sets the frequency\n");
 }
 
@@ -45,6 +47,16 @@ char regex_invalidate_config[] = "^invalidate_config[\n]*$";
 void cmd_invalidate_config(char *str) {
     config_invalidate();
     PAL_LOGW("Board config invalidated!\n");
+}
+
+// Config erase chip
+char regex_erase_flash_chip[] = "^erase_flash_chip[\n]*$";
+void cmd_erase_flash_chip(char *str) {
+    if (mt29f4g_erase_chip() == STATUS_OK) {
+        PAL_LOGI("Successfully erased flash chip\n");
+    } else {
+        PAL_LOGE("Failed to erase flash chip\n");
+    }
 }
 
 // Config set frequency command
