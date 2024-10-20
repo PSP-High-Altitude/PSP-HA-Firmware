@@ -3,6 +3,7 @@
 #include "board.h"
 #include "board_config.h"
 #include "gps.pb.h"
+#include "hwil/hwil.h"
 #include "i2c/i2c.h"
 #include "max_m10s.h"
 #include "pspcom.h"
@@ -104,6 +105,15 @@ void task_gps(TaskHandle_t* handle_ptr) {
     while (1) {
         GPS_Fix_TypeDef fix;
         if (max_m10s_poll_fix(&s_gps_conf, &fix) == STATUS_OK) {
+#ifdef HWIL_TEST
+            // If we're doing a HWIL test, overwrite the actual GPS fix
+            // with one from the test data based on the current timestamp
+            GPS_Fix_TypeDef hwil_fix;
+            if (get_hwil_gps_fix(&hwil_fix) == STATUS_OK) {
+                fix = hwil_fix;
+            }
+#endif  // HWIL_TEST
+
             GpsFrame gps_frame = gps_fix_to_pb_frame(MILLIS(), &fix);
 
             // Set LED to indicate GPS fix

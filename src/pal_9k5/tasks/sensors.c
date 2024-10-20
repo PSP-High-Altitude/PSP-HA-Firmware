@@ -158,7 +158,6 @@ void task_sensors(TaskHandle_t* handle_ptr) {
 #ifdef HWIL_TEST
         // If we're doing a HWIL test, overwrite the actual sensor frame with
         // one from the test data based on the current system timestamp
-        gpio_write(PIN_RED, GPIO_HIGH);
         SensorFrame hwil_sensor_frame;
         if (get_hwil_sensor_frame(&hwil_sensor_frame) == STATUS_OK) {
             sensor_frame = hwil_sensor_frame;

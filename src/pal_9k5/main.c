@@ -154,8 +154,15 @@ void task_init() {
             gpio_write(PIN_BLUE, GPIO_LOW);
             DELAY(1000);
         } else {
+#ifdef HWIL_TEST
+            gpio_write(PIN_RED, GPIO_HIGH);
+            DELAY(100);
+            gpio_write(PIN_RED, GPIO_LOW);
+            DELAY(100);
+#else
             DELAY(1000 * 60);
             PAL_LOGI("<3\n");
+#endif  // HWIL_TEST
         }
     }
 }
