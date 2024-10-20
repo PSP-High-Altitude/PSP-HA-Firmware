@@ -57,6 +57,10 @@ Status se_init() {
     if (status != STATUS_OK) {
         return status;
     }
+    s_current_state->orientation.w = 1;
+    s_current_state->orientation.x = 0;
+    s_current_state->orientation.y = 0;
+    s_current_state->orientation.z = 0;
     return STATUS_OK;
 }
 
