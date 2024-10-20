@@ -59,6 +59,8 @@ typedef enum {
 
 Status se_init();
 
+Status se_reset();
+
 const StateEst* se_predict();
 
 Status se_update(FlightPhase phase, const SensorFrame* sensor_frame);

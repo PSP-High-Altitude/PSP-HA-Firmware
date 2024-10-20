@@ -3,6 +3,7 @@
 #include <malloc.h>
 #include <math.h>
 
+#include "backup.h"
 #include "quat.h"
 #include "vector.h"
 
@@ -13,28 +14,28 @@
 #define G_MAG 9.81f
 
 typedef Vector* (*OrientFunc)(float, float, float, Vector*);
-Status init_buffer(VecBuffer* buffer, size_t buffer_size);
-VecBuffer* update_buffer(VecBuffer* buffer, float vec_x, float vec_y,
-                         float vec_z);
-Vector* sensor_convert_x_up(float sensor_x, float sensor_y, float sensor_z,
-                            Vector* v_out);
-Vector* sensor_convert_y_up(float sensor_x, float sensor_y, float sensor_z,
-                            Vector* v_out);
-Vector* sensor_convert_z_up(float sensor_x, float sensor_y, float sensor_z,
-                            Vector* v_out);
-Vector* sensor_convert_x_down(float sensor_x, float sensor_y, float sensor_z,
-                              Vector* v_out);
-Vector* sensor_convert_y_down(float sensor_x, float sensor_y, float sensor_z,
-                              Vector* v_out);
-Vector* sensor_convert_z_down(float sensor_x, float sensor_y, float sensor_z,
-                              Vector* v_out);
-OrientFunc get_orientation_function(SensorDirection up_dir);
+static Status init_buffer(VecBuffer* buffer, size_t buffer_size);
+static VecBuffer* update_buffer(VecBuffer* buffer, float vec_x, float vec_y,
+                                float vec_z);
+static Vector* sensor_convert_x_up(float sensor_x, float sensor_y,
+                                   float sensor_z, Vector* v_out);
+static Vector* sensor_convert_y_up(float sensor_x, float sensor_y,
+                                   float sensor_z, Vector* v_out);
+static Vector* sensor_convert_z_up(float sensor_x, float sensor_y,
+                                   float sensor_z, Vector* v_out);
+static Vector* sensor_convert_x_down(float sensor_x, float sensor_y,
+                                     float sensor_z, Vector* v_out);
+static Vector* sensor_convert_y_down(float sensor_x, float sensor_y,
+                                     float sensor_z, Vector* v_out);
+static Vector* sensor_convert_z_down(float sensor_x, float sensor_y,
+                                     float sensor_z, Vector* v_out);
+static OrientFunc get_orientation_function(SensorDirection up_dir);
 
-StateEst* s_current_state = {0};
+static StateEst* s_current_state = NULL;
 
-VecBuffer* s_acc_h_buffer;
-VecBuffer* s_acc_i_buffer;
-VecBuffer* s_baro_buffer;
+static VecBuffer* s_acc_h_buffer = NULL;
+static VecBuffer* s_acc_i_buffer = NULL;
+static VecBuffer* s_baro_buffer = NULL;
 
 OrientFunc orientation_function = NULL;
 
@@ -44,23 +45,19 @@ Vector s_grav_vec = {.x = -G_MAG, .y = 0.0f, .z = 0.0f};
 
 Status se_init() {
     orientation_function = get_orientation_function(DEFAULT_ORIENTATION);
-    Status status;
-    status = init_buffer(s_acc_h_buffer, STATE_EST_BUFFERS_SIZE);
-    if (status != STATUS_OK) {
-        return status;
-    }
-    status = init_buffer(s_acc_i_buffer, STATE_EST_BUFFERS_SIZE);
-    if (status != STATUS_OK) {
-        return status;
-    }
-    status = init_buffer(s_baro_buffer, STATE_EST_BUFFERS_SIZE);
-    if (status != STATUS_OK) {
-        return status;
-    }
+    EXPECT_OK(init_buffer(s_acc_h_buffer, STATE_EST_BUFFERS_SIZE),
+              "failed to init stat est buffer\n");
+    EXPECT_OK(init_buffer(s_acc_i_buffer, STATE_EST_BUFFERS_SIZE),
+              "failed to init stat est buffer\n");
+    EXPECT_OK(init_buffer(s_baro_buffer, STATE_EST_BUFFERS_SIZE),
+              "failed to init stat est buffer\n");
+    s_current_state = &(backup_get_ptr()->state_estimate);
+    return STATUS_OK;
+}
+
+Status se_reset() {
+    memset(s_current_state, 0, sizeof(StateEst));
     s_current_state->orientation.w = 1;
-    s_current_state->orientation.x = 0;
-    s_current_state->orientation.y = 0;
-    s_current_state->orientation.z = 0;
     return STATUS_OK;
 }
 
@@ -177,7 +174,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     return STATUS_OK;
 }
 
-Status init_buffer(VecBuffer* buffer, size_t buffer_size) {
+static Status init_buffer(VecBuffer* buffer, size_t buffer_size) {
     buffer = malloc(sizeof(VecBuffer));
     if (buffer == NULL) {
         return STATUS_MEMORY_ERROR;
@@ -206,7 +203,7 @@ VecBuffer* update_buffer(VecBuffer* buffer, float vec_x, float vec_y,
     return buffer;
 }
 
-OrientFunc get_orientation_function(SensorDirection up_dir) {
+static OrientFunc get_orientation_function(SensorDirection up_dir) {
     switch (up_dir) {
         case IMU_X_UP:
             return &sensor_convert_x_up;
@@ -225,48 +222,48 @@ OrientFunc get_orientation_function(SensorDirection up_dir) {
     }
 }
 
-Vector* sensor_convert_x_up(float sensor_x, float sensor_y, float sensor_z,
-                            Vector* v_out) {
+static Vector* sensor_convert_x_up(float sensor_x, float sensor_y,
+                                   float sensor_z, Vector* v_out) {
     v_out->x = sensor_x;
     v_out->y = sensor_y;
     v_out->z = sensor_z;
     return v_out;
 }
 
-Vector* sensor_convert_y_up(float sensor_x, float sensor_y, float sensor_z,
-                            Vector* v_out) {
+static Vector* sensor_convert_y_up(float sensor_x, float sensor_y,
+                                   float sensor_z, Vector* v_out) {
     v_out->x = sensor_y;
     v_out->y = sensor_z;
     v_out->z = sensor_x;
     return v_out;
 }
 
-Vector* sensor_convert_z_up(float sensor_x, float sensor_y, float sensor_z,
-                            Vector* v_out) {
+static Vector* sensor_convert_z_up(float sensor_x, float sensor_y,
+                                   float sensor_z, Vector* v_out) {
     v_out->x = sensor_z;
     v_out->y = sensor_x;
     v_out->z = sensor_y;
     return v_out;
 }
 
-Vector* sensor_convert_x_down(float sensor_x, float sensor_y, float sensor_z,
-                              Vector* v_out) {
+static Vector* sensor_convert_x_down(float sensor_x, float sensor_y,
+                                     float sensor_z, Vector* v_out) {
     v_out->x = -sensor_x;
     v_out->y = -sensor_y;
     v_out->z = -sensor_z;
     return v_out;
 }
 
-Vector* sensor_convert_y_down(float sensor_x, float sensor_y, float sensor_z,
-                              Vector* v_out) {
+static Vector* sensor_convert_y_down(float sensor_x, float sensor_y,
+                                     float sensor_z, Vector* v_out) {
     v_out->x = -sensor_y;
     v_out->y = -sensor_z;
     v_out->z = -sensor_x;
     return v_out;
 }
 
-Vector* sensor_convert_z_down(float sensor_x, float sensor_y, float sensor_z,
-                              Vector* v_out) {
+static Vector* sensor_convert_z_down(float sensor_x, float sensor_y,
+                                     float sensor_z, Vector* v_out) {
     v_out->x = -sensor_z;
     v_out->y = -sensor_x;
     v_out->z = -sensor_y;

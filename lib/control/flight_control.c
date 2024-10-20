@@ -2,15 +2,16 @@
 
 #include <stdlib.h>
 
+#include "backup.h"
 #include "board_config.h"
 #include "state_estimation.h"
 #include "timer.h"
 
-// Current flight phase
-static FlightPhase s_flight_phase = FP_INIT;
+// Pointer to flight phase
+static FlightPhase* s_flight_phase_ptr = NULL;
 
 // Pointer to config object
-static BoardConfig* s_config_ptr;
+static BoardConfig* s_config_ptr = NULL;
 
 // Initialization start time
 static uint64_t s_init_start_ms;
@@ -27,6 +28,11 @@ Status fp_init() {
         ASSERT_OK(STATUS_STATE_ERROR, "unable to get ptr to config\n");
     }
 
+    s_flight_phase_ptr = &(backup_get_ptr()->flight_phase);
+    if (s_flight_phase_ptr == NULL) {
+        ASSERT_OK(STATUS_STATE_ERROR, "unable to get ptr to flight phase\n");
+    }
+
     if (s_config_ptr->launch_detect_replay) {
         // Allocate buffer for storing sensor data during launch detection
         // Dynamic allocation is gross, but it's during init so should be safe
@@ -40,23 +46,29 @@ Status fp_init() {
         }
     }
 
+    if (*s_flight_phase_ptr == FP_INIT || *s_flight_phase_ptr == FP_READY ||
+        *s_flight_phase_ptr == FP_LANDED) {
+        ASSERT_OK(se_reset(), "failed to reset state\n");
+        *s_flight_phase_ptr = FP_INIT;
+    }
+
     return STATUS_OK;
 }
 
-FlightPhase fp_get() { return s_flight_phase; }
+FlightPhase fp_get() { return *s_flight_phase_ptr; }
 
 Status fp_update(const SensorFrame* sensor_frame) {
-    switch (s_flight_phase) {
+    switch (*s_flight_phase_ptr) {
         case FP_INIT:
-            s_flight_phase = fp_update_init(sensor_frame);
+            *s_flight_phase_ptr = fp_update_init(sensor_frame);
             break;
 
         case FP_READY:
-            s_flight_phase = fp_update_ready(sensor_frame);
+            *s_flight_phase_ptr = fp_update_ready(sensor_frame);
             break;
 
         case FP_BOOST:
-            s_flight_phase = fp_update_boost(sensor_frame);
+            *s_flight_phase_ptr = fp_update_boost(sensor_frame);
             break;
 
         default:
@@ -109,7 +121,7 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
     if (s_ms_accel_above_threshold > launch_detect_period) {
         if (s_config_ptr->launch_detect_replay) {
             for (int i = 0; i < s_ld_buffer_entries; i++) {
-                EXPECT_OK(se_update(s_flight_phase, &s_ld_buffer_data[i]),
+                EXPECT_OK(se_update(*s_flight_phase_ptr, &s_ld_buffer_data[i]),
                           "state est update failed during launch replay\n");
             }
         }
@@ -120,7 +132,7 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
 }
 
 FlightPhase fp_update_boost(const SensorFrame* sensor_frame) {
-    EXPECT_OK(se_update(s_flight_phase, sensor_frame),
+    EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
               "state est update failed in boost\n");
 
     const StateEst* state = se_predict();

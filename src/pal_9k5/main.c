@@ -213,6 +213,9 @@ void SysTick_Handler(void) {
     /* Clear overflow flag */
     SysTick->CTRL;
 
+    /* Update backup system timestamp */
+    backup_get_ptr()->timestamp = MICROS();
+
     if (xTaskGetSchedulerState() != taskSCHEDULER_NOT_STARTED) {
         /* Call tick handler */
         xPortSysTickHandler();
