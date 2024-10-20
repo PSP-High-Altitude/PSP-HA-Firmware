@@ -32,13 +32,15 @@ OrientFunc get_orientation_function(SensorDirection up_dir);
 
 StateEst* s_current_state = {0};
 
-VecBuffer* s_acc_h_buffer = {0};
-VecBuffer* s_acc_i_buffer = {0};
-VecBuffer* s_baro_buffer = {0};
+VecBuffer* s_acc_h_buffer;
+VecBuffer* s_acc_i_buffer;
+VecBuffer* s_baro_buffer;
 
 OrientFunc orientation_function = NULL;
 
 float s_dt_prev = 0;
+
+Vector s_grav_vec = {.x = -G_MAG, .y = 0.0f, .z = 0.0f};
 
 Status se_init() {
     orientation_function = get_orientation_function(DEFAULT_ORIENTATION);
@@ -144,6 +146,9 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     quat_rot_inv(&(s_current_state->accBody), &(s_current_state->orientation),
                  &(s_current_state->accGeo));
 
+    vec_iadd(&(s_current_state->accBody), &s_grav_vec);
+    vec_iadd(&(s_current_state->accGeo), &s_grav_vec);
+
     vec_int_step(&(s_current_state->velBody), &acc_old,
                  &(s_current_state->accBody), dt, &vec_temp);
     vec_copy(&vec_temp, &(s_current_state->velBody));
@@ -169,6 +174,10 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
 }
 
 Status init_buffer(VecBuffer* buffer, size_t buffer_size) {
+    buffer = malloc(sizeof(VecBuffer));
+    if (buffer == NULL) {
+        return STATUS_MEMORY_ERROR;
+    }
     buffer->vectors = malloc(sizeof(Vector) * buffer_size);
     if (buffer->vectors == NULL) {
         return STATUS_MEMORY_ERROR;
@@ -181,9 +190,12 @@ Status init_buffer(VecBuffer* buffer, size_t buffer_size) {
 
 VecBuffer* update_buffer(VecBuffer* buffer, float vec_x, float vec_y,
                          float vec_z) {
+    vec_iscale(&(buffer->avg), buffer->filled_elements);
+    buffer->filled_elements = fmax(buffer->filled_elements + 1, buffer->size);
     vec_isub(&(buffer->avg), s_acc_i_buffer->current);
     orientation_function(vec_x, vec_y, vec_z, buffer->current);
     vec_iadd(&(buffer->avg), buffer->current);
+    vec_iscale(&(buffer->avg), 1.0f / buffer->filled_elements);
     buffer->previous = buffer->vectors + buffer->i_prev;
     buffer->current = buffer->vectors + ((buffer->i_prev + 1) % buffer->size);
     buffer->i_prev = (buffer->i_prev + 1) % buffer->size;

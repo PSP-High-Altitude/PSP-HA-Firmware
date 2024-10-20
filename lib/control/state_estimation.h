@@ -43,6 +43,7 @@ typedef struct {
     Vector avg;
     uint16_t i_prev;
     uint16_t size;
+    uint16_t filled_elements;
 } VecBuffer;
 
 typedef enum {
