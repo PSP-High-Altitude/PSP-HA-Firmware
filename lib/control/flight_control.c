@@ -67,8 +67,56 @@ Status fp_update(const SensorFrame* sensor_frame) {
             *s_flight_phase_ptr = fp_update_ready(sensor_frame);
             break;
 
-        case FP_BOOST:
-            *s_flight_phase_ptr = fp_update_boost(sensor_frame);
+        case FP_BOOST_1:
+            *s_flight_phase_ptr = fp_update_boost_1(sensor_frame);
+            break;
+
+        case FP_FAST_BOOST_1:
+            *s_flight_phase_ptr = fp_update_fast_boost_1(sensor_frame);
+            break;
+
+        case FP_FAST_1:
+            *s_flight_phase_ptr = fp_update_fast_1(sensor_frame);
+            break;
+
+        case FP_COAST_1:
+            *s_flight_phase_ptr = fp_update_coast_1(sensor_frame);
+            break;
+
+        case FP_STAGE:
+            *s_flight_phase_ptr = fp_update_stage(sensor_frame);
+            break;
+
+        case FP_IGNITE:
+            *s_flight_phase_ptr = fp_update_ignite(sensor_frame);
+            break;
+
+        case FP_BOOST_2:
+            *s_flight_phase_ptr = fp_update_boost_2(sensor_frame);
+            break;
+
+        case FP_FAST_BOOST_2:
+            *s_flight_phase_ptr = fp_update_fast_boost_2(sensor_frame);
+            break;
+
+        case FP_FAST_2:
+            *s_flight_phase_ptr = fp_update_fast_2(sensor_frame);
+            break;
+
+        case FP_COAST_2:
+            *s_flight_phase_ptr = fp_update_coast_2(sensor_frame);
+            break;
+
+        case FP_DROGUE:
+            *s_flight_phase_ptr = fp_update_drogue(sensor_frame);
+            break;
+
+        case FP_MAIN:
+            *s_flight_phase_ptr = fp_update_main(sensor_frame);
+            break;
+
+        case FP_LANDED:
+            *s_flight_phase_ptr = fp_update_landed(sensor_frame);
             break;
 
         default:
@@ -125,25 +173,96 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
                           "state est update failed during launch replay\n");
             }
         }
-        return FP_BOOST;
+        return FP_BOOST_1;
     }
 
     return FP_READY;
 }
 
-FlightPhase fp_update_boost(const SensorFrame* sensor_frame) {
+FlightPhase fp_update_boost_1(const SensorFrame* sensor_frame) {
     EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
               "state est update failed in boost\n");
 
     const StateEst* state = se_predict();
 
-    if (-state->velGeo.z > s_config_ptr->min_fast_vel_mps) {
-        return FP_FAST;
-    }
+    uint8_t is_fast = state->velGeo.x > s_config_ptr->min_fast_vel_mps;
+    uint8_t is_coast = state->accGeo.x < s_config_ptr->max_coast_acc_mps2;
 
-    if (-state->accGeo.z < s_config_ptr->max_coast_acc_mps2) {
-        return FP_COAST;
+    if (is_fast && is_coast) {
+        return FP_FAST_1;
     }
+    if (is_coast) {
+        return FP_COAST_1;
+    }
+    if (is_fast) {
+        return FP_FAST_BOOST_1;
+    }
+    return FP_BOOST_1;
+}
 
-    return FP_BOOST;
+FlightPhase fp_update_fast_boost_1(const SensorFrame* sensor_frame) {
+    EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
+              "state est update failed in fast boost\n");
+
+    const StateEst* state = se_predict();
+
+    uint8_t is_fast = state->velGeo.x > s_config_ptr->min_fast_vel_mps;
+    uint8_t is_coast = state->accGeo.x < s_config_ptr->max_coast_acc_mps2;
+
+    if (is_fast && is_coast) {
+        return FP_FAST_1;
+    }
+    if (is_coast) {
+        return FP_COAST_1;
+    }
+    if (is_fast) {
+        return FP_FAST_BOOST_1;
+    }
+    return FP_BOOST_1;
+}
+
+FlightPhase fp_update_fast_1(const SensorFrame* sensor_frame) {
+    // TODO: fast_1
+    return FP_FAST_1;
+}
+
+FlightPhase fp_update_coast_1(const SensorFrame* sensor_frame) {
+    // TODO: coast_1
+    return FP_COAST_1;
+}
+FlightPhase fp_update_stage(const SensorFrame* sensor_frame) {
+    // TODO: stage
+    return FP_STAGE;
+}
+FlightPhase fp_update_ignite(const SensorFrame* sensor_frame) {
+    // TODO: ignite
+    return FP_IGNITE;
+}
+FlightPhase fp_update_boost_2(const SensorFrame* sensor_frame) {
+    // TODO: boost_2
+    return FP_BOOST_2;
+}
+FlightPhase fp_update_fast_boost_2(const SensorFrame* sensor_frame) {
+    // TODO: fast_boost_2
+    return FP_FAST_BOOST_2;
+}
+FlightPhase fp_update_fast_2(const SensorFrame* sensor_frame) {
+    // TODO: fast_2
+    return FP_FAST_2;
+}
+FlightPhase fp_update_coast_2(const SensorFrame* sensor_frame) {
+    // TODO: coast_2
+    return FP_COAST_2;
+}
+FlightPhase fp_update_drogue(const SensorFrame* sensor_frame) {
+    // TODO: drogue
+    return FP_DROGUE;
+}
+FlightPhase fp_update_main(const SensorFrame* sensor_frame) {
+    // TODO: main
+    return FP_MAIN;
+}
+FlightPhase fp_update_landed(const SensorFrame* sensor_frame) {
+    // TODO: landed
+    return FP_LANDED;
 }

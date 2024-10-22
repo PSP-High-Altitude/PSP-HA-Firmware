@@ -15,8 +15,10 @@
 
 typedef Vector* (*OrientFunc)(float, float, float, Vector*);
 static Status init_buffer(VecBuffer* buffer, size_t buffer_size);
+static Status init_baro_buffer(BaroBuffer* buffer, size_t buffer_size);
 static VecBuffer* update_buffer(VecBuffer* buffer, float vec_x, float vec_y,
                                 float vec_z);
+BaroBuffer* update_baro_buffer(BaroBuffer* buffer, float baro);
 static Vector* sensor_convert_x_up(float sensor_x, float sensor_y,
                                    float sensor_z, Vector* v_out);
 static Vector* sensor_convert_y_up(float sensor_x, float sensor_y,
@@ -35,7 +37,7 @@ static StateEst* s_current_state = NULL;
 
 static VecBuffer* s_acc_h_buffer = NULL;
 static VecBuffer* s_acc_i_buffer = NULL;
-static VecBuffer* s_baro_buffer = NULL;
+static BaroBuffer* s_baro_buffer = NULL;
 
 OrientFunc orientation_function = NULL;
 
@@ -49,7 +51,7 @@ Status se_init() {
               "failed to init stat est buffer\n");
     EXPECT_OK(init_buffer(s_acc_i_buffer, STATE_EST_BUFFERS_SIZE),
               "failed to init stat est buffer\n");
-    EXPECT_OK(init_buffer(s_baro_buffer, STATE_EST_BUFFERS_SIZE),
+    EXPECT_OK(init_baro_buffer(s_baro_buffer, STATE_EST_BUFFERS_SIZE),
               "failed to init stat est buffer\n");
     s_current_state = &(backup_get_ptr()->state_estimate);
     return STATUS_OK;
@@ -130,8 +132,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
 
     update_buffer(s_acc_h_buffer, acc_h_x, acc_h_y, acc_h_z);
     update_buffer(s_acc_i_buffer, acc_i_x, acc_i_y, acc_i_z);
-    update_buffer(s_baro_buffer, baro, s_current_state->posBody.y,
-                  s_current_state->posBody.z);
+    update_baro_buffer(s_baro_buffer, baro);
 
     if (fabsf(acc_h_x) > LOW_G_MAX_ACC || fabsf(acc_h_y) > LOW_G_MAX_ACC ||
         fabsf(acc_h_z) > LOW_G_MAX_ACC) {
@@ -159,7 +160,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     vec_copy(&vec_temp, &(s_current_state->velGeo));
 
     if (CHUTE_DEPLOYED(phase)) {
-        vec_copy(&(s_baro_buffer->avg), &(s_current_state->posBody));
+        s_current_state->posBody.x = s_baro_buffer->avg;
     } else {
         vec_int_step(&(s_current_state->posBody), &vel_old,
                      &(s_current_state->velBody), dt, &vec_temp);
@@ -186,6 +187,23 @@ static Status init_buffer(VecBuffer* buffer, size_t buffer_size) {
     buffer->current = buffer->vectors + 1;
     buffer->previous = buffer->vectors;
     buffer->i_prev = 0;
+    buffer->filled_elements = 0;
+    return STATUS_OK;
+}
+
+static Status init_baro_buffer(BaroBuffer* buffer, size_t buffer_size) {
+    buffer = malloc(sizeof(BaroBuffer));
+    if (buffer == NULL) {
+        return STATUS_MEMORY_ERROR;
+    }
+    buffer->vals = malloc(sizeof(float) * buffer_size);
+    if (buffer->vals == NULL) {
+        return STATUS_MEMORY_ERROR;
+    }
+    buffer->current = buffer->vals + 1;
+    buffer->previous = buffer->vals;
+    buffer->i_prev = 0;
+    buffer->filled_elements = 0;
     return STATUS_OK;
 }
 
@@ -193,12 +211,25 @@ VecBuffer* update_buffer(VecBuffer* buffer, float vec_x, float vec_y,
                          float vec_z) {
     vec_iscale(&(buffer->avg), buffer->filled_elements);
     buffer->filled_elements = fmax(buffer->filled_elements + 1, buffer->size);
-    vec_isub(&(buffer->avg), s_acc_i_buffer->current);
+    vec_isub(&(buffer->avg), buffer->current);
     orientation_function(vec_x, vec_y, vec_z, buffer->current);
     vec_iadd(&(buffer->avg), buffer->current);
     vec_iscale(&(buffer->avg), 1.0f / buffer->filled_elements);
     buffer->previous = buffer->vectors + buffer->i_prev;
     buffer->current = buffer->vectors + ((buffer->i_prev + 1) % buffer->size);
+    buffer->i_prev = (buffer->i_prev + 1) % buffer->size;
+    return buffer;
+}
+
+BaroBuffer* update_baro_buffer(BaroBuffer* buffer, float baro) {
+    buffer->avg *= buffer->filled_elements;
+    buffer->filled_elements = fmax(buffer->filled_elements + 1, buffer->size);
+    buffer->avg -= *buffer->current;
+    *buffer->current = baro;
+    buffer->avg += *buffer->current;
+    buffer->avg *= 1.0f / buffer->filled_elements;
+    buffer->previous = buffer->vals + buffer->i_prev;
+    buffer->current = buffer->vals + ((buffer->i_prev + 1) % buffer->size);
     buffer->i_prev = (buffer->i_prev + 1) % buffer->size;
     return buffer;
 }

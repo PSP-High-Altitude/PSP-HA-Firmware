@@ -1,8 +1,6 @@
 #ifndef STATE_ESTIMATION_H
 #define STATE_ESTIMATION_H
 
-#include <stdio.h>
-
 #include "data.h"
 #include "flight_control.h"
 #include "math.h"
@@ -45,6 +43,16 @@ typedef struct {
     uint16_t size;
     uint16_t filled_elements;
 } VecBuffer;
+
+typedef struct {
+    float* vals;
+    float* current;
+    float* previous;
+    float avg;
+    uint16_t i_prev;
+    uint16_t size;
+    uint16_t filled_elements;
+} BaroBuffer;
 
 typedef enum {
     IMU_X_UP,
