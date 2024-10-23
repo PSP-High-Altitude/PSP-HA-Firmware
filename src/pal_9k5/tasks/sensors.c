@@ -136,17 +136,20 @@ void task_sensors(TaskHandle_t* handle_ptr) {
         SensorFrame sensor_frame;
         sensor_frame.timestamp = timestamp;
 
-        sensor_frame.acc_h_x = acch.accelX;
-        sensor_frame.acc_h_y = acch.accelY;
-        sensor_frame.acc_h_z = acch.accelZ;
+        // Reads 1g on y-axis; want -1g on z-axis
+        sensor_frame.acc_h_x = +acch.accelX;
+        sensor_frame.acc_h_y = +acch.accelZ;
+        sensor_frame.acc_h_z = -acch.accelY;
 
-        sensor_frame.acc_i_x = accel.accelX;
-        sensor_frame.acc_i_y = accel.accelY;
-        sensor_frame.acc_i_z = accel.accelZ;
+        // Reads -1g on y-axis; want -1g on z-axis
+        sensor_frame.acc_i_x = +accel.accelX;
+        sensor_frame.acc_i_y = -accel.accelZ;
+        sensor_frame.acc_i_z = +accel.accelY;
 
-        sensor_frame.rot_i_x = gyro.gyroX;
-        sensor_frame.rot_i_y = gyro.gyroY;
-        sensor_frame.rot_i_z = gyro.gyroZ;
+        // Apply same transformation to gyro
+        sensor_frame.rot_i_x = +gyro.gyroX;
+        sensor_frame.rot_i_y = -gyro.gyroY;
+        sensor_frame.rot_i_z = +gyro.gyroZ;
 
         sensor_frame.mag_i_x = mag.magX;
         sensor_frame.mag_i_y = mag.magY;
