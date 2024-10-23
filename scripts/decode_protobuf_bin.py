@@ -4,6 +4,23 @@ import sys
 import os
 import pandas as pd
 
+def read_varint(stream):
+    """Read a varint from the stream."""
+    shift = 0
+    result = 0
+    while True:
+        byte = stream.read(1)
+        if not byte:
+            # End of stream
+            return None
+        i = ord(byte)
+        result |= (i & 0x7F) << shift
+        if not (i & 0x80):
+            # MSB not set, end of varint
+            break
+        shift += 7
+    return result
+
 def decode_protobuf_file(file_path, protobuf_class):
     messages = []
 
@@ -11,19 +28,17 @@ def decode_protobuf_file(file_path, protobuf_class):
 
     with open(file_path, 'rb') as file:
         header = file.readline()
+        file.read(1)  # Consume null terminator
         print("Firmware specifier:", header.decode('utf-8'))
 
         while True:
-            # Read the length byte
-            length_byte = file.read(1)
-            if not length_byte:
-                break  # End of file
-
-            # Unpack the length
-            message_length = struct.unpack('B', length_byte)[0]
+            # Read the length
+            length = read_varint(file)
+            if length is None:
+                break  # End of stream
 
             # Read the message based on the length
-            message_data = file.read(message_length)
+            message_data = file.read(length)
 
             # Create an instance of the provided protobuf class and parse the message
             protobuf_message = protobuf_class()
@@ -109,25 +124,14 @@ if __name__ == "__main__":
         file.close()
 
     # Decode the protobuf messages
-    while True:
-        try:
-            # If successful, move on
-            sensor_frames = decode_protobuf_file(input_bin_path + '_copy', protobuf_class)
-            break
-        except:
-            # If failed, truncate the file by 1 byte and try again
-            print("Failed - Truncating...")
-            st_size = os.stat(input_bin_path + '_copy').st_size
-            with open(input_bin_path + '_copy', 'r+b') as copy_file:
-                copy_file.truncate(st_size-1)
-                copy_file.close()
+    df = decode_protobuf_file(input_bin_path + '_copy', protobuf_class)
 
     # Remove the copied file
     os.remove(input_bin_path + '_copy')
 
     # Do any required processing
     if frame_kind == "gps":
-        sensor_frames = unpack_gps_validity_flags(sensor_frames)
+        df = unpack_gps_validity_flags(df)
 
     # Write the decoded values to the CSV file
-    write_dataframe_to_csv(sensor_frames, output_csv_path)
+    write_dataframe_to_csv(df, output_csv_path)

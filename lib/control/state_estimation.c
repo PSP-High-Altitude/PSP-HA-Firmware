@@ -59,6 +59,48 @@ Status se_reset() {
 
 const StateEst* se_predict() { return s_current_state; }
 
+StateFrame se_as_frame() {
+    StateFrame frame = {
+        // Inertial values
+        .pos_geo_x = s_current_state->posGeo.x,
+        .pos_geo_y = s_current_state->posGeo.y,
+        .pos_geo_z = s_current_state->posGeo.z,
+
+        .vel_geo_x = s_current_state->velGeo.x,
+        .vel_geo_y = s_current_state->velGeo.y,
+        .vel_geo_z = s_current_state->velGeo.z,
+
+        .acc_geo_x = s_current_state->accGeo.x,
+        .acc_geo_y = s_current_state->accGeo.y,
+        .acc_geo_z = s_current_state->accGeo.z,
+
+        // Body values
+        .pos_body_x = s_current_state->posBody.x,
+        .pos_body_y = s_current_state->posBody.y,
+        .pos_body_z = s_current_state->posBody.z,
+
+        .vel_body_x = s_current_state->velBody.x,
+        .vel_body_y = s_current_state->velBody.y,
+        .vel_body_z = s_current_state->velBody.z,
+
+        .acc_body_x = s_current_state->accBody.x,
+        .acc_body_y = s_current_state->accBody.y,
+        .acc_body_z = s_current_state->accBody.z,
+
+        .angvel_body_x = s_current_state->angVelBody.x,
+        .angvel_body_y = s_current_state->angVelBody.y,
+        .angvel_body_z = s_current_state->angVelBody.z,
+
+        // Orientation
+        .orientation_w = s_current_state->orientation.w,
+        .orientation_x = s_current_state->orientation.x,
+        .orientation_y = s_current_state->orientation.y,
+        .orientation_z = s_current_state->orientation.z,
+    };
+
+    return frame;
+}
+
 Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     float acc_h_x, acc_h_y, acc_h_z;
     float acc_i_x, acc_i_y, acc_i_z;

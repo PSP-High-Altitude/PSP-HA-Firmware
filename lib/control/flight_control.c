@@ -144,6 +144,7 @@ FlightPhase fp_update_init(const SensorFrame* sensor_frame) {
     uint64_t init_period = s_config_ptr->state_init_time_ms;
     if (MILLIS() - s_init_start_ms > init_period) {
         // Once the init time is up, move to ready
+        PAL_LOGI("FP_INIT -> FP_READY\n");
         return FP_READY;
     }
 
@@ -186,6 +187,7 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
                           "state est update failed during launch replay\n");
             }
         }
+        PAL_LOGI("FP_READY -> FP_BOOST_1\n");
         return FP_BOOST_1;
     }
 
@@ -202,12 +204,15 @@ FlightPhase fp_update_boost_1(const SensorFrame* sensor_frame) {
     uint8_t is_coast = state->accBody.x < s_config_ptr->max_coast_acc_mps2;
 
     if (is_fast && is_coast) {
+        PAL_LOGI("FP_BOOST_1 -> FP_FAST_1\n");
         return FP_FAST_1;
     }
     if (is_coast) {
+        PAL_LOGI("FP_BOOST_1 -> FP_COAST_1\n");
         return FP_COAST_1;
     }
     if (is_fast) {
+        PAL_LOGI("FP_BOOST_1 -> FP_FAST_BOOST_1\n");
         return FP_FAST_BOOST_1;
     }
     return FP_BOOST_1;

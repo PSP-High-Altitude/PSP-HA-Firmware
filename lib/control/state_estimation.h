@@ -5,6 +5,7 @@
 #include "flight_control.h"
 #include "math.h"
 #include "quat.h"
+#include "state.pb.h"
 #include "status.h"
 #include "vector.h"
 
@@ -76,6 +77,8 @@ Status se_init();
 Status se_reset();
 
 const StateEst* se_predict();
+
+StateFrame se_as_frame();
 
 Status se_update(FlightPhase phase, const SensorFrame* sensor_frame);
 

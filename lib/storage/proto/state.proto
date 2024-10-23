@@ -7,33 +7,44 @@ message StateFrame {
   // Flight phase (enum value)
   uint32 flight_phase = 2;
 
-  // Position (m)
-  float pos_n = 3;
-  float pos_e = 4;
-  float pos_d = 5;
+  // Inertial position (m)
+  float pos_geo_x = 3;
+  float pos_geo_y = 4;
+  float pos_geo_z = 5;
 
-  // NED velocity (m/s)
-  float vel_n = 6;
-  float vel_e = 7;
-  float vel_d = 8;
+  // Inertial velocity (m/s)
+  float vel_geo_x = 6;
+  float vel_geo_y = 7;
+  float vel_geo_z = 8;
 
-  // NED acceleration (m/s^2)
-  float acc_n = 9;
-  float acc_e = 10;
-  float acc_d = 11;
+  // Inertial acceleration (m/s^2)
+  float acc_geo_x = 9;
+  float acc_geo_y = 10;
+  float acc_geo_z = 11;
+
+  // Body position (m)
+  float pos_body_x = 12;
+  float pos_body_y = 13;
+  float pos_body_z = 14;
 
   // Body velocity (m/s)
-  float vel_x = 12;
-  float vel_y = 13;
-  float vel_z = 14;
+  float vel_body_x = 15;
+  float vel_body_y = 16;
+  float vel_body_z = 17;
 
   // Body acceleration (m/s^2)
-  float acc_x = 15;
-  float acc_y = 16;
-  float acc_z = 17;
+  float acc_body_x = 18;
+  float acc_body_y = 19;
+  float acc_body_z = 20;
 
-  // Orientation (deg)
-  float orient_x = 18;
-  float orient_y = 19;
-  float orient_z = 20;
+  // Body angular velocity (rad/s)
+  float angvel_body_x = 21;
+  float angvel_body_y = 22;
+  float angvel_body_z = 23;
+
+  // Orientation (quarternion)
+  float orientation_w = 24;
+  float orientation_x = 25;
+  float orientation_y = 26;
+  float orientation_z = 27;
 }

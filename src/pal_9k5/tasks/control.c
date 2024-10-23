@@ -4,7 +4,9 @@
 #include "flight_control.h"
 #include "pspcom.h"
 #include "sensors.h"
+#include "state.pb.h"
 #include "state_estimation.h"
+#include "storage.h"
 #include "timer.h"
 
 // FreeRTOS
@@ -63,6 +65,11 @@ void task_control(TaskHandle_t* handle_ptr) {
 
         sensors_start_read();
         pspcom_update_fp(fp_get());
+
+        StateFrame state_frame = se_as_frame();
+        state_frame.flight_phase = fp_get();
+        state_frame.timestamp = MILLIS();
+        storage_queue_state(&state_frame);
 
         vTaskDelayUntil(&last_iteration_start_tick,
                         pdMS_TO_TICKS(s_config_ptr->control_loop_period_ms));
