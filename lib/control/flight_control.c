@@ -54,7 +54,8 @@ Status fp_init() {
     }
 
     if (*s_flight_phase_ptr == FP_INIT || *s_flight_phase_ptr == FP_READY ||
-        *s_flight_phase_ptr == FP_LANDED) {
+        *s_flight_phase_ptr == FP_LANDED || *s_flight_phase_ptr > FP_LANDED) {
+        PAL_LOGI("Resetting flight logic and state estimation\n");
         ASSERT_OK(se_reset(), "failed to reset state\n");
         *s_flight_phase_ptr = FP_INIT;
     }
@@ -132,6 +133,9 @@ Status fp_update(const SensorFrame* sensor_frame) {
             break;
 
         default:
+            // Unknown state; go back to init because there's not really
+            // much else that we can realistically do at this point
+            *s_flight_phase_ptr = fp_update_init(sensor_frame);
             break;
     }
 

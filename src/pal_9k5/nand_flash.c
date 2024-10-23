@@ -249,13 +249,22 @@ Status nand_flash_delete_file_list(char** file_list, size_t num_files) {
 }
 
 Status nand_flash_reinit() {
-    g_nand_ready = 0;
+    if (f_mount(&g_fs, NAND_MOUNT_POINT, 1) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
     g_nand_ready = 1;
+
     return STATUS_OK;
 }
 
 Status nand_flash_deinit() {
     g_nand_ready = 0;
+
+    if (f_unmount(NAND_MOUNT_POINT) != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
     return STATUS_OK;
 }
 

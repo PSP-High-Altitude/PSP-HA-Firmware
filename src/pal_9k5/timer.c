@@ -50,6 +50,7 @@ void init_timers(uint32_t sensor_interval_ms) {
     HAL_TIM_Base_Init(&tim3_handle);
     HAL_TIM_SlaveConfigSynchro(&tim3_handle, &tim3_slave_conf);
 
+#ifndef HWIL_TEST
     // If we have a valid backed up timestamp value, set the counters to that
     Backup* backup = backup_get_ptr();
     if (backup->timestamp) {
@@ -58,6 +59,7 @@ void init_timers(uint32_t sensor_interval_ms) {
         __HAL_TIM_SET_COUNTER(&tim2_handle, tim2_count);
         __HAL_TIM_SET_COUNTER(&tim3_handle, tim3_count);
     }
+#endif
 
     HAL_TIM_Base_Start(&tim3_handle);
     HAL_TIM_Base_Start(&tim2_handle);

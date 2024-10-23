@@ -305,6 +305,7 @@ void task_storage(TaskHandle_t* handle_ptr) {
                 nand_flash_write_data(&s_gpsfile, gps_buf, gps_buf_size);
             } else {
                 // Should print an error but don't want to spam log
+                // and anyway this should never happen in the first place
             }
 
             stored_items += 1;

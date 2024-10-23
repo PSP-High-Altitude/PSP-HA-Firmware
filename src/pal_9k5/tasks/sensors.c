@@ -162,6 +162,7 @@ void task_sensors(TaskHandle_t* handle_ptr) {
         if (get_hwil_sensor_frame(&hwil_sensor_frame) == STATUS_OK) {
             sensor_frame = hwil_sensor_frame;
         }
+        sensor_frame.timestamp = MICROS();
 #endif  // HWIL_TEST
 
         control_update_sensors(&sensor_frame);
