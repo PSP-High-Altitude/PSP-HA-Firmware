@@ -29,7 +29,7 @@ static BoardConfig* s_config_ptr;
 /*****************/
 Status control_init() {
     ASSERT_OK(fp_init(), "failed to init control logic\n");
-    // ASSERT_OK(se_init(), "failed to init state est\n");
+    ASSERT_OK(se_init(), "failed to init state est\n");
 
     // Each iteration of the control loop triggers one sensor read, so there
     // can't be more than one frame in the queue. The reason to use a queue is

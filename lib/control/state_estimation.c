@@ -7,9 +7,17 @@
 #include "quat.h"
 #include "vector.h"
 
+#ifndef M_PI
+#define M_PI 3.1415926535f
+#endif
+
+#define MAX(a, b) (a > b ? a : b)
+
+#define G_MAG 9.81f
+
 typedef Vector* (*OrientFunc)(float, float, float, Vector*);
-static Status init_buffer(VecBuffer* buffer, size_t buffer_size);
-static Status init_baro_buffer(BaroBuffer* buffer, size_t buffer_size);
+static Status init_buffer(VecBuffer** buffer, size_t buffer_size);
+static Status init_baro_buffer(BaroBuffer** buffer, size_t buffer_size);
 static VecBuffer* update_buffer(VecBuffer* buffer, float vec_x, float vec_y,
                                 float vec_z);
 BaroBuffer* update_baro_buffer(BaroBuffer* buffer, float baro);
@@ -41,11 +49,11 @@ Vector s_grav_vec = {.x = -G_MAG, .y = 0.0f, .z = 0.0f};
 
 Status se_init() {
     orientation_function = get_orientation_function(DEFAULT_ORIENTATION);
-    EXPECT_OK(init_buffer(s_acc_h_buffer, STATE_EST_BUFFERS_SIZE),
+    EXPECT_OK(init_buffer(&s_acc_h_buffer, STATE_EST_BUFFERS_SIZE),
               "failed to init stat est buffer\n");
-    EXPECT_OK(init_buffer(s_acc_i_buffer, STATE_EST_BUFFERS_SIZE),
+    EXPECT_OK(init_buffer(&s_acc_i_buffer, STATE_EST_BUFFERS_SIZE),
               "failed to init stat est buffer\n");
-    EXPECT_OK(init_baro_buffer(s_baro_buffer, STATE_EST_BUFFERS_SIZE),
+    EXPECT_OK(init_baro_buffer(&s_baro_buffer, STATE_EST_BUFFERS_SIZE),
               "failed to init stat est buffer\n");
     s_current_state = &(backup_get_ptr()->state_estimate);
     return STATUS_OK;
@@ -211,55 +219,58 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     return STATUS_OK;
 }
 
-static Status init_buffer(VecBuffer* buffer, size_t buffer_size) {
-    buffer = malloc(sizeof(VecBuffer));
+static Status init_buffer(VecBuffer** buffer, size_t buffer_size) {
+    *buffer = malloc(sizeof(VecBuffer));
     if (buffer == NULL) {
         return STATUS_MEMORY_ERROR;
     }
-    buffer->vectors = malloc(sizeof(Vector) * buffer_size);
-    if (buffer->vectors == NULL) {
+    (*buffer)->vectors = malloc(sizeof(Vector) * buffer_size);
+    if ((*buffer)->vectors == NULL) {
         return STATUS_MEMORY_ERROR;
     }
-    buffer->current = buffer->vectors + 1;
-    buffer->previous = buffer->vectors;
-    buffer->i_prev = 0;
-    buffer->filled_elements = 0;
+    (*buffer)->current = (*buffer)->vectors + 1;
+    (*buffer)->previous = (*buffer)->vectors;
+    (*buffer)->i_prev = 0;
+    (*buffer)->filled_elements = 0;
+    (*buffer)->size = buffer_size;
     return STATUS_OK;
 }
 
-static Status init_baro_buffer(BaroBuffer* buffer, size_t buffer_size) {
-    buffer = malloc(sizeof(BaroBuffer));
+static Status init_baro_buffer(BaroBuffer** buffer, size_t buffer_size) {
+    *buffer = malloc(sizeof(BaroBuffer));
     if (buffer == NULL) {
         return STATUS_MEMORY_ERROR;
     }
-    buffer->vals = malloc(sizeof(float) * buffer_size);
-    if (buffer->vals == NULL) {
+    (*buffer)->vals = malloc(sizeof(float) * buffer_size);
+    if ((*buffer)->vals == NULL) {
         return STATUS_MEMORY_ERROR;
     }
-    buffer->current = buffer->vals + 1;
-    buffer->previous = buffer->vals;
-    buffer->i_prev = 0;
-    buffer->filled_elements = 0;
+    (*buffer)->current = (*buffer)->vals + 1;
+    (*buffer)->previous = (*buffer)->vals;
+    (*buffer)->i_prev = 0;
+    (*buffer)->filled_elements = 0;
+    (*buffer)->size = buffer_size;
     return STATUS_OK;
 }
 
 VecBuffer* update_buffer(VecBuffer* buffer, float vec_x, float vec_y,
                          float vec_z) {
     vec_iscale(&(buffer->avg), buffer->filled_elements);
-    buffer->filled_elements = fmax(buffer->filled_elements + 1, buffer->size);
+    buffer->filled_elements = MAX(buffer->filled_elements + 1, buffer->size);
     vec_isub(&(buffer->avg), buffer->current);
     orientation_function(vec_x, vec_y, vec_z, buffer->current);
     vec_iadd(&(buffer->avg), buffer->current);
     vec_iscale(&(buffer->avg), 1.0f / buffer->filled_elements);
     buffer->previous = buffer->vectors + buffer->i_prev;
-    buffer->current = buffer->vectors + ((buffer->i_prev + 1) % buffer->size);
     buffer->i_prev = (buffer->i_prev + 1) % buffer->size;
+    buffer->current = buffer->vectors + buffer->i_prev;
+
     return buffer;
 }
 
 BaroBuffer* update_baro_buffer(BaroBuffer* buffer, float baro) {
     buffer->avg *= buffer->filled_elements;
-    buffer->filled_elements = fmax(buffer->filled_elements + 1, buffer->size);
+    buffer->filled_elements = MAX(buffer->filled_elements + 1, buffer->size);
     buffer->avg -= *buffer->current;
     *buffer->current = baro;
     buffer->avg += *buffer->current;

@@ -53,6 +53,7 @@ Status fp_init() {
         }
     }
 
+    *s_flight_phase_ptr = FP_INIT;
     if (*s_flight_phase_ptr == FP_INIT || *s_flight_phase_ptr == FP_READY ||
         *s_flight_phase_ptr == FP_LANDED || *s_flight_phase_ptr > FP_LANDED) {
         PAL_LOGI("Resetting flight logic and state estimation\n");
@@ -166,7 +167,7 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
     static size_t s_ld_buffer_entries = 0;
 
     float accel_threshold = s_config_ptr->min_boost_acc_mps2;
-    float accel_current = sensor_frame->acc_i_x * 9.81;
+    float accel_current = -sensor_frame->acc_i_z * 9.81;
 
     if (accel_current > accel_threshold) {
         s_ms_accel_above_threshold += MILLIS() - s_last_frame_timestamp_ms;
