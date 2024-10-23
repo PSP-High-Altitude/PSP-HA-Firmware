@@ -29,12 +29,12 @@ const static BoardConfig s_default_config = {
     // Stage separation settings
     .stage_is_separator_bool = 0,
     .stage_sep_delay_ms = 10000,
-    .stage_min_sep_velocity_mps = 60.96f,
-    .stage_max_sep_velocity_mps = 1e6f,
+    .stage_min_sep_velocity_mps = -1e9f,
+    .stage_max_sep_velocity_mps = 1e9f,
     .stage_min_sep_altitude_m = 100,
-    .stage_max_sep_altitude_m = 1e6f,
-    .stage_min_sep_angle_deg = 0,
-    .stage_max_sep_angle_deg = 20,
+    .stage_max_sep_altitude_m = 1e9f,
+    .stage_min_sep_angle_deg = -1e4,
+    .stage_max_sep_angle_deg = 1e4,
     // Stage ignititon settings
     .stage_is_igniter_bool = 0,
     .stage_ignite_delay_ms = 10500,

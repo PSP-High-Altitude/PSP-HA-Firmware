@@ -371,8 +371,10 @@ FlightPhase fp_update_coast_2(const SensorFrame* sensor_frame) {
             s_apogee_time_ms = MILLIS();
         }
         if (s_apogee_time_ms + s_config_ptr->drogue_delay_ms < MILLIS()) {
-            // TODO: deploy drogue
-            return FP_DROGUE;
+            if (MILLIS() > s_config_ptr->deploy_lockout_ms) {
+                // TODO: deploy drogue
+                return FP_DROGUE;
+            }
         }
     }
 
@@ -392,6 +394,7 @@ FlightPhase fp_update_drogue(const SensorFrame* sensor_frame) {
         // TODO: deploy main
         return FP_MAIN;
     }
+    return FP_DROGUE;
 }
 FlightPhase fp_update_main(const SensorFrame* sensor_frame) {
     EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
