@@ -12,6 +12,12 @@
 #define LOW_G_MAX_ACC (24)
 #endif
 
+#ifndef M_PI
+#define M_PI 3.1415926535f
+#endif
+
+#define G_MAG 9.81f
+
 #define CHUTE_DEPLOYED(x) \
     ((x) == FP_DROGUE || (x) == FP_MAIN || (x) == FP_LANDED)
 

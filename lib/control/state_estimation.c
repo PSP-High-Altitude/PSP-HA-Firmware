@@ -7,12 +7,6 @@
 #include "quat.h"
 #include "vector.h"
 
-#ifndef M_PI
-#define M_PI 3.1415926535f
-#endif
-
-#define G_MAG 9.81f
-
 typedef Vector* (*OrientFunc)(float, float, float, Vector*);
 static Status init_buffer(VecBuffer* buffer, size_t buffer_size);
 static Status init_baro_buffer(BaroBuffer* buffer, size_t buffer_size);
@@ -85,9 +79,9 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
         acc_i_y = s_current_state->accBody.y;
         acc_i_z = s_current_state->accBody.z;
 
-        gyro_x = s_current_state->accBody.x;
-        gyro_y = s_current_state->accBody.y;
-        gyro_z = s_current_state->accBody.z;
+        gyro_x = s_current_state->angVelBody.x;
+        gyro_y = s_current_state->angVelBody.y;
+        gyro_z = s_current_state->angVelBody.z;
 
         baro = s_current_state->posBody.x;
     } else {

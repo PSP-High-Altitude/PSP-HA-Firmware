@@ -24,5 +24,6 @@ Vector *quat_rot(const Vector *vec, const Quaternion *quat, Vector *v_out);
 Vector *quat_rot_inv(const Vector *vec, const Quaternion *quat, Vector *v_out);
 Quaternion *quat_step(const Quaternion *quat_init, const Vector *ang_vel,
                       float dt, Quaternion *q_out);
+float quat_angle_from_vertical(const Quaternion *quat);
 
 #endif

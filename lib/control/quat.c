@@ -94,3 +94,8 @@ Quaternion* quat_step(const Quaternion* q_0, const Vector* ang_vel, float dt,
     quat_add(q_0, quat_scale(&q_dot, 0.5f * dt, &q_dot), q_out);
     return q_out;
 }
+
+float quat_angle_from_vertical(const Quaternion* quat) {
+    return acosf((powf(quat->w, 2) + powf(quat->x, 2)) -
+                 (powf(quat->y, 2) + powf(quat->z, 2)));
+}

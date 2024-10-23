@@ -26,6 +26,25 @@ const static BoardConfig s_default_config = {
     .min_boost_acc_mps2 = 50,        // m/s^2
     .max_coast_acc_mps2 = 0,         // m/s^2
 
+    // Stage separation settings
+    .stage_is_separator_bool = 0,
+    .stage_sep_delay_ms = 10000,
+    .stage_min_sep_velocity_mps = 60.96f,
+    .stage_max_sep_velocity_mps = 1e6f,
+    .stage_min_sep_altitude_m = 100,
+    .stage_max_sep_altitude_m = 1e6f,
+    .stage_min_sep_angle_deg = 0,
+    .stage_max_sep_angle_deg = 20,
+    // Stage ignititon settings
+    .stage_is_igniter_bool = 0,
+    .stage_ignite_delay_ms = 10500,
+    .stage_min_ignite_velocity_mps = 60.96f,
+    .stage_max_ignite_velocity_mps = 1e6f,
+    .stage_min_ignite_altitude_m = 100,
+    .stage_max_ignite_altitude_m = 1e6f,
+    .stage_min_ignite_angle_deg = 0,
+    .stage_max_ignite_angle_deg = 0,
+
     // Recovery settings
     .main_height_m = 300.0,      // m
     .drogue_delay_ms = 1000,     // ms

@@ -22,6 +22,8 @@ typedef enum {
     FP_LANDED,
 } FlightPhase;
 
+typedef enum { FP_STG_GO, FP_STG_NOGO, FP_STG_WAIT } FlightStageStatus;
+
 Status fp_init();
 
 FlightPhase fp_get();
@@ -43,9 +45,11 @@ FlightPhase fp_update_coast_2(const SensorFrame* sensor_frame);
 FlightPhase fp_update_drogue(const SensorFrame* sensor_frame);
 FlightPhase fp_update_main(const SensorFrame* sensor_frame);
 FlightPhase fp_update_landed(const SensorFrame* sensor_frame);
-
-#define fp_check_boost_fast_coast(is_fast, is_coast, value_if_both, \
-                                  value_if_fast, value_if_coast,    \
-                                  value_if_none)
+uint8_t fp_stage_check_sep_lockout(const SensorFrame* sensor_frame,
+                                   const StateEst* state);
+uint8_t fp_stage_check_ignite_lockout(const SensorFrame* sensor_frame,
+                                      const StateEst* state);
+uint8_t fp_check_grounded(const SensorFrame* sensorframe,
+                          const StateEst* state);
 
 #endif  // FLIGHT_CONTROL_H
