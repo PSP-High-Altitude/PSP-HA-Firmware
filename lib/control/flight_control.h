@@ -30,26 +30,4 @@ FlightPhase fp_get();
 
 Status fp_update(const SensorFrame* sensor_frame);
 
-FlightPhase fp_update_init(const SensorFrame* sensor_frame);
-FlightPhase fp_update_ready(const SensorFrame* sensor_frame);
-FlightPhase fp_update_boost_1(const SensorFrame* sensor_frame);
-FlightPhase fp_update_fast_boost_1(const SensorFrame* sensor_frame);
-FlightPhase fp_update_fast_1(const SensorFrame* sensor_frame);
-FlightPhase fp_update_coast_1(const SensorFrame* sensor_frame);
-FlightPhase fp_update_stage(const SensorFrame* sensor_frame);
-FlightPhase fp_update_ignite(const SensorFrame* sensor_frame);
-FlightPhase fp_update_boost_2(const SensorFrame* sensor_frame);
-FlightPhase fp_update_fast_boost_2(const SensorFrame* sensor_frame);
-FlightPhase fp_update_fast_2(const SensorFrame* sensor_frame);
-FlightPhase fp_update_coast_2(const SensorFrame* sensor_frame);
-FlightPhase fp_update_drogue(const SensorFrame* sensor_frame);
-FlightPhase fp_update_main(const SensorFrame* sensor_frame);
-FlightPhase fp_update_landed(const SensorFrame* sensor_frame);
-uint8_t fp_stage_check_sep_lockout(const SensorFrame* sensor_frame,
-                                   const StateEst* state);
-uint8_t fp_stage_check_ignite_lockout(const SensorFrame* sensor_frame,
-                                      const StateEst* state);
-uint8_t fp_check_grounded(const SensorFrame* sensorframe,
-                          const StateEst* state);
-
 #endif  // FLIGHT_CONTROL_H

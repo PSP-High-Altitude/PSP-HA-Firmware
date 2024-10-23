@@ -7,6 +7,29 @@
 #include "state_estimation.h"
 #include "timer.h"
 
+// Forward declarations
+FlightPhase fp_update_init(const SensorFrame* sensor_frame);
+FlightPhase fp_update_ready(const SensorFrame* sensor_frame);
+FlightPhase fp_update_boost_1(const SensorFrame* sensor_frame);
+FlightPhase fp_update_fast_boost_1(const SensorFrame* sensor_frame);
+FlightPhase fp_update_fast_1(const SensorFrame* sensor_frame);
+FlightPhase fp_update_coast_1(const SensorFrame* sensor_frame);
+FlightPhase fp_update_stage(const SensorFrame* sensor_frame);
+FlightPhase fp_update_ignite(const SensorFrame* sensor_frame);
+FlightPhase fp_update_boost_2(const SensorFrame* sensor_frame);
+FlightPhase fp_update_fast_boost_2(const SensorFrame* sensor_frame);
+FlightPhase fp_update_fast_2(const SensorFrame* sensor_frame);
+FlightPhase fp_update_coast_2(const SensorFrame* sensor_frame);
+FlightPhase fp_update_drogue(const SensorFrame* sensor_frame);
+FlightPhase fp_update_main(const SensorFrame* sensor_frame);
+FlightPhase fp_update_landed(const SensorFrame* sensor_frame);
+FlightStageStatus fp_stage_check_sep_lockout(const SensorFrame* sensor_frame,
+                                             const StateEst* state);
+FlightStageStatus fp_stage_check_ignite_lockout(const SensorFrame* sensor_frame,
+                                                const StateEst* state);
+uint8_t fp_check_grounded(const SensorFrame* sensorframe,
+                          const StateEst* state);
+
 // Pointer to flight phase
 static FlightPhase* s_flight_phase_ptr = NULL;
 
@@ -250,12 +273,13 @@ FlightPhase fp_update_fast_1(const SensorFrame* sensor_frame) {
 
     const StateEst* state = se_predict();
 
-    FlightPhase sep_status = fp_stage_check_sep_lockout(sensor_frame, state);
+    FlightStageStatus sep_status =
+        fp_stage_check_sep_lockout(sensor_frame, state);
     if (sep_status == FP_STG_GO) {
         return FP_STAGE;
     }
 
-    FlightPhase ignite_status =
+    FlightStageStatus ignite_status =
         fp_stage_check_ignite_lockout(sensor_frame, state);
     if (ignite_status == FP_STG_GO) {
         return FP_IGNITE;
@@ -274,12 +298,13 @@ FlightPhase fp_update_coast_1(const SensorFrame* sensor_frame) {
 
     const StateEst* state = se_predict();
 
-    FlightPhase sep_status = fp_stage_check_sep_lockout(sensor_frame, state);
+    FlightStageStatus sep_status =
+        fp_stage_check_sep_lockout(sensor_frame, state);
     if (sep_status == FP_STG_GO) {
         return FP_STAGE;
     }
 
-    FlightPhase ignite_status =
+    FlightStageStatus ignite_status =
         fp_stage_check_ignite_lockout(sensor_frame, state);
     if (ignite_status == FP_STG_GO) {
         return FP_IGNITE;
@@ -298,7 +323,7 @@ FlightPhase fp_update_stage(const SensorFrame* sensor_frame) {
 
     // TODO: stage separation
 
-    FlightPhase ignite_status =
+    FlightStageStatus ignite_status =
         fp_stage_check_ignite_lockout(sensor_frame, state);
 
     if (ignite_status == FP_STG_GO) {
@@ -422,8 +447,8 @@ FlightPhase fp_update_landed(const SensorFrame* sensor_frame) {
     return FP_LANDED;
 }
 
-uint8_t fp_stage_check_sep_lockout(const SensorFrame* sensor_frame,
-                                   const StateEst* state) {
+FlightStageStatus fp_stage_check_sep_lockout(const SensorFrame* sensor_frame,
+                                             const StateEst* state) {
     if (s_stage_sep_locked) {
         return FP_STG_NOGO;
     }
@@ -462,8 +487,8 @@ uint8_t fp_stage_check_sep_lockout(const SensorFrame* sensor_frame,
     return FP_STG_GO;
 }
 
-uint8_t fp_stage_check_ignite_lockout(const SensorFrame* sensor_frame,
-                                      const StateEst* state) {
+FlightStageStatus fp_stage_check_ignite_lockout(const SensorFrame* sensor_frame,
+                                                const StateEst* state) {
     if (s_stage_ignite_locked) {
         return FP_STG_NOGO;
     }
