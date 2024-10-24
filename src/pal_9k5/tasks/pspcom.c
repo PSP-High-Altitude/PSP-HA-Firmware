@@ -285,24 +285,24 @@ void task_pspcom_rx() {
                     break;
                 case ARMAUX:
                     // For a 0-length payload, arm A1
-                    if (user_armed[2] && msg.payload_len == 0) {
+                    if (msg.payload_len == 0) {
                         user_armed[PYRO_A1] = 1;
                         if (start_arm_timeout(PYRO_A1) != STATUS_OK) {
                             user_armed[PYRO_A1] = 0;
                         }
                     }  // Otherwise, determine the right AUX pyro to arm
                     else if (msg.payload_len == 1) {
-                        if (user_armed[2] && msg.payload[0] == 0U) {
+                        if (msg.payload[0] == 0U) {
                             user_armed[PYRO_A1] = 1;
                             if (start_arm_timeout(PYRO_A1) != STATUS_OK) {
                                 user_armed[PYRO_A1] = 0;
                             }
-                        } else if (user_armed[3] && msg.payload[0] == 1U) {
+                        } else if (msg.payload[0] == 1U) {
                             user_armed[PYRO_A2] = 1;
                             if (start_arm_timeout(PYRO_A2) != STATUS_OK) {
                                 user_armed[PYRO_A2] = 0;
                             }
-                        } else if (user_armed[4] && msg.payload[0] == 2U) {
+                        } else if (msg.payload[0] == 2U) {
                             user_armed[PYRO_A3] = 1;
                             if (start_arm_timeout(PYRO_A3) != STATUS_OK) {
                                 user_armed[PYRO_A3] = 0;

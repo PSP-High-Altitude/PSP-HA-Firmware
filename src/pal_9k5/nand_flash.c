@@ -138,10 +138,10 @@ Status nand_flash_init() {
     PAL_LOGI("NAND mounted successfully!\n");
 
     // See the files in the root directory
-    if (f_ls(NAND_MOUNT_POINT, 0) != 0) {
-        PAL_LOGE("Failed to list files on flash\n");
-        return STATUS_HARDWARE_ERROR;
-    }
+    // if (f_ls(NAND_MOUNT_POINT, 0) != 0) {
+    //    PAL_LOGE("Failed to list files on flash\n");
+    //    return STATUS_HARDWARE_ERROR;
+    //}
 
     // Get free space
     DWORD clusters;
