@@ -10,7 +10,7 @@
 #include "vector.h"
 
 #ifndef LOW_G_MAX_ACC
-#define LOW_G_MAX_ACC (24)
+#define LOW_G_MAX_ACC (15)
 #endif
 
 #ifndef M_PI
@@ -19,14 +19,7 @@
 
 #define G_MAG 9.81f
 
-#define CHUTE_DEPLOYED(x) \
-    ((x) == FP_DROGUE || (x) == FP_MAIN || (x) == FP_LANDED)
-
 #define STATE_EST_BUFFERS_SIZE (10)
-
-#define p0 (101325)
-#define MBAR_TO_PA(P_mbar) (100 * (P_mbar))
-#define BARO_ALT(P) (44330 * (1 - powf(((P) / p0), (1 / 5.255f))))
 
 typedef struct {
     // x is up!
@@ -70,11 +63,13 @@ typedef enum {
     IMU_Z_DOWN
 } SensorDirection;
 
-#define DEFAULT_ORIENTATION (IMU_Y_UP)
+#define DEFAULT_ORIENTATION (IMU_Z_DOWN)
 
 Status se_init();
 
 Status se_reset();
+
+Status se_set_time(float t_s);
 
 const StateEst* se_predict();
 

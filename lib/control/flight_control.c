@@ -72,17 +72,21 @@ Status fp_init() {
         s_ld_buffer_data = malloc(sizeof(SensorFrame) * s_ld_buffer_size);
 
         if (s_ld_buffer_data == NULL) {
-            return STATUS_MEMORY_ERROR;
+            ASSERT_OK(STATUS_MEMORY_ERROR,
+                      "failed to allocate launch replay buffer");
         }
+
+        PAL_LOGI("Allocated %u entry buffer for launch replay\n",
+                 s_ld_buffer_size);
     }
 
-    *s_flight_phase_ptr = FP_INIT;
     if (*s_flight_phase_ptr == FP_INIT || *s_flight_phase_ptr == FP_READY ||
         *s_flight_phase_ptr == FP_LANDED || *s_flight_phase_ptr > FP_LANDED) {
         PAL_LOGI("Resetting flight logic and state estimation\n");
         ASSERT_OK(se_reset(), "failed to reset state\n");
         *s_flight_phase_ptr = FP_INIT;
     }
+
     s_apogee_time_ms = 0;
     s_stage_sep_locked = 0;
     s_stage_ignite_locked = 0;
@@ -190,7 +194,7 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
     static size_t s_ld_buffer_entries = 0;
 
     float accel_threshold = s_config_ptr->min_boost_acc_mps2;
-    float accel_current = -sensor_frame->acc_i_z * 9.81;
+    float accel_current = -sensor_frame->acc_i_z * 9.81 - G_MAG;
 
     if (accel_current > accel_threshold) {
         s_ms_accel_above_threshold += MILLIS() - s_last_frame_timestamp_ms;
@@ -201,15 +205,27 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
                 s_ld_buffer_data[s_ld_buffer_entries++] = *sensor_frame;
             }
         }
-    } else {
+    } else if (!isnan(accel_current)) {
+        // Don't reset for a NAN acceleration
         s_ms_accel_above_threshold = 0;
         s_ld_buffer_entries = 0;
     }
 
     uint64_t launch_detect_period = s_config_ptr->launch_detect_period_ms;
     if (s_ms_accel_above_threshold > launch_detect_period) {
-        s_launch_time_ms = MILLIS();
+        s_launch_time_ms = MILLIS() - launch_detect_period;
+
         if (s_config_ptr->launch_detect_replay) {
+            // Reset the state estimation since we're
+            // replaying from the new start of the flight
+            se_reset();
+
+            // Resetting will clear the state estimation time, so we deal
+            // with that by setting it to the time of the first stored
+            // sensor frame minus the control loop period
+            se_set_time(s_ld_buffer_data[0].timestamp / 1e6 -
+                        s_config_ptr->control_loop_period_ms / 1e3);
+
             for (int i = 0; i < s_ld_buffer_entries; i++) {
                 EXPECT_OK(se_update(*s_flight_phase_ptr, &s_ld_buffer_data[i]),
                           "state est update failed during launch replay\n");

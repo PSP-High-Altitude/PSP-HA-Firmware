@@ -16,7 +16,7 @@
 #define GPS_DIR "/gps"
 
 // Queue lengths
-#define SENSOR_QUEUE_LENGTH (256UL)
+#define SENSOR_QUEUE_LENGTH (64UL)
 #define STATE_QUEUE_LENGTH (64UL)
 #define GPS_QUEUE_LENGTH (16UL)
 #define QUEUE_SET_LENGTH \
