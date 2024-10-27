@@ -358,6 +358,8 @@ FlightPhase fp_update_coast_1(const SensorFrame* sensor_frame) {
     FlightStageStatus sep_status =
         fp_stage_check_sep_lockout(sensor_frame, state);
     if (sep_status == FP_STG_GO) {
+        EXPECT_OK(pyros_fire(PYRO_A1), "failed to fire stage sep pyro\n");
+
         PAL_LOGI("FP_COAST_1 -> FP_STAGE\n");
         return FP_STAGE;
     }
@@ -365,6 +367,8 @@ FlightPhase fp_update_coast_1(const SensorFrame* sensor_frame) {
     FlightStageStatus ignite_status =
         fp_stage_check_ignite_lockout(sensor_frame, state);
     if (ignite_status == FP_STG_GO) {
+        EXPECT_OK(pyros_fire(PYRO_A2), "failed to fire motor ignitor\n");
+
         PAL_LOGI("FP_COAST_1 -> FP_IGNITE\n");
         return FP_IGNITE;
     }
@@ -382,12 +386,12 @@ FlightPhase fp_update_stage(const SensorFrame* sensor_frame) {
 
     const StateEst* state = se_predict();
 
-    // TODO: stage separation
-
     FlightStageStatus ignite_status =
         fp_stage_check_ignite_lockout(sensor_frame, state);
 
     if (ignite_status == FP_STG_GO) {
+        EXPECT_OK(pyros_fire(PYRO_A2), "failed to fire motor ignitor\n");
+
         PAL_LOGI("FP_STAGE -> FP_IGNITE\n");
         return FP_IGNITE;
     }
@@ -504,7 +508,7 @@ FlightPhase fp_update_coast_2(const SensorFrame* sensor_frame) {
         }
         if (s_apogee_time_ms + s_config_ptr->drogue_delay_ms < MILLIS()) {
             if (MILLIS() > s_config_ptr->deploy_lockout_ms) {
-                pyros_fire(PYRO_DRG);
+                EXPECT_OK(pyros_fire(PYRO_DRG), "failed to fire drogue pyro\n");
 
                 PAL_LOGI("FP_COAST_2 -> FP_DROGUE\n");
                 return FP_DROGUE;
@@ -532,7 +536,7 @@ FlightPhase fp_update_drogue(const SensorFrame* sensor_frame) {
     }
 
     if (state->posBody.x - s_ground_altitude_m < s_config_ptr->main_height_m) {
-        pyros_fire(PYRO_MAIN);
+        EXPECT_OK(pyros_fire(PYRO_MAIN), "failed to fire main pyro\n");
 
         PAL_LOGI("FP_DROGUE -> FP_MAIN\n");
         return FP_MAIN;

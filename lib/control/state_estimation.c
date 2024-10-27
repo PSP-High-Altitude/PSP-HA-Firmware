@@ -8,7 +8,6 @@
 #include "sma_buffer.h"
 #include "vector.h"
 
-#define MAX(a, b) (a > b ? a : b)
 #define DEG_TO_RAD(x) (x * M_PI / 180)
 
 #define CHUTE_DEPLOYED(x) \
