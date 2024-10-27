@@ -5,6 +5,7 @@
 
 #include "backup.h"
 #include "quat.h"
+#include "sma_buffer.h"
 #include "vector.h"
 
 #define MAX(a, b) (a > b ? a : b)
@@ -13,13 +14,7 @@
 #define CHUTE_DEPLOYED(x) \
     ((x) == FP_DROGUE || (x) == FP_MAIN || (x) == FP_LANDED)
 
-#define p0 (101325)
-#define MBAR_TO_PA(P_mbar) (100 * (P_mbar))
-#define BARO_ALT(P) (44330 * (1 - powf(((P) / p0), (1 / 5.255f))))
-
 typedef Vector* (*OrientFunc)(float, float, float, Vector*);
-static Status init_baro_buffer(BaroBuffer** buffer, size_t buffer_size);
-BaroBuffer* update_baro_buffer(BaroBuffer* buffer, float baro);
 static Vector* sensor_convert_x_up(float sensor_x, float sensor_y,
                                    float sensor_z, Vector* v_out);
 static Vector* sensor_convert_y_up(float sensor_x, float sensor_y,
@@ -36,17 +31,24 @@ static OrientFunc get_orientation_function(SensorDirection up_dir);
 
 static StateEst* s_current_state = NULL;
 
-static BaroBuffer* s_baro_buffer = NULL;
+static SmaFloatBuffer s_baro_buffer;
 
-OrientFunc orientation_function = NULL;
+static OrientFunc orientation_function = NULL;
 
-Vector s_grav_vec = {.x = -G_MAG, .y = 0.0f, .z = 0.0f};
+static Vector s_grav_vec = {.x = -G_MAG, .y = 0.0f, .z = 0.0f};
+
+float se_baro_alt_m(float p_mbar) {
+    return 44330 * (1 - powf(((p_mbar) / 1013.25), 1 / 5.255f));
+}
 
 Status se_init() {
     orientation_function = get_orientation_function(DEFAULT_ORIENTATION);
-    EXPECT_OK(init_baro_buffer(&s_baro_buffer, STATE_EST_BUFFERS_SIZE),
-              "failed to init stat est buffer\n");
+
+    ASSERT_OK(sma_float_buffer_init(&s_baro_buffer, BARO_BUFFER_SIZE),
+              "failed to init baro average buffer\n");
+
     s_current_state = &(backup_get_ptr()->state_estimate);
+
     return STATUS_OK;
 }
 
@@ -190,7 +192,8 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
 
     // Update the baro altitude buffer if we have a valid pressure value
     if (!isnan(sensor_frame->pressure)) {
-        update_baro_buffer(s_baro_buffer, BARO_ALT(sensor_frame->pressure));
+        float alt_m = se_baro_alt_m(sensor_frame->pressure);
+        sma_float_buffer_insert_sample(&s_baro_buffer, alt_m);
     }
 
     // STATE ESTIMATION START
@@ -211,7 +214,8 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     vec_copy(&vec_temp, &(s_current_state->velGeo));
 
     if (CHUTE_DEPLOYED(phase)) {
-        s_current_state->posBody.x = s_baro_buffer->avg;
+        s_current_state->posBody.x =
+            sma_float_buffer_get_current_avg(&s_baro_buffer);
     } else {
         vec_int_step(&(s_current_state->posBody), &vel_old,
                      &(s_current_state->velBody), dt, &vec_temp);
@@ -226,36 +230,6 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     quat_copy(&quat_temp, &(s_current_state->orientation));
 
     return STATUS_OK;
-}
-
-static Status init_baro_buffer(BaroBuffer** buffer, size_t buffer_size) {
-    *buffer = malloc(sizeof(BaroBuffer));
-    if (buffer == NULL) {
-        return STATUS_MEMORY_ERROR;
-    }
-    (*buffer)->vals = malloc(sizeof(float) * buffer_size);
-    if ((*buffer)->vals == NULL) {
-        return STATUS_MEMORY_ERROR;
-    }
-    (*buffer)->current = (*buffer)->vals + 1;
-    (*buffer)->previous = (*buffer)->vals;
-    (*buffer)->i_prev = 0;
-    (*buffer)->filled_elements = 0;
-    (*buffer)->size = buffer_size;
-    return STATUS_OK;
-}
-
-BaroBuffer* update_baro_buffer(BaroBuffer* buffer, float baro) {
-    buffer->avg *= buffer->filled_elements;
-    buffer->filled_elements = MAX(buffer->filled_elements + 1, buffer->size);
-    buffer->avg -= *buffer->current;
-    *buffer->current = baro;
-    buffer->avg += *buffer->current;
-    buffer->avg *= 1.0f / buffer->filled_elements;
-    buffer->previous = buffer->vals + buffer->i_prev;
-    buffer->current = buffer->vals + ((buffer->i_prev + 1) % buffer->size);
-    buffer->i_prev = (buffer->i_prev + 1) % buffer->size;
-    return buffer;
 }
 
 static OrientFunc get_orientation_function(SensorDirection up_dir) {

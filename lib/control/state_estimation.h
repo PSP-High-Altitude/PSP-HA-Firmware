@@ -19,7 +19,7 @@
 
 #define G_MAG 9.81f
 
-#define STATE_EST_BUFFERS_SIZE (10)
+#define BARO_BUFFER_SIZE (10)
 
 typedef struct {
     // x is up!
@@ -33,26 +33,6 @@ typedef struct {
     Vector angVelBody;   // rad/s
     Quaternion orientation;  // rad (ish)
 } StateEst;
-
-typedef struct {
-    Vector* vectors;
-    Vector* current;
-    Vector* previous;
-    Vector avg;
-    uint16_t i_prev;
-    uint16_t size;
-    uint16_t filled_elements;
-} VecBuffer;
-
-typedef struct {
-    float* vals;
-    float* current;
-    float* previous;
-    float avg;
-    uint16_t i_prev;
-    uint16_t size;
-    uint16_t filled_elements;
-} BaroBuffer;
 
 typedef enum {
     IMU_X_UP,
@@ -70,6 +50,8 @@ Status se_init();
 Status se_reset();
 
 Status se_set_time(float t_s);
+
+float se_baro_alt_m(float p_mbar);
 
 const StateEst* se_predict();
 

@@ -91,7 +91,7 @@ void task_pyros() {
             pdPASS) {
             // If we somehow time out here, just go back to the start because we
             // do NOT want to accidentally trigger pyros
-            printf("pyro restart recv\n");
+            PAL_LOGW("Pyro receive timeout\n");
             continue;
         }
 
@@ -104,7 +104,7 @@ void task_pyros() {
         // If the pin is somehow invalid, something weird is going on so just
         // abort and wait for a new command
         if (pin_status != STATUS_OK) {
-            printf("pyro invalid pin\n");
+            PAL_LOGE("Invalid pyro pin; aborting!\n");
             continue;
         }
 

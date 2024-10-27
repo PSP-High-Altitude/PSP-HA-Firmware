@@ -4,6 +4,7 @@
 
 #include "backup.h"
 #include "board_config.h"
+#include "pyros.h"
 #include "state_estimation.h"
 #include "timer.h"
 
@@ -43,6 +44,7 @@ static uint64_t s_init_start_ms;
 static SensorFrame* s_ld_buffer_data;
 static size_t s_ld_buffer_size = 0;
 
+static float s_ground_altitude_m;
 static uint64_t s_launch_time_ms;
 static uint64_t s_apogee_time_ms;
 static uint8_t s_stage_sep_locked;
@@ -79,6 +81,11 @@ Status fp_init() {
         PAL_LOGI("Allocated %u entry buffer for launch replay\n",
                  s_ld_buffer_size);
     }
+
+#ifdef HWIL_TEST
+    // Always start from init for HWIL test
+    *s_flight_phase_ptr = FP_INIT;
+#endif
 
     if (*s_flight_phase_ptr == FP_INIT || *s_flight_phase_ptr == FP_READY ||
         *s_flight_phase_ptr == FP_LANDED || *s_flight_phase_ptr > FP_LANDED) {
@@ -171,11 +178,24 @@ Status fp_update(const SensorFrame* sensor_frame) {
 }
 
 FlightPhase fp_update_init(const SensorFrame* sensor_frame) {
-    // During init, we're just updating the state and ignoring
-    // the output, because at this point it won't be reliable
+    // During init, we want to record a reliable pressure value we can use to
+    // determine the ground altitude later on
+    static float s_pressure_sum = 0;
+    static size_t s_pressure_num_pts = 0;
+
+    if (!isnan(sensor_frame->pressure)) {
+        s_pressure_sum += sensor_frame->pressure;
+        s_pressure_num_pts += 1;
+    }
+
     uint64_t init_period = s_config_ptr->state_init_time_ms;
     if (MILLIS() - s_init_start_ms > init_period) {
-        // Once the init time is up, move to ready
+        // Once the init time is up, record the ground altitude
+        s_ground_altitude_m =
+            se_baro_alt_m(s_pressure_sum / s_pressure_num_pts);
+
+        PAL_LOGI("Ground alt set to %.1f m\n", s_ground_altitude_m);
+
         PAL_LOGI("FP_INIT -> FP_READY\n");
         return FP_READY;
     }
@@ -188,7 +208,7 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
     // In ready, we're tracking the acceleration for launch
     // detection and buffering data so that we can replay
     // it through the state estimation when launch is detected
-    static uint64_t s_last_frame_timestamp_ms;
+    static uint64_t s_last_frame_timestamp_ms = 0;
     static uint64_t s_ms_accel_above_threshold = 0;
 
     static size_t s_ld_buffer_entries = 0;
@@ -210,6 +230,9 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
         s_ms_accel_above_threshold = 0;
         s_ld_buffer_entries = 0;
     }
+
+    // Record this iteration time for future use
+    s_last_frame_timestamp_ms = MILLIS();
 
     uint64_t launch_detect_period = s_config_ptr->launch_detect_period_ms;
     if (s_ms_accel_above_threshold > launch_detect_period) {
@@ -352,6 +375,7 @@ FlightPhase fp_update_coast_1(const SensorFrame* sensor_frame) {
     }
     return FP_COAST_1;
 }
+
 FlightPhase fp_update_stage(const SensorFrame* sensor_frame) {
     EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
               "state est update failed in staging\n");
@@ -386,6 +410,7 @@ FlightPhase fp_update_stage(const SensorFrame* sensor_frame) {
         return FP_COAST_2;
     }
 }
+
 FlightPhase fp_update_ignite(const SensorFrame* sensor_frame) {
     EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
               "state est update failed in staging\n");
@@ -403,6 +428,7 @@ FlightPhase fp_update_ignite(const SensorFrame* sensor_frame) {
         return FP_BOOST_2;
     }
 }
+
 FlightPhase fp_update_boost_2(const SensorFrame* sensor_frame) {
     EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
               "state est update failed in boost 2\n");
@@ -426,6 +452,7 @@ FlightPhase fp_update_boost_2(const SensorFrame* sensor_frame) {
     }
     return FP_BOOST_2;
 }
+
 FlightPhase fp_update_fast_boost_2(const SensorFrame* sensor_frame) {
     EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
               "state est update failed in fast boost 2\n");
@@ -449,6 +476,7 @@ FlightPhase fp_update_fast_boost_2(const SensorFrame* sensor_frame) {
     PAL_LOGI("FP_FAST_BOOST_2 -> FP_BOOST_2\n");
     return FP_BOOST_2;
 }
+
 FlightPhase fp_update_fast_2(const SensorFrame* sensor_frame) {
     EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
               "state est update failed in fast 2\n");
@@ -463,6 +491,7 @@ FlightPhase fp_update_fast_2(const SensorFrame* sensor_frame) {
         return FP_COAST_2;
     }
 }
+
 FlightPhase fp_update_coast_2(const SensorFrame* sensor_frame) {
     EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
               "state est update failed in coast 2\n");
@@ -475,7 +504,7 @@ FlightPhase fp_update_coast_2(const SensorFrame* sensor_frame) {
         }
         if (s_apogee_time_ms + s_config_ptr->drogue_delay_ms < MILLIS()) {
             if (MILLIS() > s_config_ptr->deploy_lockout_ms) {
-                // TODO: deploy drogue
+                pyros_fire(PYRO_DRG);
 
                 PAL_LOGI("FP_COAST_2 -> FP_DROGUE\n");
                 return FP_DROGUE;
@@ -501,13 +530,17 @@ FlightPhase fp_update_drogue(const SensorFrame* sensor_frame) {
         PAL_LOGI("FP_DROGUE -> FP_LANDED\n");
         return FP_LANDED;
     }
-    if (state->posBody.x < s_config_ptr->main_height_m) {
-        // TODO: deploy main
+
+    if (state->posBody.x - s_ground_altitude_m < s_config_ptr->main_height_m) {
+        pyros_fire(PYRO_MAIN);
+
         PAL_LOGI("FP_DROGUE -> FP_MAIN\n");
         return FP_MAIN;
     }
+
     return FP_DROGUE;
 }
+
 FlightPhase fp_update_main(const SensorFrame* sensor_frame) {
     EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
               "state est update failed in main\n");
@@ -520,6 +553,7 @@ FlightPhase fp_update_main(const SensorFrame* sensor_frame) {
     }
     return FP_MAIN;
 }
+
 FlightPhase fp_update_landed(const SensorFrame* sensor_frame) {
     // TODO: landed
     return FP_LANDED;
