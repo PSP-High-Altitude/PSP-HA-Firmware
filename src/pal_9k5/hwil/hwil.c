@@ -48,9 +48,9 @@ static GPS_Fix_TypeDef pb_frame_to_gps_fix(const GpsFrame* gps_frame) {
 }
 
 static void fixup_axes(float* y_axis, float* z_axis) {
-    float temp = *y_axis;
-    *y_axis = *z_axis;
-    *z_axis = -temp;
+    float temp = *z_axis;
+    *z_axis = *y_axis;
+    *y_axis = -temp;
 }
 
 static SensorFrame interpolate_sensor_frames(SensorFrame last_sensor_frame,
@@ -131,7 +131,7 @@ Status get_hwil_sensor_frame(SensorFrame* sensor_frame) {
             HWIL_SENSOR_DATA[s_hwil_sensor_data_idx]);
     }
 
-    // HWIL data has 1g on y-axis; want -1g on z-axis
+    // HWIL data has +1g on y-axis; want +1g on z-axis
     fixup_axes(&(sensor_frame->acc_h_y), &(sensor_frame->acc_h_z));
     fixup_axes(&(sensor_frame->acc_i_y), &(sensor_frame->acc_i_z));
     fixup_axes(&(sensor_frame->rot_i_y), &(sensor_frame->rot_i_z));

@@ -8,14 +8,10 @@ typedef enum {
     FP_INIT,
     FP_READY,  // on the pad
     FP_BOOST_1,
-    FP_FAST_BOOST_1,
-    FP_FAST_1,  // faster than mach 1
     FP_COAST_1,
     FP_STAGE,
     FP_IGNITE,
     FP_BOOST_2,
-    FP_FAST_BOOST_2,
-    FP_FAST_2,  // faster than mach 1
     FP_COAST_2,
     FP_DROGUE,  // trigger drogue
     FP_MAIN,    // trigger chute

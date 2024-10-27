@@ -12,18 +12,15 @@
 FlightPhase fp_update_init(const SensorFrame* sensor_frame);
 FlightPhase fp_update_ready(const SensorFrame* sensor_frame);
 FlightPhase fp_update_boost_1(const SensorFrame* sensor_frame);
-FlightPhase fp_update_fast_boost_1(const SensorFrame* sensor_frame);
-FlightPhase fp_update_fast_1(const SensorFrame* sensor_frame);
 FlightPhase fp_update_coast_1(const SensorFrame* sensor_frame);
 FlightPhase fp_update_stage(const SensorFrame* sensor_frame);
 FlightPhase fp_update_ignite(const SensorFrame* sensor_frame);
 FlightPhase fp_update_boost_2(const SensorFrame* sensor_frame);
-FlightPhase fp_update_fast_boost_2(const SensorFrame* sensor_frame);
-FlightPhase fp_update_fast_2(const SensorFrame* sensor_frame);
 FlightPhase fp_update_coast_2(const SensorFrame* sensor_frame);
 FlightPhase fp_update_drogue(const SensorFrame* sensor_frame);
 FlightPhase fp_update_main(const SensorFrame* sensor_frame);
 FlightPhase fp_update_landed(const SensorFrame* sensor_frame);
+
 FlightStageStatus fp_stage_check_sep_lockout(const SensorFrame* sensor_frame,
                                              const StateEst* state);
 FlightStageStatus fp_stage_check_ignite_lockout(const SensorFrame* sensor_frame,
@@ -106,6 +103,9 @@ Status fp_init() {
 FlightPhase fp_get() { return *s_flight_phase_ptr; }
 
 Status fp_update(const SensorFrame* sensor_frame) {
+    EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
+              "state estimation update failed\n");
+
     switch (*s_flight_phase_ptr) {
         case FP_INIT:
             *s_flight_phase_ptr = fp_update_init(sensor_frame);
@@ -117,14 +117,6 @@ Status fp_update(const SensorFrame* sensor_frame) {
 
         case FP_BOOST_1:
             *s_flight_phase_ptr = fp_update_boost_1(sensor_frame);
-            break;
-
-        case FP_FAST_BOOST_1:
-            *s_flight_phase_ptr = fp_update_fast_boost_1(sensor_frame);
-            break;
-
-        case FP_FAST_1:
-            *s_flight_phase_ptr = fp_update_fast_1(sensor_frame);
             break;
 
         case FP_COAST_1:
@@ -141,14 +133,6 @@ Status fp_update(const SensorFrame* sensor_frame) {
 
         case FP_BOOST_2:
             *s_flight_phase_ptr = fp_update_boost_2(sensor_frame);
-            break;
-
-        case FP_FAST_BOOST_2:
-            *s_flight_phase_ptr = fp_update_fast_boost_2(sensor_frame);
-            break;
-
-        case FP_FAST_2:
-            *s_flight_phase_ptr = fp_update_fast_2(sensor_frame);
             break;
 
         case FP_COAST_2:
@@ -214,7 +198,7 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
     static size_t s_ld_buffer_entries = 0;
 
     float accel_threshold = s_config_ptr->min_boost_acc_mps2;
-    float accel_current = -sensor_frame->acc_i_z * 9.81 - G_MAG;
+    float accel_current = sensor_frame->acc_i_z * 9.81 - G_MAG;
 
     if (accel_current > accel_threshold) {
         s_ms_accel_above_threshold += MILLIS() - s_last_frame_timestamp_ms;
@@ -262,97 +246,19 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
 }
 
 FlightPhase fp_update_boost_1(const SensorFrame* sensor_frame) {
-    EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
-              "state est update failed in boost 1\n");
-
     const StateEst* state = se_predict();
 
-    uint8_t is_fast = state->velBody.x > s_config_ptr->min_fast_vel_mps;
     uint8_t is_coast = state->accBody.x < s_config_ptr->max_coast_acc_mps2;
 
-    if (is_fast && is_coast) {
-        PAL_LOGI("FP_BOOST_1 -> FP_FAST_1\n");
-        return FP_FAST_1;
-    }
     if (is_coast) {
         PAL_LOGI("FP_BOOST_1 -> FP_COAST_1\n");
         return FP_COAST_1;
     }
-    if (is_fast) {
-        PAL_LOGI("FP_BOOST_1 -> FP_FAST_BOOST_1\n");
-        return FP_FAST_BOOST_1;
-    }
+
     return FP_BOOST_1;
-}
-
-FlightPhase fp_update_fast_boost_1(const SensorFrame* sensor_frame) {
-    EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
-              "state est update failed in fast boost 1\n");
-
-    const StateEst* state = se_predict();
-
-    uint8_t is_fast = state->velBody.x > s_config_ptr->min_fast_vel_mps;
-    uint8_t is_coast = state->accBody.x < s_config_ptr->max_coast_acc_mps2;
-
-    if (is_fast && is_coast) {
-        PAL_LOGI("FP_FAST_BOOST_1 -> FP_FAST_1\n");
-        return FP_FAST_1;
-    }
-    if (is_coast) {
-        PAL_LOGI("FP_FAST_BOOST_1 -> FP_COAST_1\n");
-        return FP_COAST_1;
-    }
-    if (is_fast) {
-        return FP_FAST_BOOST_1;
-    }
-
-    PAL_LOGI("FP_FAST_BOOST_1 -> FP_BOOST_1\n");
-    return FP_BOOST_1;
-}
-
-FlightPhase fp_update_fast_1(const SensorFrame* sensor_frame) {
-    EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
-              "state est update failed in fast 1\n");
-
-    const StateEst* state = se_predict();
-
-    FlightStageStatus sep_status =
-        fp_stage_check_sep_lockout(sensor_frame, state);
-    if (sep_status == FP_STG_GO) {
-        PAL_LOGI("FP_FAST_1 -> FP_STAGE\n");
-        return FP_STAGE;
-    }
-
-    FlightStageStatus ignite_status =
-        fp_stage_check_ignite_lockout(sensor_frame, state);
-    if (ignite_status == FP_STG_GO) {
-        PAL_LOGI("FP_FAST_1 -> FP_IGNITE\n");
-        return FP_IGNITE;
-    }
-
-    uint8_t is_fast = state->velGeo.x > s_config_ptr->min_fast_vel_mps;
-    if (sep_status == FP_STG_NOGO && ignite_status == FP_STG_NOGO) {
-        if (is_fast) {
-            PAL_LOGI("FP_FAST_1 -> FP_FAST_2\n");
-            return FP_FAST_2;
-        } else {
-            PAL_LOGI("FP_FAST_1 -> FP_COAST_2\n");
-            return FP_COAST_2;
-        }
-    }
-
-    if (is_fast) {
-        return FP_FAST_1;
-    } else {
-        PAL_LOGI("FP_FAST_1 -> FP_COAST_1\n");
-        return FP_COAST_1;
-    }
 }
 
 FlightPhase fp_update_coast_1(const SensorFrame* sensor_frame) {
-    EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
-              "state est update failed in coast 1\n");
-
     const StateEst* state = se_predict();
 
     FlightStageStatus sep_status =
@@ -377,13 +283,11 @@ FlightPhase fp_update_coast_1(const SensorFrame* sensor_frame) {
         PAL_LOGI("FP_COAST_1 -> FP_COAST_2\n");
         return FP_COAST_2;
     }
+
     return FP_COAST_1;
 }
 
 FlightPhase fp_update_stage(const SensorFrame* sensor_frame) {
-    EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
-              "state est update failed in staging\n");
-
     const StateEst* state = se_predict();
 
     FlightStageStatus ignite_status =
@@ -395,117 +299,44 @@ FlightPhase fp_update_stage(const SensorFrame* sensor_frame) {
         PAL_LOGI("FP_STAGE -> FP_IGNITE\n");
         return FP_IGNITE;
     }
-    uint8_t is_fast = state->velGeo.x > s_config_ptr->min_fast_vel_mps;
+
     if (ignite_status == FP_STG_WAIT) {
-        if (is_fast) {
-            PAL_LOGI("FP_STAGE -> FP_FAST_1\n");
-            return FP_FAST_1;
-        } else {
-            PAL_LOGI("FP_STAGE -> FP_COAST_1\n");
-            return FP_COAST_1;
-        }
+        PAL_LOGI("FP_STAGE -> FP_COAST_1\n");
+        return FP_COAST_1;
     }
 
-    if (is_fast) {
-        PAL_LOGI("FP_STAGE -> FP_FAST_2\n");
-        return FP_FAST_2;
-    } else {
-        PAL_LOGI("FP_STAGE -> FP_COAST_2\n");
-        return FP_COAST_2;
-    }
+    PAL_LOGI("FP_STAGE -> FP_COAST_2\n");
+    return FP_COAST_2;
 }
 
 FlightPhase fp_update_ignite(const SensorFrame* sensor_frame) {
-    EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
-              "state est update failed in staging\n");
-
-    const StateEst* state = se_predict();
-
     // TODO: motor ignition
 
-    uint8_t is_fast = state->velGeo.x > s_config_ptr->min_fast_vel_mps;
-    if (is_fast) {
-        PAL_LOGI("FP_STAGE -> FP_FAST_BOOST_2\n");
-        return FP_FAST_BOOST_2;
-    } else {
-        PAL_LOGI("FP_STAGE -> FP_BOOST_2\n");
-        return FP_BOOST_2;
-    }
+    PAL_LOGI("FP_STAGE -> FP_BOOST_2\n");
+    return FP_BOOST_2;
 }
 
 FlightPhase fp_update_boost_2(const SensorFrame* sensor_frame) {
-    EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
-              "state est update failed in boost 2\n");
-
     const StateEst* state = se_predict();
 
-    uint8_t is_fast = state->velBody.x > s_config_ptr->min_fast_vel_mps;
     uint8_t is_coast = state->accBody.x < s_config_ptr->max_coast_acc_mps2;
 
-    if (is_fast && is_coast) {
-        PAL_LOGI("FP_BOOST_2 -> FP_FAST_2\n");
-        return FP_FAST_2;
-    }
     if (is_coast) {
         PAL_LOGI("FP_BOOST_2 -> FP_COAST_2\n");
         return FP_COAST_2;
     }
-    if (is_fast) {
-        PAL_LOGI("FP_BOOST_2 -> FP_FAST_BOOST_2\n");
-        return FP_FAST_BOOST_2;
-    }
+
     return FP_BOOST_2;
-}
-
-FlightPhase fp_update_fast_boost_2(const SensorFrame* sensor_frame) {
-    EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
-              "state est update failed in fast boost 2\n");
-
-    const StateEst* state = se_predict();
-
-    uint8_t is_fast = state->velBody.x > s_config_ptr->min_fast_vel_mps;
-    uint8_t is_coast = state->accBody.x < s_config_ptr->max_coast_acc_mps2;
-
-    if (is_fast && is_coast) {
-        PAL_LOGI("FP_FAST_BOOST_2 -> FP_FAST_2\n");
-        return FP_FAST_2;
-    }
-    if (is_coast) {
-        PAL_LOGI("FP_FAST_BOOST_2 -> FP_COAST_2\n");
-        return FP_COAST_2;
-    }
-    if (is_fast) {
-        return FP_FAST_BOOST_2;
-    }
-    PAL_LOGI("FP_FAST_BOOST_2 -> FP_BOOST_2\n");
-    return FP_BOOST_2;
-}
-
-FlightPhase fp_update_fast_2(const SensorFrame* sensor_frame) {
-    EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
-              "state est update failed in fast 2\n");
-
-    const StateEst* state = se_predict();
-
-    uint8_t is_fast = state->velGeo.x > s_config_ptr->min_fast_vel_mps;
-    if (is_fast) {
-        return FP_FAST_2;
-    } else {
-        PAL_LOGI("FP_FAST_2 -> FP_COAST_2\n");
-        return FP_COAST_2;
-    }
 }
 
 FlightPhase fp_update_coast_2(const SensorFrame* sensor_frame) {
-    EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
-              "state est update failed in coast 2\n");
-
     const StateEst* state = se_predict();
 
     if (state->velBody.x < 0) {
         if (!s_apogee_time_ms) {
             s_apogee_time_ms = MILLIS();
         }
+
         if (s_apogee_time_ms + s_config_ptr->drogue_delay_ms < MILLIS()) {
             if (MILLIS() > s_config_ptr->deploy_lockout_ms) {
                 EXPECT_OK(pyros_fire(PYRO_DRG), "failed to fire drogue pyro\n");
@@ -516,18 +347,10 @@ FlightPhase fp_update_coast_2(const SensorFrame* sensor_frame) {
         }
     }
 
-    uint8_t is_fast = state->velGeo.x > s_config_ptr->min_fast_vel_mps;
-    if (is_fast) {
-        PAL_LOGI("FP_COAST_2 -> FP_FAST_2\n");
-        return FP_FAST_2;
-    } else {
-        return FP_COAST_2;
-    }
+    return FP_COAST_2;
 }
-FlightPhase fp_update_drogue(const SensorFrame* sensor_frame) {
-    EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
-              "state est update failed in drogue\n");
 
+FlightPhase fp_update_drogue(const SensorFrame* sensor_frame) {
     const StateEst* state = se_predict();
 
     if (fp_check_grounded(sensor_frame, state)) {
@@ -546,15 +369,13 @@ FlightPhase fp_update_drogue(const SensorFrame* sensor_frame) {
 }
 
 FlightPhase fp_update_main(const SensorFrame* sensor_frame) {
-    EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
-              "state est update failed in main\n");
-
     const StateEst* state = se_predict();
 
     if (fp_check_grounded(sensor_frame, state)) {
         PAL_LOGI("FP_MAIN -> FP_LANDED\n");
         return FP_LANDED;
     }
+
     return FP_MAIN;
 }
 
@@ -568,11 +389,13 @@ FlightStageStatus fp_stage_check_sep_lockout(const SensorFrame* sensor_frame,
     if (s_stage_sep_locked) {
         return FP_STG_NOGO;
     }
+
     if (!s_config_ptr->stage_is_separator_bool) {
         s_stage_sep_locked = 1;
         s_stage_sep_status = 0;
         return FP_STG_NOGO;
     }
+
     if (MILLIS() - s_launch_time_ms < s_config_ptr->stage_sep_delay_ms) {
         return FP_STG_WAIT;
     }
@@ -599,6 +422,7 @@ FlightStageStatus fp_stage_check_sep_lockout(const SensorFrame* sensor_frame,
         angle_deg > s_config_ptr->stage_max_sep_angle_deg) {
         return FP_STG_NOGO;
     }
+
     s_stage_sep_status = 1;
     return FP_STG_GO;
 }
@@ -608,11 +432,13 @@ FlightStageStatus fp_stage_check_ignite_lockout(const SensorFrame* sensor_frame,
     if (s_stage_ignite_locked) {
         return FP_STG_NOGO;
     }
+
     if (!s_config_ptr->stage_is_igniter_bool) {
         s_stage_ignite_locked = 1;
         s_stage_ignite_status = 0;
         return FP_STG_NOGO;
     }
+
     if (MILLIS() - s_launch_time_ms < s_config_ptr->stage_ignite_delay_ms) {
         return FP_STG_WAIT;
     }
@@ -639,6 +465,7 @@ FlightStageStatus fp_stage_check_ignite_lockout(const SensorFrame* sensor_frame,
         angle_deg > s_config_ptr->stage_max_ignite_angle_deg) {
         return FP_STG_NOGO;
     }
+
     s_stage_ignite_status = 1;
     return FP_STG_GO;
 }
