@@ -1,4 +1,4 @@
-import struct
+import tempfile
 import time
 import sys
 import os
@@ -24,7 +24,7 @@ def read_varint(stream):
 def decode_protobuf_file(file_path, protobuf_class):
     messages = []
 
-    start_time = time.time()
+    start_time = time.perf_counter()
 
     with open(file_path, 'rb') as file:
         header = file.readline()
@@ -46,7 +46,7 @@ def decode_protobuf_file(file_path, protobuf_class):
 
             messages.append(protobuf_message)
 
-    end_time = time.time()
+    end_time = time.perf_counter()
     elapsed_time = end_time - start_time
     print(f"Decoded {len(messages)} elements in {elapsed_time:.6f} seconds")
 
@@ -64,11 +64,11 @@ def decode_protobuf_file(file_path, protobuf_class):
     return df
 
 def write_dataframe_to_csv(dataframe, csv_output_path):
-    start_time = time.time()
+    start_time = time.perf_counter()
 
     dataframe.to_csv(csv_output_path, index=False, float_format="%.6f")
 
-    end_time = time.time()
+    end_time = time.perf_counter()
     elapsed_time = end_time - start_time
     print(f"Written {len(dataframe)} elements to CSV in {elapsed_time:.6f} seconds")
 
@@ -117,17 +117,27 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # Copy the input file to avoid modifying the original
-    with open(input_bin_path, 'rb') as file:
-        with open(input_bin_path + '_copy', 'wb') as copy_file:
-            copy_file.write(file.read())
-            copy_file.close()
-        file.close()
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        print('Copying input file to temporary')
+
+        start_time = time.perf_counter()
+        with open(input_bin_path, 'rb') as original_file:
+            temp_file.write(original_file.read())
+            temp_file_path = temp_file.name
+            size = temp_file.tell()
+        end_time = time.perf_counter()
+
+    size_kib = size/1024
+    time_s = end_time - start_time
+
+    print(f'Copied {size_kib:.1f} KiB in {time_s:.1f} s')
+    print(f'Average copy speed {size_kib/time_s:.1f} KiB/s\n')
 
     # Decode the protobuf messages
-    df = decode_protobuf_file(input_bin_path + '_copy', protobuf_class)
+    df = decode_protobuf_file(temp_file_path, protobuf_class)
 
     # Remove the copied file
-    os.remove(input_bin_path + '_copy')
+    os.remove(temp_file_path)
 
     # Do any required processing
     if frame_kind == "gps":
