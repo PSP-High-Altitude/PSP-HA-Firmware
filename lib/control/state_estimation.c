@@ -39,21 +39,54 @@ static Vector s_grav_vec = {.x = -G_MAG, .y = 0.0f, .z = 0.0f};
 
 static float s_ground_baro_alt_m = 0.;
 
-__attribute__((unused)) static float se_baro_weight(float alt_m,
-                                                    float vel_mps) {
-    const static float s_baro_max_vel_mps = 100.;  // m/s
-    const static float s_baro_max_alt_m = 10000.;  // m
+static float se_baro_weight(float alt_m, float vel_mps) {
+    const static float s_baro_max_vel_mps = 150.;  // m/s
+    const static float s_baro_max_alt_m = 9000.;   // m
 
-    // Pulled out of my ass currently; feel free to change
-    float alt_weight = 1. - expf(25. * (alt_m / s_baro_max_alt_m - 1.));
+    /** WEIGHTING FUNCTIONS
+     *
+     * We want to trust the barometer only when we are:
+     *     1. under the operational ceiling (9000 m/300 mbar)
+     *     2. slow enough for averaging delay to be low
+     *        and for aerodynamic effects to be negligible
+     *
+     * So, we have two independent weights calculated from
+     * the estimated altitude and velocity each of which are
+     * multiplied together (equivalent to logical AND).
+     *
+     * The altitude weighting function is an exponential that
+     * starts off near one, then rapidly goes to zero as the
+     * altitude approaches s_baro_max_alt_m. See:
+     * https://www.desmos.com/calculator/wqz5wfycre
+     *
+     * The velocity weighting function is composed of two terms.
+     * The first term is a linear term for clamping the weight to
+     * 0 at s_baro_max_vel_mps. The other term is an exponential
+     * term to smooth the transition to barometer-based velocity
+     * measurements. This is required because the fact that the
+     * linear model uses the current velocity and position as a
+     * basis for the integration, even incorporating barometer
+     * measurements (which are absolute) with a tiny weight can
+     * result in very rapid changes. The result looks like this:
+     * https://www.desmos.com/calculator/uigvlbbhpf
+     *
+     */
+
+    float alt_weight = 1. - expf(10. * (alt_m / s_baro_max_alt_m - 1.));
     float vel_weight_lin = 1. - vel_mps / s_baro_max_vel_mps;
-    float vel_weight_exp = expf(-vel_mps / 25.);  // > 0
+    float vel_weight_exp = expf(-vel_mps / 10.);  // > 0
 
-    if (alt_weight < 0. || vel_weight_lin < 0.) {
+    float tot_weight = alt_weight * vel_weight_lin * vel_weight_exp;
+
+    if (tot_weight < 0.) {
         return 0.;
     }
 
-    return alt_weight * vel_weight_lin * vel_weight_exp;
+    if (tot_weight > 1.) {
+        return 1.;
+    }
+
+    return tot_weight;
 }
 
 static float se_trap_int_step(float old, float new, float dt) {
@@ -67,9 +100,9 @@ static float se_baro_alt_m(float p_mbar) {
 Status se_init() {
     orientation_function = get_orientation_function(DEFAULT_ORIENTATION);
 
-    ASSERT_OK(sma_float_buffer_init(&s_baro_alt_buffer, BARO_BUFFER_SIZE),
+    ASSERT_OK(sma_float_buffer_init(&s_baro_alt_buffer, BARO_ALT_BUFFER_SIZE),
               "failed to init baro alt buffer\n");
-    ASSERT_OK(sma_float_buffer_init(&s_baro_vel_buffer, BARO_BUFFER_SIZE),
+    ASSERT_OK(sma_float_buffer_init(&s_baro_vel_buffer, BARO_VEL_BUFFER_SIZE),
               "failed to init baro vel buffer\n");
 
     s_current_state_ptr = &(backup_get_ptr()->state_estimate);
@@ -244,7 +277,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
         s_current_state_ptr->posVert = s_current_baro_alt;
         s_current_state_ptr->velVert = current_baro_vel;
         s_current_state_ptr->accVert = NAN;
-    } /* else if (phase == FP_COAST_1 || phase == FP_COAST_2) {
+    } else if (phase == FP_COAST_1 || phase == FP_COAST_2) {
         // During coast, use weighted combination of integration and baro
         float baro_weight = se_baro_weight(s_current_state_ptr->posVert,
                                            s_current_state_ptr->velVert);
@@ -255,8 +288,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
         s_current_state_ptr->velVert =
             int_weight * current_int_vel + baro_weight * current_baro_vel;
         s_current_state_ptr->accVert = current_int_acc;
-    } */
-    else {
+    } else {
         // Otherwise, use integration exclusively
         s_current_state_ptr->posVert = current_int_alt;
         s_current_state_ptr->velVert = current_int_vel;

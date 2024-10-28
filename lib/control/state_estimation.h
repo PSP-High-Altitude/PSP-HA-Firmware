@@ -19,7 +19,8 @@
 
 #define G_MAG 9.81f
 
-#define BARO_BUFFER_SIZE (32)
+#define BARO_ALT_BUFFER_SIZE (80)
+#define BARO_VEL_BUFFER_SIZE (20)
 
 typedef struct {
     // x is up!
