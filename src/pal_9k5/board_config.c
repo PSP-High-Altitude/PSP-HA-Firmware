@@ -25,6 +25,8 @@ const static BoardConfig s_default_config = {
     .min_fast_vel_mps = 300,         // m/s
     .min_boost_acc_mps2 = 50,        // m/s^2
     .max_coast_acc_mps2 = 0,         // m/s^2
+    .max_grounded_alt_m = 100,       // m
+    .min_grounded_time_ms = 10000,   // ms
 
     // Stage separation settings
     .stage_is_separator_bool = 0,

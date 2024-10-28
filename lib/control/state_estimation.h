@@ -19,17 +19,17 @@
 
 #define G_MAG 9.81f
 
-#define BARO_BUFFER_SIZE (10)
+#define BARO_BUFFER_SIZE (32)
 
 typedef struct {
     // x is up!
     float time;          // seconds
+    float posVert;       // m
+    float velVert;       // m/s
+    float accVert;       // m/s^2
     Vector posGeo;       // m
     Vector velGeo;       // m/s
     Vector accGeo;       // m/s^2
-    Vector posBody;      // m
-    Vector velBody;      // m/s
-    Vector accBody;      // m/s^2
     Vector angVelBody;   // rad/s
     Quaternion orientation;  // rad (ish)
 } StateEst;
@@ -51,7 +51,7 @@ Status se_reset();
 
 Status se_set_time(float t_s);
 
-float se_baro_alt_m(float p_mbar);
+Status se_set_ground_pressure(float p_mbar);
 
 const StateEst* se_predict();
 

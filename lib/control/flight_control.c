@@ -25,8 +25,6 @@ FlightStageStatus fp_stage_check_sep_lockout(const SensorFrame* sensor_frame,
                                              const StateEst* state);
 FlightStageStatus fp_stage_check_ignite_lockout(const SensorFrame* sensor_frame,
                                                 const StateEst* state);
-uint8_t fp_check_grounded(const SensorFrame* sensorframe,
-                          const StateEst* state);
 
 // Pointer to flight phase
 static FlightPhase* s_flight_phase_ptr = NULL;
@@ -41,7 +39,6 @@ static uint64_t s_init_start_ms;
 static SensorFrame* s_ld_buffer_data;
 static size_t s_ld_buffer_size = 0;
 
-static float s_ground_altitude_m;
 static uint64_t s_launch_time_ms;
 static uint64_t s_apogee_time_ms;
 static uint8_t s_stage_sep_locked;
@@ -174,11 +171,8 @@ FlightPhase fp_update_init(const SensorFrame* sensor_frame) {
 
     uint64_t init_period = s_config_ptr->state_init_time_ms;
     if (MILLIS() - s_init_start_ms > init_period) {
-        // Once the init time is up, record the ground altitude
-        s_ground_altitude_m =
-            se_baro_alt_m(s_pressure_sum / s_pressure_num_pts);
-
-        PAL_LOGI("Ground alt set to %.1f m\n", s_ground_altitude_m);
+        // Once the init time is up, record the average ground pressure
+        se_set_ground_pressure(s_pressure_sum / s_pressure_num_pts);
 
         PAL_LOGI("FP_INIT -> FP_READY\n");
         return FP_READY;
@@ -248,7 +242,7 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
 FlightPhase fp_update_boost_1(const SensorFrame* sensor_frame) {
     const StateEst* state = se_predict();
 
-    uint8_t is_coast = state->accBody.x < s_config_ptr->max_coast_acc_mps2;
+    uint8_t is_coast = state->accVert < s_config_ptr->max_coast_acc_mps2;
 
     if (is_coast) {
         PAL_LOGI("FP_BOOST_1 -> FP_COAST_1\n");
@@ -319,7 +313,7 @@ FlightPhase fp_update_ignite(const SensorFrame* sensor_frame) {
 FlightPhase fp_update_boost_2(const SensorFrame* sensor_frame) {
     const StateEst* state = se_predict();
 
-    uint8_t is_coast = state->accBody.x < s_config_ptr->max_coast_acc_mps2;
+    uint8_t is_coast = state->accVert < s_config_ptr->max_coast_acc_mps2;
 
     if (is_coast) {
         PAL_LOGI("FP_BOOST_2 -> FP_COAST_2\n");
@@ -332,7 +326,7 @@ FlightPhase fp_update_boost_2(const SensorFrame* sensor_frame) {
 FlightPhase fp_update_coast_2(const SensorFrame* sensor_frame) {
     const StateEst* state = se_predict();
 
-    if (state->velBody.x < 0) {
+    if (state->velVert < 0) {
         if (!s_apogee_time_ms) {
             s_apogee_time_ms = MILLIS();
         }
@@ -353,12 +347,7 @@ FlightPhase fp_update_coast_2(const SensorFrame* sensor_frame) {
 FlightPhase fp_update_drogue(const SensorFrame* sensor_frame) {
     const StateEst* state = se_predict();
 
-    if (fp_check_grounded(sensor_frame, state)) {
-        PAL_LOGI("FP_DROGUE -> FP_LANDED\n");
-        return FP_LANDED;
-    }
-
-    if (state->posBody.x - s_ground_altitude_m < s_config_ptr->main_height_m) {
+    if (state->posVert < s_config_ptr->main_height_m) {
         EXPECT_OK(pyros_fire(PYRO_MAIN), "failed to fire main pyro\n");
 
         PAL_LOGI("FP_DROGUE -> FP_MAIN\n");
@@ -371,7 +360,18 @@ FlightPhase fp_update_drogue(const SensorFrame* sensor_frame) {
 FlightPhase fp_update_main(const SensorFrame* sensor_frame) {
     const StateEst* state = se_predict();
 
-    if (fp_check_grounded(sensor_frame, state)) {
+    static uint64_t s_last_frame_timestamp_ms = 0;
+    static uint64_t s_ms_alt_below_threshold = 0;
+
+    if (state->posVert < s_config_ptr->max_grounded_alt_m) {
+        s_ms_alt_below_threshold += MILLIS() - s_last_frame_timestamp_ms;
+    } else {
+        s_ms_alt_below_threshold = 0;
+    }
+
+    s_last_frame_timestamp_ms = MILLIS();
+
+    if (s_ms_alt_below_threshold > s_config_ptr->min_grounded_time_ms) {
         PAL_LOGI("FP_MAIN -> FP_LANDED\n");
         return FP_LANDED;
     }
@@ -403,8 +403,8 @@ FlightStageStatus fp_stage_check_sep_lockout(const SensorFrame* sensor_frame,
     // Since nothing else will cause a wait condition
     s_stage_sep_locked = 1;
 
-    float velocity = state->velBody.x;
-    float altitude = state->posBody.x;
+    float velocity = state->velVert;
+    float altitude = state->posVert;
     float angle_deg =
         quat_angle_from_vertical(&(state->orientation)) * M_PI / 180.0f;
 
@@ -446,8 +446,8 @@ FlightStageStatus fp_stage_check_ignite_lockout(const SensorFrame* sensor_frame,
     // Since nothing else will cause a wait condition
     s_stage_ignite_locked = 1;
 
-    float velocity = state->velBody.x;
-    float altitude = state->posBody.x;
+    float velocity = state->velVert;
+    float altitude = state->posVert;
     float angle_deg =
         quat_angle_from_vertical(&(state->orientation)) * M_PI / 180.0f;
 
@@ -468,9 +468,4 @@ FlightStageStatus fp_stage_check_ignite_lockout(const SensorFrame* sensor_frame,
 
     s_stage_ignite_status = 1;
     return FP_STG_GO;
-}
-
-uint8_t fp_check_grounded(const SensorFrame* sensorframe,
-                          const StateEst* state) {
-    return state->posBody.x < 10;
 }

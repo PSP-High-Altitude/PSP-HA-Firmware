@@ -20,11 +20,9 @@ typedef struct {
     uint32_t gps_loop_period_ms;
     // period in ms between checking for incoming telemetry messages
     uint32_t pspcom_rx_loop_period_ms;
-    // period in ms between sending the standard telemetry message when on the
-    // ground
+    // period in ms between sending standard telemetry message on the ground
     uint32_t pspcom_tx_ground_loop_period_ms;
-    // period in ms between sending the standard telemetry message when in
-    // flight
+    // period in ms between sending standard telemetry message in flight
     uint32_t pspcom_tx_flight_loop_period_ms;
 
     /* STATE ESTIMATION SETTINGS */
@@ -40,6 +38,10 @@ typedef struct {
     float min_boost_acc_mps2;
     // maximum acceleration below which we are considered to be in coast
     float max_coast_acc_mps2;
+    // maximum altitude under which we are considered to be grounded
+    float max_grounded_alt_m;
+    // minimum time for which we have to be below the grounded alt to transition
+    float min_grounded_time_ms;
 
     /* STAGE SEPARATION SETTINGS */
     // status of this board as a stage separator
