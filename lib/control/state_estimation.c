@@ -39,7 +39,8 @@ static Vector s_grav_vec = {.x = -G_MAG, .y = 0.0f, .z = 0.0f};
 
 static float s_ground_baro_alt_m = 0.;
 
-static float se_baro_weight(float alt_m, float vel_mps) {
+__attribute__((unused)) static float se_baro_weight(float alt_m,
+                                                    float vel_mps) {
     const static float s_baro_max_vel_mps = 100.;  // m/s
     const static float s_baro_max_alt_m = 10000.;  // m
 

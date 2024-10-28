@@ -189,7 +189,7 @@ void config_print() {
     printf("Min boost acc: %.2f m/s^2\n", config->min_boost_acc_mps2);
     printf("Max coast acc: %.2f m/s^2\n", config->max_coast_acc_mps2);
     printf("Max grounded alt: %.2f m\n", config->max_grounded_alt_m);
-    printf("Min grounded time: %ld ms\n", config->min_grounded_time_ms);
+    printf("Min grounded time: %.2f ms\n", config->min_grounded_time_ms);
 
     printf("\n----- STAGE SEPARATION -----\n");
     printf("Stage is separator: %s\n",
