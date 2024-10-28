@@ -23,6 +23,7 @@ typedef struct {
     uint8_t hour;
     uint8_t min;
     uint8_t sec;
+    int32_t nano;
 
     // Validity flags
     uint8_t date_valid;

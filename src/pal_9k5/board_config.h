@@ -47,8 +47,8 @@ typedef struct {
     // status of this board as a stage separator
     // (1 to fire separation charge, 0 to not)
     uint8_t stage_is_separator_bool;
-    // delay after launch in ms to separate stages (NOT TO IGNITE)
-    uint32_t stage_sep_delay_ms;
+    // lockout after launch in ms to separate stages (NOT TO IGNITE)
+    uint32_t stage_sep_lockout_ms;
     // minimum velocity in m/s to separate stages
     float stage_min_sep_velocity_mps;
     // maximum velocity in m/s to separate stages
@@ -61,13 +61,15 @@ typedef struct {
     float stage_min_sep_angle_deg;
     // maximum angle from vertical in deg to separate stages
     float stage_max_sep_angle_deg;
+    // stage separation pyro channel
+    uint32_t stage_sep_pyro_channel;
 
     /* STAGE IGNITION SETTINGS */
     // status of this board as a MOTOR IGNITER
     // (1 to IGNITE motor after separation, 0 to NOT IGNITE)
     uint8_t stage_is_igniter_bool;
-    // delay after launch in ms to IGNITE the next stage
-    uint32_t stage_ignite_delay_ms;
+    // lockout after launch in ms to IGNITE the next stage
+    uint32_t stage_ignite_lockout_ms;
     // minimum velocity in m/s to IGNITE stage
     float stage_min_ignite_velocity_mps;
     // maximum velocity in m/s to IGNITE stage
@@ -80,6 +82,8 @@ typedef struct {
     float stage_min_ignite_angle_deg;
     // maximum angle from vertical in deg to IGNITE stage
     float stage_max_ignite_angle_deg;
+    // stage separation pyro channel
+    uint32_t stage_ignite_pyro_channel;
 
     /* RECOVERY SETTINGS */
     // height above ground in m at which main pyro is fired

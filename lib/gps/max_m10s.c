@@ -57,7 +57,7 @@ static Status ubx_read_msg(I2cDevice* device, uint8_t header[4],
                 return STATUS_TIMEOUT_ERROR;
             }
 
-            DELAY(1);
+            DELAY(0);
 
             ASSERT_OK(i2c_write(device, tx_buf, 1), "GPS i2c write");
             ASSERT_OK(i2c_read(device, rx_buf, 1), "GPS i2c read");
@@ -232,9 +232,9 @@ Status max_m10s_read_fix(I2cDevice* device, GPS_Fix_TypeDef* fix) {
     uint8_t message_buf[800];
     uint16_t message_len = 0;
 
-    if (ubx_read_msg(device, message_header, message_buf, &message_len, 10) !=
+    if (ubx_read_msg(device, message_header, message_buf, &message_len, 50) !=
         STATUS_OK) {
-        return STATUS_TIMEOUT_ERROR;
+        ASSERT_OK(STATUS_TIMEOUT_ERROR, "UBX msg read");
     }
 
     if (message_len != 92) {
@@ -247,6 +247,8 @@ Status max_m10s_read_fix(I2cDevice* device, GPS_Fix_TypeDef* fix) {
     fix->hour = message_buf[8];
     fix->min = message_buf[9];
     fix->sec = message_buf[10];
+    fix->nano = (int32_t)(message_buf[16] + (message_buf[17] << 8) +
+                          (message_buf[18] << 16) + (message_buf[19] << 24));
     fix->date_valid = message_buf[11] & 0x1;
     fix->time_valid = (message_buf[11] & 0x2) >> 1;
     fix->time_resolved = (message_buf[11] & 0x4) >> 2;
@@ -339,9 +341,9 @@ Status max_m10s_poll_fix(I2cDevice* device, GPS_Fix_TypeDef* fix) {
     uint8_t message_buf[800];
     uint16_t message_len = 0;
 
-    if (ubx_read_msg(device, message_header, message_buf, &message_len, 10) !=
+    if (ubx_read_msg(device, message_header, message_buf, &message_len, 50) !=
         STATUS_OK) {
-        return STATUS_TIMEOUT_ERROR;
+        ASSERT_OK(STATUS_TIMEOUT_ERROR, "UBX msg read");
     }
 
     if (message_len != 92) {
@@ -354,6 +356,8 @@ Status max_m10s_poll_fix(I2cDevice* device, GPS_Fix_TypeDef* fix) {
     fix->hour = message_buf[8];
     fix->min = message_buf[9];
     fix->sec = message_buf[10];
+    fix->nano = (int32_t)(message_buf[16] + (message_buf[17] << 8) +
+                          (message_buf[18] << 16) + (message_buf[19] << 24));
     fix->date_valid = message_buf[11] & 0x1;
     fix->time_valid = (message_buf[11] & 0x2) >> 1;
     fix->time_resolved = (message_buf[11] & 0x4) >> 2;

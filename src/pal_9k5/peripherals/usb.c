@@ -47,6 +47,7 @@ Status usb_init() {
     terminal_add_cmd(regex_help, cmd_help);
     terminal_add_cmd(regex_set_datetime, cmd_set_datetime);
     terminal_add_cmd(regex_get_datetime, cmd_get_datetime);
+    terminal_add_cmd(regex_print_config, cmd_print_config);
     terminal_add_cmd(regex_invalidate_config, cmd_invalidate_config);
     terminal_add_cmd(regex_erase_flash_chip, cmd_erase_flash_chip);
     terminal_add_cmd(regex_set_frequency, cmd_set_frequency);

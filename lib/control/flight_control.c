@@ -257,8 +257,10 @@ FlightPhase fp_update_coast_1(const SensorFrame* sensor_frame) {
 
     FlightStageStatus sep_status =
         fp_stage_check_sep_lockout(sensor_frame, state);
+    // Separate first if GO
     if (sep_status == FP_STG_GO) {
-        EXPECT_OK(pyros_fire(PYRO_A1), "failed to fire stage sep pyro\n");
+        EXPECT_OK(pyros_fire(s_config_ptr->stage_sep_pyro_channel),
+                  "failed to fire stage sep pyro\n");
 
         PAL_LOGI("FP_COAST_1 -> FP_STAGE\n");
         return FP_STAGE;
@@ -266,18 +268,22 @@ FlightPhase fp_update_coast_1(const SensorFrame* sensor_frame) {
 
     FlightStageStatus ignite_status =
         fp_stage_check_ignite_lockout(sensor_frame, state);
+    // Ignite otherwise if GO
     if (ignite_status == FP_STG_GO) {
-        EXPECT_OK(pyros_fire(PYRO_A2), "failed to fire motor ignitor\n");
+        EXPECT_OK(pyros_fire(s_config_ptr->stage_ignite_pyro_channel),
+                  "failed to fire motor ignitor\n");
 
         PAL_LOGI("FP_COAST_1 -> FP_IGNITE\n");
         return FP_IGNITE;
     }
 
+    // If NOGO on both, go to coast 2 and don't try again
     if (sep_status == FP_STG_NOGO && ignite_status == FP_STG_NOGO) {
         PAL_LOGI("FP_COAST_1 -> FP_COAST_2\n");
         return FP_COAST_2;
     }
 
+    // If WAIT on either, stay in coast 1 so we can try again
     return FP_COAST_1;
 }
 
@@ -287,26 +293,27 @@ FlightPhase fp_update_stage(const SensorFrame* sensor_frame) {
     FlightStageStatus ignite_status =
         fp_stage_check_ignite_lockout(sensor_frame, state);
 
+    // Ignite if GO
     if (ignite_status == FP_STG_GO) {
-        EXPECT_OK(pyros_fire(PYRO_A2), "failed to fire motor ignitor\n");
+        EXPECT_OK(pyros_fire(s_config_ptr->stage_ignite_pyro_channel),
+                  "failed to fire motor ignitor\n");
 
         PAL_LOGI("FP_STAGE -> FP_IGNITE\n");
         return FP_IGNITE;
     }
 
+    // If WAIT, stay in stage and try again
     if (ignite_status == FP_STG_WAIT) {
-        PAL_LOGI("FP_STAGE -> FP_COAST_1\n");
-        return FP_COAST_1;
+        return FP_STAGE;
     }
 
+    // If NOGO, go to coast 2 and don't try again
     PAL_LOGI("FP_STAGE -> FP_COAST_2\n");
     return FP_COAST_2;
 }
 
 FlightPhase fp_update_ignite(const SensorFrame* sensor_frame) {
-    // TODO: motor ignition
-
-    PAL_LOGI("FP_STAGE -> FP_BOOST_2\n");
+    PAL_LOGI("FP_IGNITE -> FP_BOOST_2\n");
     return FP_BOOST_2;
 }
 
@@ -396,7 +403,7 @@ FlightStageStatus fp_stage_check_sep_lockout(const SensorFrame* sensor_frame,
         return FP_STG_NOGO;
     }
 
-    if (MILLIS() - s_launch_time_ms < s_config_ptr->stage_sep_delay_ms) {
+    if (MILLIS() - s_launch_time_ms < s_config_ptr->stage_sep_lockout_ms) {
         return FP_STG_WAIT;
     }
 
@@ -439,7 +446,7 @@ FlightStageStatus fp_stage_check_ignite_lockout(const SensorFrame* sensor_frame,
         return FP_STG_NOGO;
     }
 
-    if (MILLIS() - s_launch_time_ms < s_config_ptr->stage_ignite_delay_ms) {
+    if (MILLIS() - s_launch_time_ms < s_config_ptr->stage_ignite_lockout_ms) {
         return FP_STG_WAIT;
     }
 

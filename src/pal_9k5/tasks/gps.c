@@ -7,6 +7,7 @@
 #include "i2c/i2c.h"
 #include "max_m10s.h"
 #include "pspcom.h"
+#include "rtc/rtc.h"
 #include "storage.h"
 #include "timer.h"
 
@@ -22,10 +23,10 @@
 /* PERIPHERAL CONFIG */
 /*********************/
 
-// MS5637 Barometer
+// GPS
 static I2cDevice s_gps_conf = {
     .address = 0x42,
-    .clk = I2C_SPEED_FAST,
+    .clk = I2C_SPEED_STANDARD,
     .periph = P_I2C2,
     .scl = PIN_PB10,
     .sda = PIN_PB11,
@@ -124,6 +125,31 @@ void task_gps(TaskHandle_t* handle_ptr) {
             // update_gps_for_control(&gps_frame);
             storage_queue_gps(&gps_frame);
             pspcom_update_gps(&fix);
+
+            // Update RTC
+            RTCDateTime rtc_datetime = rtc_get_datetime();
+            if (fix.time_valid) {
+                // Allow for one second of drift
+                uint32_t second_fast = (rtc_datetime.second + 1) % 60;
+                uint32_t second_slow = (rtc_datetime.second + 59) % 60;
+                if (rtc_datetime.year != fix.year ||
+                    rtc_datetime.month != fix.month ||
+                    rtc_datetime.day != fix.day ||
+                    rtc_datetime.hour != fix.hour ||
+                    rtc_datetime.minute != fix.min ||
+                    (fix.sec != second_fast && fix.sec != second_slow &&
+                     fix.sec != rtc_datetime.second)) {
+                    // Set RTC to GPS time
+                    rtc_datetime.year = fix.year;
+                    rtc_datetime.month = fix.month;
+                    rtc_datetime.day = fix.day;
+                    rtc_datetime.hour = fix.hour;
+                    rtc_datetime.minute = fix.min;
+                    rtc_datetime.second = fix.sec;
+                    rtc_set_datetime(rtc_datetime);
+                    PAL_LOGI("GPS synced RTC\n");
+                }
+            }
         } else {
             // Set LED low
             gpio_write(PIN_BLUE, GPIO_LOW);

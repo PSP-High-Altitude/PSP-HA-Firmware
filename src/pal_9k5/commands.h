@@ -16,6 +16,7 @@ void cmd_help(char *str) {
         "  help                                  this command\n"
         "  set_datetime YYYY-MM-DD HH:MM:SS      sets the RTC time\n"
         "  get_datetime                          gets the RTC time\n"
+        "  print_config                          prints the config\n"
         "  invalidate_config                     invalidates the config\n"
         "  erase_flash_chip                      full block-level flash erase\n"
         "  set_frequency [frequency in Hz]       sets the frequency\n");
@@ -41,6 +42,10 @@ void cmd_get_datetime(char *str) {
     printf("Current time: %04ld-%02ld-%02ld %02ld:%02ld:%02ld\n", dt.year,
            dt.month, dt.day, dt.hour, dt.minute, dt.second);
 }
+
+// Print config command
+char regex_print_config[] = "^print_config[\n]*$";
+void cmd_print_config(char *str) { config_print(); }
 
 // Config invalidate command
 char regex_invalidate_config[] = "^invalidate_config[\n]*$";
