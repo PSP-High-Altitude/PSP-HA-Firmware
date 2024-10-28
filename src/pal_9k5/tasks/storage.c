@@ -165,13 +165,17 @@ static Status storage_open_files() {
                   "failed to open gps\n");
 
         // Write the header to each file
-        ASSERT_OK(nand_flash_write_data(&s_logfile, s_header, sizeof(s_header)),
+        ASSERT_OK(nand_flash_write_data(&s_logfile, s_header,
+                                        strlen((char*)s_header)),
                   "failed to write log header\n");
-        ASSERT_OK(nand_flash_write_data(&s_datfile, s_header, sizeof(s_header)),
+        ASSERT_OK(nand_flash_write_data(&s_datfile, s_header,
+                                        strlen((char*)s_header)),
                   "failed to write sensor header\n");
-        ASSERT_OK(nand_flash_write_data(&s_fslfile, s_header, sizeof(s_header)),
+        ASSERT_OK(nand_flash_write_data(&s_fslfile, s_header,
+                                        strlen((char*)s_header)),
                   "failed to write state header\n");
-        ASSERT_OK(nand_flash_write_data(&s_gpsfile, s_header, sizeof(s_header)),
+        ASSERT_OK(nand_flash_write_data(&s_gpsfile, s_header,
+                                        strlen((char*)s_header)),
                   "failed to write gps header\n");
     }
 

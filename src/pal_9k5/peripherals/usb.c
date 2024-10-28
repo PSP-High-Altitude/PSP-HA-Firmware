@@ -58,7 +58,8 @@ Status usb_init() {
 
 // Serial debug stuff -- used by printf
 int _write(int file, char *data, int len) {
-    if ((file != STDOUT_FILENO) && (file != STDERR_FILENO)) {
+    if ((file != STDOUT_FILENO) && (file != STDERR_FILENO) &&
+        (file != STORAGE_FILENO) && (file != USB_FILENO)) {
         errno = EBADF;
         return -1;
     }
@@ -67,32 +68,37 @@ int _write(int file, char *data, int len) {
     /*       NAND Section      */
     /***************************/
 
-    storage_write_log(data, len);
+    // USB_FILENO means only USB
+    if (file != USB_FILENO) {
+        storage_write_log(data, len);
+    }
+
 #ifdef DEBUG
     /***************************/
     /*       USB Section       */
     /***************************/
 
-    // If the USB isn't yet initialized, buffer the writes in an internal buffer
-    // so that they can be output when the interface actually gets initialized
-    if (!s_usb_initialized || (MILLIS() - s_usb_initialized_time < 1000) ||
-        xPortIsInsideInterrupt()) {
-        int32_t copy_size =
-            fifo_enqueuen(&s_usb_serial_fifo, (uint8_t *)data, len);
-        return copy_size;
+    // STORAGE_FILENO means only storage
+    if (file != STORAGE_FILENO) {
+        // If the USB isn't yet initialized, buffer the writes in an internal
+        // buffer so that they can be output when the interface actually gets
+        // initialized
+        if (!s_usb_initialized || (MILLIS() - s_usb_initialized_time < 1000) ||
+            xPortIsInsideInterrupt()) {
+            int32_t copy_size =
+                fifo_enqueuen(&s_usb_serial_fifo, (uint8_t *)data, len);
+            return copy_size;
+        }
+
+        // If the USB is initialized, write the data to the USB interface.
+        int new_len = s_usb_serial_fifo.count;
+        fifo_dequeuen(&s_usb_serial_fifo, ser_out_buf, new_len);
+        tud_cdc_write(ser_out_buf, new_len);
+
+        // Send data
+        tud_cdc_write(data, len);
     }
-
-    // If the USB is initialized, write the data to the USB interface.
-    int new_len = s_usb_serial_fifo.count;
-    fifo_dequeuen(&s_usb_serial_fifo, ser_out_buf, new_len);
-    tud_cdc_write(ser_out_buf, new_len);
-
-    // Send data
-    tud_cdc_write(data, len);
-
 #endif
-
-    gpio_write(PIN_RED, GPIO_LOW);
     return len;
 }
 

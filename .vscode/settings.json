@@ -107,6 +107,7 @@
                 "board_config.h": "c",
                 "basic_math_functions.h": "c",
                 "buzzer.h": "c",
-                "sensors.h": "c"
+                "sensors.h": "c",
+                "io.h": "c"
         }
 }

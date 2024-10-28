@@ -20,6 +20,9 @@ typedef enum {
     LOG_ERROR,
 } LogType;
 
+#define STORAGE_FILENO 3
+#define USB_FILENO 4
+
 Status expect_ok(Status status, const char msg[], const char file[],
                  const int line);
 

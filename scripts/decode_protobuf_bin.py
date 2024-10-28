@@ -28,7 +28,7 @@ def decode_protobuf_file(file_path, protobuf_class):
 
     with open(file_path, 'rb') as file:
         header = file.readline()
-        file.read(1)  # Consume null terminator
+        #file.read(1)  # Consume null terminator
         print("Firmware specifier:", header.decode('utf-8'))
 
         while True:
