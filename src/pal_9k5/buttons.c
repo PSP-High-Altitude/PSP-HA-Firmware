@@ -5,6 +5,7 @@
 #include "board_config.h"
 #include "button_event.h"
 #include "main.h"
+#include "nand_flash.h"
 #include "stdio.h"
 #include "timer.h"
 #include "timers.h"
@@ -52,12 +53,12 @@ static void mtp_button_handler() {
     xTimerStopFromISR(g_mtp_button_timer, 0);
 
     // Save the NAND flash
-    // nand_flash_flush();
-    // nand_flash_deinit();
+    nand_flash_deinit();
 
     DELAY_MICROS(1000000);
     backup_get_ptr()->flag_mtp_pressed = 1;
     config_invalidate();
+
     NVIC_SystemReset();
 }
 

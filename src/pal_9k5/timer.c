@@ -61,6 +61,10 @@ void init_timers(uint32_t sensor_interval_ms) {
     }
 #endif
 
+    // Disable timers during debug
+    DBGMCU->APB1LFZ1 |= DBGMCU_APB1LFZ1_DBG_TIM2;
+    DBGMCU->APB1LFZ1 |= DBGMCU_APB1LFZ1_DBG_TIM3;
+
     HAL_TIM_Base_Start(&tim3_handle);
     HAL_TIM_Base_Start(&tim2_handle);
 };
