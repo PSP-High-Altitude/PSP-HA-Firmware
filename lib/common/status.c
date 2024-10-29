@@ -73,7 +73,7 @@ void pal_log(LogType type, const char* format, ...) {
             fnoprintf(USB_FILENO,
                       "\033[0;33m%04ld-%02ld-%02ld %02ld:%02ld:%02ld: WARN: ",
                       dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
-            fnoprintf(USB_FILENO,
+            fnoprintf(STORAGE_FILENO,
                       "%04ld-%02ld-%02ld %02ld:%02ld:%02ld: WARN: ", dt.year,
                       dt.month, dt.day, dt.hour, dt.minute, dt.second);
             break;
@@ -81,7 +81,7 @@ void pal_log(LogType type, const char* format, ...) {
             fnoprintf(USB_FILENO,
                       "\033[0;31m%04ld-%02ld-%02ld %02ld:%02ld:%02ld: ERR: ",
                       dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
-            fnoprintf(USB_FILENO,
+            fnoprintf(STORAGE_FILENO,
                       "%04ld-%02ld-%02ld %02ld:%02ld:%02ld: ERR: ", dt.year,
                       dt.month, dt.day, dt.hour, dt.minute, dt.second);
             break;
