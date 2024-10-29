@@ -1,6 +1,7 @@
 #ifndef FIFOS_H
 #define FIFOS_H
 
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 

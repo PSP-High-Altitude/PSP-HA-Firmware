@@ -1,14 +1,14 @@
 #include "timer.h"
 
 #include "FreeRTOS.h"
-#include "backup.h"
+#include "backup/backup.h"
 #include "stm32h7xx_hal.h"
 #include "task.h"
 
 TIM_HandleTypeDef tim2_handle;
 TIM_HandleTypeDef tim3_handle;
 
-void init_timers(uint32_t sensor_interval_ms) {
+void init_timers() {
     __HAL_RCC_TIM2_CLK_ENABLE();
 
     TIM_Base_InitTypeDef tim2_conf = {

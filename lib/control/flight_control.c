@@ -1,8 +1,9 @@
 #include "flight_control.h"
 
+#include <math.h>
 #include <stdlib.h>
 
-#include "backup.h"
+#include "backup/backup.h"
 #include "board_config.h"
 #include "pyros.h"
 #include "state_estimation.h"

@@ -1,6 +1,6 @@
 #include "board_config.h"
 
-#include "backup.h"
+#include "backup/backup.h"
 #include "nand_flash.h"
 #include "pyros.h"
 #include "stdio.h"

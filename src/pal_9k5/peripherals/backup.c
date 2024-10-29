@@ -1,4 +1,10 @@
-#include "backup.h"
+#include "backup/backup.h"
+
+#include "stm32h7xx_hal.h"
+
+#define BKPSRAM_SIZE 4096  // bytes
+
+_Static_assert(sizeof(Backup) < BKPSRAM_SIZE, "Backup does not fit in BKPSRAM");
 
 Status backup_init() {
     // Enable backup RAM

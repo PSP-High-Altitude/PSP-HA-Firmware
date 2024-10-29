@@ -3,7 +3,7 @@
 #include <sys/types.h>
 
 #include "Regex.h"
-#include "backup.h"
+#include "backup/backup.h"
 #include "buttons.h"
 #include "fifos.h"
 #include "main.h"

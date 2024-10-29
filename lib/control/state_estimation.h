@@ -1,10 +1,9 @@
 #ifndef STATE_ESTIMATION_H
 #define STATE_ESTIMATION_H
 
-#include "data.h"
 #include "flight_control.h"
-#include "math.h"
 #include "quat.h"
+#include "sensor.pb.h"
 #include "state.pb.h"
 #include "status.h"
 #include "vector.h"
