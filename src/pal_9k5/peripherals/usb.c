@@ -51,6 +51,7 @@ Status usb_init() {
     terminal_add_cmd(regex_invalidate_config, cmd_invalidate_config);
     terminal_add_cmd(regex_erase_flash_chip, cmd_erase_flash_chip);
     terminal_add_cmd(regex_set_frequency, cmd_set_frequency);
+    terminal_add_cmd(regex_set_config_value, cmd_set_config_value);
 #endif
 
     return STATUS_OK;

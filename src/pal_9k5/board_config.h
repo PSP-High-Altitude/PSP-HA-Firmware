@@ -116,4 +116,7 @@ Status config_invalidate();
 // Print the config
 void config_print();
 
+// Set a config value
+Status config_set_value(const char* key, void* value, int is_float);
+
 #endif  // BOARD_CONFIG_H

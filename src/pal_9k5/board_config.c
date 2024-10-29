@@ -233,3 +233,102 @@ void config_print() {
     printf("\nChecksum: %08lx\n", config->checksum);
     printf("========================\n");
 }
+
+Status config_set_value(const char* key, void* value, int is_float) {
+    BoardConfig* config = config_get_ptr();
+
+    if (config == NULL) {
+        return STATUS_ERROR;
+    }
+
+    float val_f;
+    uint32_t val_u32;
+    if (is_float) {
+        val_f = *(float*)value;
+        val_u32 = val_f;
+    } else {
+        val_u32 = *(uint32_t*)value;
+        val_f = val_u32;
+    }
+
+    if (strcmp(key, "control_loop_period_ms") == 0) {
+        config->control_loop_period_ms = val_u32;
+    } else if (strcmp(key, "sensor_loop_period_ms") == 0) {
+        config->sensor_loop_period_ms = val_u32;
+    } else if (strcmp(key, "storage_loop_period_ms") == 0) {
+        config->storage_loop_period_ms = val_u32;
+    } else if (strcmp(key, "gps_loop_period_ms") == 0) {
+        config->gps_loop_period_ms = val_u32;
+    } else if (strcmp(key, "pspcom_rx_loop_period_ms") == 0) {
+        config->pspcom_rx_loop_period_ms = val_u32;
+    } else if (strcmp(key, "pspcom_tx_ground_loop_period_ms") == 0) {
+        config->pspcom_tx_ground_loop_period_ms = val_u32;
+    } else if (strcmp(key, "pspcom_tx_flight_loop_period_ms") == 0) {
+        config->pspcom_tx_flight_loop_period_ms = val_u32;
+    } else if (strcmp(key, "state_init_time_ms") == 0) {
+        config->state_init_time_ms = val_u32;
+    } else if (strcmp(key, "launch_detect_period_ms") == 0) {
+        config->launch_detect_period_ms = val_u32;
+    } else if (strcmp(key, "launch_detect_replay") == 0) {
+        config->launch_detect_replay = val_u32;
+    } else if (strcmp(key, "min_fast_vel_mps") == 0) {
+        config->min_fast_vel_mps = val_f;
+    } else if (strcmp(key, "min_boost_acc_mps2") == 0) {
+        config->min_boost_acc_mps2 = val_f;
+    } else if (strcmp(key, "max_coast_acc_mps2") == 0) {
+        config->max_coast_acc_mps2 = val_f;
+    } else if (strcmp(key, "max_grounded_alt_m") == 0) {
+        config->max_grounded_alt_m = val_f;
+    } else if (strcmp(key, "min_grounded_time_ms") == 0) {
+        config->min_grounded_time_ms = val_u32;
+    } else if (strcmp(key, "stage_is_separator_bool") == 0) {
+        config->stage_is_separator_bool = val_u32;
+    } else if (strcmp(key, "stage_sep_lockout_ms") == 0) {
+        config->stage_sep_lockout_ms = val_u32;
+    } else if (strcmp(key, "stage_min_sep_velocity_mps") == 0) {
+        config->stage_min_sep_velocity_mps = val_f;
+    } else if (strcmp(key, "stage_max_sep_velocity_mps") == 0) {
+        config->stage_max_sep_velocity_mps = val_f;
+    } else if (strcmp(key, "stage_min_sep_altitude_m") == 0) {
+        config->stage_min_sep_altitude_m = val_f;
+    } else if (strcmp(key, "stage_max_sep_altitude_m") == 0) {
+        config->stage_max_sep_altitude_m = val_f;
+    } else if (strcmp(key, "stage_min_sep_angle_deg") == 0) {
+        config->stage_min_sep_angle_deg = val_f;
+    } else if (strcmp(key, "stage_max_sep_angle_deg") == 0) {
+        config->stage_max_sep_angle_deg = val_f;
+    } else if (strcmp(key, "stage_sep_pyro_channel") == 0) {
+        config->stage_sep_pyro_channel = val_u32;
+    } else if (strcmp(key, "stage_is_igniter_bool") == 0) {
+        config->stage_is_igniter_bool = val_u32;
+    } else if (strcmp(key, "stage_ignite_lockout_ms") == 0) {
+        config->stage_ignite_lockout_ms = val_u32;
+    } else if (strcmp(key, "stage_min_ignite_velocity_mps") == 0) {
+        config->stage_min_ignite_velocity_mps = val_f;
+    } else if (strcmp(key, "stage_max_ignite_velocity_mps") == 0) {
+        config->stage_max_ignite_velocity_mps = val_f;
+    } else if (strcmp(key, "stage_min_ignite_altitude_m") == 0) {
+        config->stage_min_ignite_altitude_m = val_f;
+    } else if (strcmp(key, "stage_max_ignite_altitude_m") == 0) {
+        config->stage_max_ignite_altitude_m = val_f;
+    } else if (strcmp(key, "stage_min_ignite_angle_deg") == 0) {
+        config->stage_min_ignite_angle_deg = val_f;
+    } else if (strcmp(key, "stage_max_ignite_angle_deg") == 0) {
+        config->stage_max_ignite_angle_deg = val_f;
+    } else if (strcmp(key, "stage_ignite_pyro_channel") == 0) {
+        config->stage_ignite_pyro_channel = val_u32;
+    } else if (strcmp(key, "main_height_m") == 0) {
+        printf("Setting main height to %.2f\n", val_f);
+        config->main_height_m = val_f;
+    } else if (strcmp(key, "drogue_delay_ms") == 0) {
+        config->drogue_delay_ms = val_u32;
+    } else if (strcmp(key, "deploy_lockout_ms") == 0) {
+        config->deploy_lockout_ms = val_u32;
+    } else if (strcmp(key, "telemetry_frequency_hz") == 0) {
+        config->telemetry_frequency_hz = val_u32;
+    } else {
+        return STATUS_ERROR;
+    }
+    config_commit();
+    return STATUS_OK;
+}
