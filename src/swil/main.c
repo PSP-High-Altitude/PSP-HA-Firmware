@@ -1,14 +1,15 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "board_config.h"
 #include "flight_control.h"
 #include "hwil/hwil.h"
 #include "state_estimation.h"
 #include "storage.h"
 #include "timer.h"
 
-const static char s_sensor_fname[] = "sim_out/sensor_native_sim.csv";
-const static char s_state_fname[] = "sim_out/state_native_sim.csv";
+const static char s_sensor_fname[] = "sim_out/sensor.csv";
+const static char s_state_fname[] = "sim_out/state.csv";
 
 int main() {
     // Need to do this because PAL_LOG* writes to FDs 3 and 4
@@ -23,15 +24,15 @@ int main() {
     printf("Creating state output file at %s\n", s_state_fname);
     create_state_csv(s_state_fname);
 
-    printf("***** Starting simulation *****\n");
+    printf("\n***** Starting simulation *****\n\n");
 
     ASSERT_OK(se_init(), "failed to init state est\n");
     ASSERT_OK(fp_init(), "failed to init control logic\n");
+    printf("^ @ %.1f s\n\n", MILLIS() / 1000.);
 
     SensorFrame hwil_sensor_frame;
     while (get_hwil_sensor_frame(&hwil_sensor_frame) == STATUS_OK) {
         hwil_sensor_frame.timestamp = MICROS();
-
         store_sensor_frame(&hwil_sensor_frame);
 
         FlightPhase fp_before = fp_get();
@@ -45,12 +46,13 @@ int main() {
         state_frame.timestamp = MICROS();
         store_state_frame(&state_frame);
 
-        DELAY(10);
+        DELAY(config_get_ptr()->control_loop_period_ms);
     }
 
     printf("***** Finished simulation *****\n");
 
     close_sensor_csv();
+    close_state_csv();
 
     return 0;
 }
