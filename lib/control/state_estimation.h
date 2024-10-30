@@ -18,20 +18,32 @@
 
 #define G_MAG 9.81f
 
-#define BARO_ALT_BUFFER_SIZE (80)
-#define BARO_VEL_BUFFER_SIZE (20)
+#define BARO_ALT_BUFFER_SIZE (50)
+#define BARO_VEL_BUFFER_SIZE (50)
 
 typedef struct {
-    // x is up!
-    float time;          // seconds
-    float posVert;       // m
-    float velVert;       // m/s
-    float accVert;       // m/s^2
-    Vector posGeo;       // m
-    Vector velGeo;       // m/s
-    Vector accGeo;       // m/s^2
-    Vector angVelBody;   // rad/s
+    float time;  // seconds
+
+    // Linear model outputs
+    float posVert;  // m
+    float velVert;  // m/s
+    float accVert;  // m/s^2
+
+    // Inertial model outputs
+    Vector posGeo;           // m
+    Vector velGeo;           // m/s
+    Vector accGeo;           // m/s^2
+    Vector angVelBody;       // rad/s
     Quaternion orientation;  // rad (ish)
+
+    // Intermediate variables (NOT LOGGED)
+    float posImu;  // m
+    float velImu;  // m/s
+    float accImu;  // m/s^2
+
+    float posBaro;  // m
+    float velBaro;  // m/s
+    float accBaro;  // m/s^2
 } StateEst;
 
 typedef enum {

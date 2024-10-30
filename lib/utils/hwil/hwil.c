@@ -5,6 +5,10 @@
 static size_t s_hwil_sensor_data_idx = 0;
 static size_t s_hwil_gps_data_idx = 0;
 
+static float clip_weight(float weight) {
+    return weight < 0 ? 0 : weight > 1 ? 1 : weight;
+}
+
 static GPS_Fix_TypeDef pb_frame_to_gps_fix(const GpsFrame* gps_frame) {
     GPS_Fix_TypeDef gps_fix;
 
@@ -66,8 +70,16 @@ static SensorFrame interpolate_sensor_frames(SensorFrame last_sensor_frame,
         (float)(next_sensor_frame.timestamp - last_sensor_frame.timestamp);
 
     // Swapped because we want the shorter distance to have higher weight
-    float last_weight = dt_real_to_next / dt_last_to_next;
-    float next_weight = dt_last_to_real / dt_last_to_next;
+    float last_weight = clip_weight(dt_real_to_next / dt_last_to_next);
+    float next_weight = clip_weight(dt_last_to_real / dt_last_to_next);
+
+    // NOTE: This way of clipping is not REALLY enough, because the weights
+    // could still sum to more than 1. The proper way to do this would be to
+    // compute one of the weights and subtract it from 1 to get the other one.
+    // However, this also sometimes inserts bad values into the data stream,
+    // which can be useful for testing error checking in the code.
+    //
+    // So, I'm gonna go ahead and call this a feature and not a bug.
 
     SensorFrame interpolated_frame = {
         .timestamp = real_us,

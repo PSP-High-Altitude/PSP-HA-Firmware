@@ -40,12 +40,20 @@ static uint64_t s_init_start_ms;
 static SensorFrame* s_ld_buffer_data;
 static size_t s_ld_buffer_size = 0;
 
-static uint64_t s_launch_time_ms;
-static uint64_t s_apogee_time_ms;
-static uint8_t s_stage_sep_locked;
-static uint8_t s_stage_ignite_locked;
-static uint8_t s_stage_sep_status;
-static uint8_t s_stage_ignite_status;
+static uint64_t s_launch_time_ms = 0;
+static uint64_t s_apogee_time_ms = 0;
+static uint8_t s_stage_sep_locked = 0;
+static uint8_t s_stage_ignite_locked = 0;
+static uint8_t s_stage_sep_status = 0;
+static uint8_t s_stage_ignite_status = 0;
+
+static uint64_t ms_since_launch() {
+    if (s_launch_time_ms) {
+        return MILLIS() - s_launch_time_ms;
+    }
+
+    return 0;
+}
 
 Status fp_init() {
     s_init_start_ms = MILLIS();
@@ -334,17 +342,22 @@ FlightPhase fp_update_boost_2(const SensorFrame* sensor_frame) {
 FlightPhase fp_update_coast_2(const SensorFrame* sensor_frame) {
     const StateEst* state = se_predict();
 
-    if (state->velVert < 0) {
+    if (state->velVert < 1) {
+        // Record apogee time for delayed deployment
         if (!s_apogee_time_ms) {
             s_apogee_time_ms = MILLIS();
         }
 
         if (s_apogee_time_ms + s_config_ptr->drogue_delay_ms < MILLIS()) {
-            if (MILLIS() > s_config_ptr->deploy_lockout_ms) {
-                EXPECT_OK(pyros_fire(PYRO_DRG), "failed to fire drogue pyro\n");
+            if (ms_since_launch() > s_config_ptr->deploy_lockout_ms) {
+                Status fired = EXPECT_OK(pyros_fire(PYRO_DRG),
+                                         "failed to fire drogue pyro\n");
 
-                PAL_LOGI("FP_COAST_2 -> FP_DROGUE\n");
-                return FP_DROGUE;
+                // Only transition to if we successfully fired
+                if (fired == STATUS_OK) {
+                    PAL_LOGI("FP_COAST_2 -> FP_DROGUE\n");
+                    return FP_DROGUE;
+                }
             }
         }
     }
@@ -404,7 +417,7 @@ FlightStageStatus fp_stage_check_sep_lockout(const SensorFrame* sensor_frame,
         return FP_STG_NOGO;
     }
 
-    if (MILLIS() - s_launch_time_ms < s_config_ptr->stage_sep_lockout_ms) {
+    if (ms_since_launch() < s_config_ptr->stage_sep_lockout_ms) {
         return FP_STG_WAIT;
     }
 
@@ -447,7 +460,7 @@ FlightStageStatus fp_stage_check_ignite_lockout(const SensorFrame* sensor_frame,
         return FP_STG_NOGO;
     }
 
-    if (MILLIS() - s_launch_time_ms < s_config_ptr->stage_ignite_lockout_ms) {
+    if (ms_since_launch() < s_config_ptr->stage_ignite_lockout_ms) {
         return FP_STG_WAIT;
     }
 
