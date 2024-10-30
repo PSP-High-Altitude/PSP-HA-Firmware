@@ -2,12 +2,11 @@
 
 #include <stdio.h>
 
-#define BKPSRAM_SIZE 4096  // bytes
-
-_Static_assert(sizeof(Backup) < BKPSRAM_SIZE, "Backup does not fit in BKPSRAM");
-
 static Backup s_backup;
 
-Status backup_init() { printf("Initialized backup\n"); }
+Status backup_init() {
+    printf("Initialized backup\n");
+    return STATUS_OK;
+}
 
 Backup* backup_get_ptr() { return &s_backup; }

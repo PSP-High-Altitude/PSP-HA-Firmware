@@ -2,6 +2,12 @@
 
 #include <stdio.h>
 
-Status pyros_init() { printf("Initialized pyros\n"); }
+Status pyros_init() {
+    printf("Initialized pyros\n");
+    return STATUS_OK;
+}
 
-Status pyros_fire(Pyro pyro) { printf("Firing pyro %d\n", pyro); }
+Status pyros_fire(Pyro pyro) {
+    printf("Firing pyro %d\n", pyro);
+    return STATUS_OK;
+}

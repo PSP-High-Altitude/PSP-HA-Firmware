@@ -15,8 +15,8 @@ int main() {
     // Need to do this because PAL_LOG* writes to FDs 3 and 4
     // NOTE: this is Windows-specific; change to /dev/null on Unix
     printf("Redirecting FD 3 and FD 4 to NUL\n");
-    FILE* n1 = fopen("NUL", "w");
-    FILE* n2 = fopen("NUL", "w");
+    __attribute__((unused)) FILE* n1 = fopen("NUL", "w");
+    __attribute__((unused)) FILE* n2 = fopen("NUL", "w");
 
     printf("Creating sensor output file at %s\n", s_sensor_fname);
     create_sensor_csv(s_sensor_fname);
@@ -48,6 +48,9 @@ int main() {
 
         DELAY(config_get_ptr()->control_loop_period_ms);
     }
+
+    printf("End of input data\n");
+    printf("^ @ %.1f s\n\n", MILLIS() / 1000.);
 
     printf("***** Finished simulation *****\n");
 

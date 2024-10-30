@@ -59,13 +59,22 @@ static BoardConfig s_config = {
 BoardConfig* config_get_ptr() { return &s_config; }
 
 // Ensure that a valid config is loaded into SRAM
-Status config_load() { printf("Config loaded\n"); }
+Status config_load() {
+    printf("Config loaded\n");
+    return STATUS_OK;
+}
 
 // Save changes to the config by updating checksum and storing to flash
-Status config_commit() { printf("Config loaded\n"); }
+Status config_commit() {
+    printf("Config loaded\n");
+    return STATUS_OK;
+}
 
 // Force next load to load from NAND by invalidating SRAM copy
-Status config_invalidate() { printf("Config invalidated\n"); }
+Status config_invalidate() {
+    printf("Config invalidated\n");
+    return STATUS_OK;
+}
 
 void config_print() {
     BoardConfig* config = config_get_ptr();

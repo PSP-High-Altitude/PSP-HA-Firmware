@@ -10,7 +10,7 @@ volatile static uint64_t system_timestamp_us = 0;
 
 void init_timers() { printf("Initializing timers\n"); };
 
-uint64_t MICROS() { return system_timestamp_us; }
+uint64_t MICROS() { return system_timestamp_us++; }
 
 uint64_t MILLIS() { return MICROS() / 1000; }
 
