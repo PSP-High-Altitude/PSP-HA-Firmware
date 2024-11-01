@@ -108,6 +108,11 @@
                 "basic_math_functions.h": "c",
                 "buzzer.h": "c",
                 "sensors.h": "c",
-                "io.h": "c"
+                "io.h": "c",
+                "array": "c",
+                "string_view": "c",
+                "format": "c",
+                "initializer_list": "c",
+                "span": "c"
         }
 }

@@ -13,13 +13,14 @@
 #endif
 
 #ifndef M_PI
-#define M_PI 3.1415926535f
+#define M_PI (3.1415926535f)
 #endif
 
-#define G_MAG 9.81f
+#define G_MAG (9.81f)
 
-#define BARO_ALT_BUFFER_SIZE (50)
-#define BARO_VEL_BUFFER_SIZE (50)
+#define BARO_ALT_MEDIAN_WINDOW 25
+#define BARO_ALT_SMA_WINDOW 50
+#define BARO_VEL_SMA_WINDOW 25
 
 typedef struct {
     float time;  // seconds

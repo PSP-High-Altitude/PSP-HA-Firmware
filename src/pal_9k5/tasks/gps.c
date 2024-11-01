@@ -3,7 +3,6 @@
 #include "board.h"
 #include "board_config.h"
 #include "gps.pb.h"
-#include "hwil/hwil.h"
 #include "i2c/i2c.h"
 #include "max_m10s.h"
 #include "pspcom.h"

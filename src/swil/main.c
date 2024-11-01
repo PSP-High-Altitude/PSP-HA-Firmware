@@ -1,3 +1,4 @@
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 
@@ -24,6 +25,10 @@ int main() {
     printf("Creating state output file at %s\n", s_state_fname);
     create_state_csv(s_state_fname);
 
+    float max_acc = 0;
+    float max_vel = 0;
+    float max_alt = 0;
+
     printf("\n***** Starting simulation *****\n\n");
 
     ASSERT_OK(se_init(), "failed to init state est\n");
@@ -46,13 +51,21 @@ int main() {
         state_frame.timestamp = MICROS();
         store_state_frame(&state_frame);
 
+        max_acc = fmaxf(max_acc, state_frame.acc_vert);
+        max_vel = fmaxf(max_vel, state_frame.vel_vert);
+        max_alt = fmaxf(max_alt, state_frame.pos_vert);
+
         DELAY(config_get_ptr()->control_loop_period_ms);
     }
 
     printf("End of input data\n");
     printf("^ @ %.1f s\n\n", MILLIS() / 1000.);
 
-    printf("***** Finished simulation *****\n");
+    printf("***** Finished simulation *****\n\n");
+
+    printf("Max acc: %.2f m/s^2\n", max_acc);
+    printf("Max vel: %.2f m/s\n", max_vel);
+    printf("Max alt: %.2f m\n", max_alt);
 
     close_sensor_csv();
     close_state_csv();

@@ -4,8 +4,9 @@
 #include <math.h>
 
 #include "backup/backup.h"
+#include "filter/median_filter.h"
+#include "filter/sma_filter.h"
 #include "quat.h"
-#include "sma_buffer.h"
 #include "vector.h"
 
 #define DEG_TO_RAD(x) (x * M_PI / 180)
@@ -18,11 +19,9 @@ static OrientFunc get_orientation_function(SensorDirection up_dir);
 
 static StateEst* s_state_ptr = NULL;
 
-static SmaFloatBuffer s_baro_alt_buffer;
-static SmaFloatBuffer s_baro_vel_buffer;
-
-const static float s_baro_max_vel_mps = 200.;  // m/s
-const static float s_baro_max_alt_m = 9000.;   // m
+static MedianFilter s_baro_alt_median;
+static SmaFilter s_baro_alt_sma;
+static SmaFilter s_baro_vel_sma;
 
 static OrientFunc orientation_function = NULL;
 
@@ -64,25 +63,31 @@ static float se_baro_weight(float alt_m, float vel_mps) {
      * https://www.desmos.com/calculator/da8kge4mkt
      *
      * Finally, we also only want to trust the barometer if we our averaging
-     * buffers are healthy, since unfiltered barometer data has too much noise.
+     * filters are healthy, since unfiltered barometer data has too much noise.
      *
      */
 
+    const static float s_baro_max_vel_mps = 150.;  // m/s
+    const static float s_baro_max_alt_m = 9000.;   // m
+
     float alt_weight = 1. - expf(10. * (alt_m / s_baro_max_alt_m - 1.));
 
-    float vel_weight_clamp = 1. - expf((vel_mps - s_baro_max_vel_mps) / 40.);
+    float vel_weight_clamp = 1. - expf((vel_mps - s_baro_max_vel_mps) / 30.);
     float vel_weight_logistic =
-        1. / (1. + expf((vel_mps - s_baro_max_vel_mps / 2.) / 40.));
+        1. / (1. + expf((vel_mps - s_baro_max_vel_mps / 2.) / 30.));
     float vel_weight = vel_weight_clamp * vel_weight_logistic;
 
-    // Also weight by the health of the baro buffers
-    float alt_buffer_weight =
-        (float)s_baro_alt_buffer.size / (float)s_baro_alt_buffer.capacity;
-    float vel_buffer_weight =
-        (float)s_baro_vel_buffer.size / (float)s_baro_vel_buffer.capacity;
-    float buffer_weight = alt_buffer_weight * vel_buffer_weight;
+    // Also weight by the health of the baro filters
+    float alt_median_filter_weight =
+        (float)s_baro_alt_median.size / (float)s_baro_alt_median.capacity;
+    float alt_sma_filter_weight =
+        (float)s_baro_alt_sma.size / (float)s_baro_alt_sma.capacity;
+    float alt_filter_weight = alt_median_filter_weight * alt_sma_filter_weight;
+    float vel_filter_weight =
+        (float)s_baro_vel_sma.size / (float)s_baro_vel_sma.capacity;
+    float filter_weight = alt_filter_weight * vel_filter_weight;
 
-    float total_weight = alt_weight * vel_weight * buffer_weight;
+    float total_weight = alt_weight * vel_weight * filter_weight;
     return total_weight < 0. ? 0. : total_weight > 1. ? 1. : total_weight;
 }
 
@@ -98,10 +103,12 @@ static float se_baro_alt_m(float p_mbar) {
 Status se_init() {
     orientation_function = get_orientation_function(DEFAULT_ORIENTATION);
 
-    ASSERT_OK(sma_float_buffer_init(&s_baro_alt_buffer, BARO_ALT_BUFFER_SIZE),
-              "failed to init baro alt buffer\n");
-    ASSERT_OK(sma_float_buffer_init(&s_baro_vel_buffer, BARO_VEL_BUFFER_SIZE),
-              "failed to init baro vel buffer\n");
+    ASSERT_OK(median_filter_init(&s_baro_alt_median, BARO_ALT_MEDIAN_WINDOW),
+              "failed to init baro alt median filter\n");
+    ASSERT_OK(sma_filter_init(&s_baro_alt_sma, BARO_ALT_SMA_WINDOW),
+              "failed to init baro alt sma filter\n");
+    ASSERT_OK(sma_filter_init(&s_baro_vel_sma, BARO_VEL_SMA_WINDOW),
+              "failed to init baro vel sma filter\n");
 
     s_state_ptr = &(backup_get_ptr()->state_estimate);
 
@@ -109,6 +116,8 @@ Status se_init() {
 }
 
 Status se_reset() {
+    sma_filter_reset(&s_baro_alt_sma);
+    sma_filter_reset(&s_baro_vel_sma);
     memset(s_state_ptr, 0, sizeof(StateEst));
     s_state_ptr->orientation.w = 1;
     return STATUS_OK;
@@ -254,18 +263,22 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     // Baro updates
     float last_baro_alt = s_state_ptr->posBaro;
 
-    // Update the baro altitude buffer regardless of if we have a NAN
-    // because we want the old values to get pushed out if the sensor
-    // is unreliable instead of continuing to use old values
-    sma_float_buffer_insert_sample(&s_baro_alt_buffer, baro_alt);
-    s_state_ptr->posBaro = sma_float_buffer_get_avg(&s_baro_alt_buffer);
+    // Median filter on the first stage for outlier rejection
+    median_filter_insert(&s_baro_alt_median, baro_alt);
+    float median_baro_alt = median_filter_get_median(&s_baro_alt_median);
+
+    // SMA filter on the second stage for smoothing
+    sma_filter_insert(&s_baro_alt_sma, median_baro_alt);
+    s_state_ptr->posBaro = sma_filter_get_mean(&s_baro_alt_sma);
 
     // Calculate baro velocity using last and current average baro altitude
     float baro_vel = (s_state_ptr->posBaro - last_baro_alt) / dt;
-    sma_float_buffer_insert_sample(&s_baro_vel_buffer, baro_vel);
-    s_state_ptr->velBaro = sma_float_buffer_get_avg(&s_baro_vel_buffer);
 
-    // If the buffers empty out, the baro estimates can be NAN, so make sure to
+    // SMA filter on the velocity calculated above
+    sma_filter_insert(&s_baro_vel_sma, baro_vel);
+    s_state_ptr->velBaro = sma_filter_get_mean(&s_baro_vel_sma);
+
+    // If the filters empty out, the baro estimates can be NAN, so make sure to
     // not infect the main state estimates with the NANovirus
     bool baro_valid =
         !isnan(s_state_ptr->posBaro) && !isnan(s_state_ptr->velBaro);
@@ -286,11 +299,13 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
         // After drogue deployment, use baro alt exclusively
         s_state_ptr->posVert = s_state_ptr->posBaro;
         s_state_ptr->velVert = s_state_ptr->velBaro;
-        s_state_ptr->accVert = NAN;
+        s_state_ptr->accVert = vec_mag(&s_current_acc);
     } else if (phase == FP_COAST_2 && baro_valid) {
         // During coast, use weighted combination of integration and baro
-        float baro_weight =
+        static float baro_weight = 0;
+        float new_baro_weight =
             se_baro_weight(s_state_ptr->posVert, s_state_ptr->velVert);
+        baro_weight = (baro_weight + new_baro_weight) / 2;
         float imu_weight = 1. - baro_weight;
 
         s_state_ptr->posVert = imu_weight * s_state_ptr->posImu +
