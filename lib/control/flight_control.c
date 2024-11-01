@@ -11,6 +11,7 @@
 
 // Forward declarations
 FlightPhase fp_update_init(const SensorFrame* sensor_frame);
+FlightPhase fp_update_wait(const SensorFrame* sensor_frame);
 FlightPhase fp_update_ready(const SensorFrame* sensor_frame);
 FlightPhase fp_update_boost_1(const SensorFrame* sensor_frame);
 FlightPhase fp_update_coast_1(const SensorFrame* sensor_frame);
@@ -117,6 +118,10 @@ Status fp_update(const SensorFrame* sensor_frame) {
             *s_flight_phase_ptr = fp_update_init(sensor_frame);
             break;
 
+        case FP_WAIT:
+            *s_flight_phase_ptr = fp_update_wait(sensor_frame);
+            break;
+
         case FP_READY:
             *s_flight_phase_ptr = fp_update_ready(sensor_frame);
             break;
@@ -183,12 +188,32 @@ FlightPhase fp_update_init(const SensorFrame* sensor_frame) {
         // Once the init time is up, record the average ground pressure
         se_set_ground_pressure(s_pressure_sum / s_pressure_num_pts);
 
-        PAL_LOGI("FP_INIT -> FP_READY\n");
-        return FP_READY;
+        PAL_LOGI("FP_INIT -> FP_WAIT\n");
+        return FP_WAIT;
     }
 
     // Otherwise, stay in init
     return FP_INIT;
+}
+
+FlightPhase fp_update_wait(const SensorFrame* sensor_frame) {
+    // If the acceleration is significantly negative, then that implies that we
+    // are not correctly positioned for launch. When the rocket is nose up on
+    // the pad, we should measure a near-zero vertical acceleration (accounting
+    // for some accelerometer bias). If we're measuring a significantly negative
+    // acceleration, that implies that the rocket is not vertical (at least in
+    // the frame of the board). This should prevent launch detection from
+    // running before it's vertical on the pad, and should alert us to potential
+    // misconfiguration of the board axes if we see this state on the pad;
+    // e.g. https://www.npr.org/sections/thetwo-way/2013/07/10/200775748.
+    const StateEst* state = se_predict();
+
+    if (state->accVert > -s_config_ptr->max_ready_acc_bias_mps2) {
+        PAL_LOGI("FP_WAIT -> FP_READY\n");
+        return FP_READY;
+    }
+
+    return FP_WAIT;
 }
 
 FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
@@ -200,10 +225,15 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
 
     static size_t s_ld_buffer_entries = 0;
 
-    float accel_threshold = s_config_ptr->min_boost_acc_mps2;
-    float accel_current = sensor_frame->acc_i_z * 9.81 - G_MAG;
+    const StateEst* state = se_predict();
 
-    if (accel_current > accel_threshold) {
+    if (state->accVert < -s_config_ptr->max_ready_acc_bias_mps2) {
+        // Go to the wait state if the acceleration is highly negative
+        PAL_LOGI("FP_READY -> FP_WAIT\n");
+        return FP_WAIT;
+    }
+
+    if (state->accVert > s_config_ptr->min_boost_acc_mps2) {
         s_ms_accel_above_threshold += MILLIS() - s_last_frame_timestamp_ms;
 
         // If we need to replay launch, save the current frame in the buffer
@@ -212,7 +242,7 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
                 s_ld_buffer_data[s_ld_buffer_entries++] = *sensor_frame;
             }
         }
-    } else if (!isnan(accel_current)) {
+    } else if (!isnan(state->accVert)) {
         // Don't reset for a NAN acceleration
         s_ms_accel_above_threshold = 0;
         s_ld_buffer_entries = 0;

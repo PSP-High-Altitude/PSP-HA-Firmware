@@ -6,6 +6,7 @@
 
 typedef enum {
     FP_INIT,
+    FP_WAIT,   // not ready
     FP_READY,  // on the pad
     FP_BOOST_1,
     FP_COAST_1,

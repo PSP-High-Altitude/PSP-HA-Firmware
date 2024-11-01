@@ -42,6 +42,8 @@ typedef struct {
     float max_grounded_alt_m;
     // minimum time for which we have to be below the grounded alt to transition
     float min_grounded_time_ms;
+    // maximum acceleration that may be measured by state estimation in ready
+    float max_ready_acc_bias_mps2;
 
     /* STAGE SEPARATION SETTINGS */
     // status of this board as a stage separator
