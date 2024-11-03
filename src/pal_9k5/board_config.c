@@ -283,6 +283,8 @@ Status config_set_value(const char* key, void* value, int is_float) {
         config->max_grounded_alt_m = val_f;
     } else if (strcmp(key, "min_grounded_time_ms") == 0) {
         config->min_grounded_time_ms = val_u32;
+    } else if (strcmp(key, "max_ready_acc_bias_mps2") == 0) {
+        config->max_ready_acc_bias_mps2 = val_f;
     } else if (strcmp(key, "stage_is_separator_bool") == 0) {
         config->stage_is_separator_bool = val_u32;
     } else if (strcmp(key, "stage_sep_lockout_ms") == 0) {
