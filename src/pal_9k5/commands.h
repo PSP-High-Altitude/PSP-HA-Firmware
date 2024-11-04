@@ -21,7 +21,8 @@ void cmd_help(char *str) {
         "  invalidate_config                     invalidates the config\n"
         "  erase_flash_chip                      full block-level flash erase\n"
         "  set_frequency [frequency in Hz]       sets the frequency\n"
-        "  set_config_value [key] [value]        sets a config value\n");
+        "  set_config_value [key] [value]        sets a config value\n"
+        "  get_firmware_spec                     prints the firmware spec\n");
 }
 // clang-format on
 
@@ -170,5 +171,11 @@ const char *boardConfigDescription =
     "\n"
     "CHECKSUM\n"
     "checksum: CRC-32 checksum for config verification\n";
+
+// Print firmware spec command
+char regex_get_firmware_spec[] = "^get_firmware_spec[\n]*$";
+void cmd_get_firmware_spec(char *str) {
+    printf("Firmware spec: %s\n", FIRMWARE_SPECIFIER);
+}
 
 #endif  // COMMANDS_H
