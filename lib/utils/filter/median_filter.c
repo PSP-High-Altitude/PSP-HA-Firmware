@@ -198,36 +198,36 @@ static Status list_insert_nonempty(MedianFilter* filter, float sample) {
     filter->size += 1;
 
     // Figure out where the new sample should go
-    bool inserted_left = true;
-    MedianFilterNode* insert_before = filter->min;
-    while (insert_before != NULL && insert_before->sample < sample) {
-        if (insert_before == filter->median) {
-            inserted_left = false;
+    bool inserted_left = false;
+    MedianFilterNode* insert_after = filter->max;
+    while (insert_after != NULL && insert_after->sample > sample) {
+        if (insert_after == filter->median) {
+            inserted_left = true;
         }
-        insert_before = insert_before->next;
+        insert_after = insert_after->prev;
     }
 
     // Perform the insertion
     node->sample = sample;
-    node->next = insert_before;
-    if (insert_before == NULL) {
-        // We are the new max element
-        node->prev = filter->max;
-        filter->max->next = node;
-        filter->max = node;
+    node->prev = insert_after;
+    if (insert_after == NULL) {
+        // We are the new min element
+        node->next = filter->min;
+        filter->min->prev = node;
+        filter->min = node;
     } else {
-        node->prev = insert_before->prev;
-        if (insert_before->prev == NULL) {
-            // We are the new min element
-            filter->min = node;
+        node->next = insert_after->next;
+        if (insert_after->next == NULL) {
+            // We are the new max element
+            filter->max = node;
         } else {
             // We are in the middle
-            insert_before->prev->next = node;
+            insert_after->next->prev = node;
         }
-        insert_before->prev = node;
+        insert_after->next = node;
     }
 
-    // Otherwise, figure out the new median
+    // Figure out the new median
     if (filter->bias == 0) {
         // If the bias was previously zero, then that means we had an odd
         // number of elements with the median at the center. So, the median
