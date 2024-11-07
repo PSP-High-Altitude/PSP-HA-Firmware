@@ -16,14 +16,14 @@ static BoardConfig s_config = {
     .pspcom_tx_flight_loop_period_ms = 1000,  // ms
 
     // State estimation settings
-    .state_init_time_ms = 10000,     // ms
-    .launch_detect_period_ms = 500,  // ms
-    .launch_detect_replay = true,    // will replay
-    .min_fast_vel_mps = 300,         // m/s
-    .min_boost_acc_mps2 = 50,        // m/s^2
-    .max_coast_acc_mps2 = 0,         // m/s^2
-    .max_grounded_alt_m = 100,       // m
-    .min_grounded_time_ms = 10000,   // ms
+    .state_init_time_ms = 10000,    // ms
+    .boost_detect_period_ms = 500,  // ms
+    .launch_detect_replay = true,   // will replay
+    .min_fast_vel_mps = 300,        // m/s
+    .min_boost_acc_mps2 = 25,       // m/s^2
+    .max_coast_acc_mps2 = 0,        // m/s^2
+    .max_grounded_alt_m = 100,      // m
+    .min_grounded_time_ms = 10000,  // ms
 
     // Stage separation settings
     .stage_is_separator_bool = 0,
@@ -49,7 +49,7 @@ static BoardConfig s_config = {
 
     // Recovery settings
     .main_height_m = 300.0,      // m
-    .drogue_delay_ms = 1000,     // ms
+    .drogue_delay_ms = 100,      // ms
     .deploy_lockout_ms = 10000,  // ms
 
     // Telemetry settings
@@ -93,7 +93,7 @@ void config_print() {
 
     printf("\n----- STATE ESTIMATION -----\n");
     printf("State init time: %ld ms\n", config->state_init_time_ms);
-    printf("Launch detect period: %ld ms\n", config->launch_detect_period_ms);
+    printf("Launch detect period: %ld ms\n", config->boost_detect_period_ms);
     printf("Launch detect replay: %s\n",
            config->launch_detect_replay ? "Yes" : "No");
     printf("Min fast vel: %.2f m/s\n", config->min_fast_vel_mps);

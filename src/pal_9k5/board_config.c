@@ -20,15 +20,15 @@ const static BoardConfig s_default_config = {
     .pspcom_tx_flight_loop_period_ms = 1000,  // ms
 
     // State estimation settings
-    .state_init_time_ms = 10000,     // ms
-    .launch_detect_period_ms = 500,  // ms
-    .launch_detect_replay = true,    // will replay
-    .min_fast_vel_mps = 300,         // m/s
-    .min_boost_acc_mps2 = 50,        // m/s^2
-    .max_coast_acc_mps2 = 0,         // m/s^2
-    .max_grounded_alt_m = 100,       // m
-    .min_grounded_time_ms = 10000,   // ms
-    .max_ready_acc_bias_mps2 = 2,    // m/s^2
+    .state_init_time_ms = 10000,    // ms
+    .boost_detect_period_ms = 500,  // ms
+    .launch_detect_replay = true,   // will replay
+    .min_fast_vel_mps = 300,        // m/s
+    .min_boost_acc_mps2 = 50,       // m/s^2
+    .max_coast_acc_mps2 = 0,        // m/s^2
+    .max_grounded_alt_m = 100,      // m
+    .min_grounded_time_ms = 10000,  // ms
+    .max_ready_acc_bias_mps2 = 2,   // m/s^2
 
     // Stage separation settings
     .stage_is_separator_bool = 0,
@@ -183,7 +183,7 @@ void config_print() {
 
     printf("\n----- STATE ESTIMATION -----\n");
     printf("State init time: %ld ms\n", config->state_init_time_ms);
-    printf("Launch detect period: %ld ms\n", config->launch_detect_period_ms);
+    printf("Launch detect period: %ld ms\n", config->boost_detect_period_ms);
     printf("Launch detect replay: %s\n",
            config->launch_detect_replay ? "Yes" : "No");
     printf("Min fast vel: %.2f m/s\n", config->min_fast_vel_mps);
@@ -269,8 +269,8 @@ Status config_set_value(const char* key, void* value, int is_float) {
         config->pspcom_tx_flight_loop_period_ms = val_u32;
     } else if (strcmp(key, "state_init_time_ms") == 0) {
         config->state_init_time_ms = val_u32;
-    } else if (strcmp(key, "launch_detect_period_ms") == 0) {
-        config->launch_detect_period_ms = val_u32;
+    } else if (strcmp(key, "boost_detect_period_ms") == 0) {
+        config->boost_detect_period_ms = val_u32;
     } else if (strcmp(key, "launch_detect_replay") == 0) {
         config->launch_detect_replay = val_u32;
     } else if (strcmp(key, "min_fast_vel_mps") == 0) {

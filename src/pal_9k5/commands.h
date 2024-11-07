@@ -125,7 +125,7 @@ const char *boardConfigDescription =
     "\n"
     "STATE ESTIMATION SETTINGS\n"
     "state_init_time_ms: Duration to determine baseline sensor values (ms)\n"
-    "launch_detect_period_ms: Time for accel to exceed threshold for launch "
+    "boost_detect_period_ms: Time for accel to exceed threshold for launch "
     "detection (ms)\n"
     "launch_detect_replay: Flag for replaying state estimation during launch "
     "(1/0)\n"

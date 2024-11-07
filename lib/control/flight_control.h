@@ -6,16 +6,12 @@
 
 typedef enum {
     FP_INIT,
-    FP_WAIT,   // not ready
-    FP_READY,  // on the pad
-    FP_BOOST_1,
-    FP_COAST_1,
-    FP_STAGE,
-    FP_IGNITE,
-    FP_BOOST_2,
-    FP_COAST_2,
-    FP_DROGUE,  // trigger drogue
-    FP_MAIN,    // trigger chute
+    FP_WAIT,    // not ready
+    FP_READY,   // on the pad
+    FP_BOOST,   // motor burning
+    FP_COAST,   // waiting for apogee
+    FP_DROGUE,  // under drogue
+    FP_MAIN,    // under main
     FP_LANDED,
 } FlightPhase;
 

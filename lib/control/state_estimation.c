@@ -300,7 +300,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
         s_state_ptr->posVert = s_state_ptr->posBaro;
         s_state_ptr->velVert = s_state_ptr->velBaro;
         s_state_ptr->accVert = vec_mag(&s_current_acc);
-    } else if (phase == FP_COAST_2 && baro_valid) {
+    } else if (phase == FP_COAST && baro_valid) {
         // During coast, use weighted combination of integration and baro
         static float baro_weight = 0;
         float new_baro_weight =

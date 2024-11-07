@@ -28,8 +28,8 @@ typedef struct {
     /* STATE ESTIMATION SETTINGS */
     // time in ms during which a baseline value for the sensors is determined
     uint32_t state_init_time_ms;
-    // time in ms for which accel must be above boost threshold to detect launch
-    uint32_t launch_detect_period_ms;
+    // time in ms for which accel must be above boost threshold to detect boost
+    uint32_t boost_detect_period_ms;
     // whether to replay state estimation of launch detection interval at exit
     uint32_t launch_detect_replay;
     // vertical velocity over which we're considered to be fast
