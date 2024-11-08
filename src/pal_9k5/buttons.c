@@ -4,6 +4,7 @@
 #include "backup/backup.h"
 #include "board_config.h"
 #include "button_event.h"
+#include "gpio/gpio.h"
 #include "main.h"
 #include "nand_flash.h"
 #include "stdio.h"
@@ -48,6 +49,19 @@ static void mtp_button_timeout(TimerHandle_t timer) {
 
 // If the MTP button is pressed
 static void mtp_button_handler() {
+    uint16_t debounce = 0x5555;
+    // Debounce
+    while (debounce != 0xFFFF && debounce != 0) {
+        debounce = debounce << 1;
+        if (gpio_read(PIN_MTP) == GPIO_HIGH) {
+            debounce |= 1;
+        }
+        DELAY_MICROS(1000);
+    }
+    if (debounce == 0) {
+        return;
+    }
+
     // Handle button press
     button_event_destroy(&g_mtp_button);
     xTimerStopFromISR(g_mtp_button_timer, 0);

@@ -24,15 +24,16 @@ const static BoardConfig s_default_config = {
     .boost_detect_period_ms = 500,  // ms
     .launch_detect_replay = true,   // will replay
     .min_fast_vel_mps = 300,        // m/s
-    .min_boost_acc_mps2 = 50,       // m/s^2
+    .min_boost_acc_mps2 = 25,       // m/s^2
     .max_coast_acc_mps2 = 0,        // m/s^2
     .max_grounded_alt_m = 100,      // m
     .min_grounded_time_ms = 10000,  // ms
     .max_ready_acc_bias_mps2 = 2,   // m/s^2
 
     // Stage separation settings
-    .stage_is_separator_bool = 0,
+    .stage_is_separator_bool = 1,
     .stage_sep_lockout_ms = 4500,
+    .stage_sep_delay_ms = 800,
     .stage_min_sep_velocity_mps = -1e9f,
     .stage_max_sep_velocity_mps = 1e9f,
     .stage_min_sep_altitude_m = 100,
@@ -54,11 +55,11 @@ const static BoardConfig s_default_config = {
 
     // Recovery settings
     .main_height_m = 300.0,      // m
-    .drogue_delay_ms = 1000,     // ms
+    .drogue_delay_ms = 0,        // ms
     .deploy_lockout_ms = 10000,  // ms
 
     // Telemetry settings
-    .telemetry_frequency_hz = 433000000,  // Hz
+    .telemetry_frequency_hz = 433550000,  // Hz
 };
 
 // Simple summing checksum with non-zero initialization
@@ -289,6 +290,8 @@ Status config_set_value(const char* key, void* value, int is_float) {
         config->stage_is_separator_bool = val_u32;
     } else if (strcmp(key, "stage_sep_lockout_ms") == 0) {
         config->stage_sep_lockout_ms = val_u32;
+    } else if (strcmp(key, "stage_sep_delay_ms") == 0) {
+        config->stage_sep_delay_ms = val_u32;
     } else if (strcmp(key, "stage_min_sep_velocity_mps") == 0) {
         config->stage_min_sep_velocity_mps = val_f;
     } else if (strcmp(key, "stage_max_sep_velocity_mps") == 0) {

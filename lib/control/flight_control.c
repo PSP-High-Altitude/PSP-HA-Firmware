@@ -43,8 +43,10 @@ static CondTimer s_init_timer;
 static CondTimer s_boost_det_timer;
 static CondTimer s_landing_det_timer;
 static CondTimer s_drogue_delay_timer;
+static CondTimer s_stage_sep_timer;
 
 static uint64_t s_launch_time_ms = 0;
+static uint64_t s_boost_time_ms = 0;
 static uint64_t s_apogee_time_ms = 0;
 static bool s_stage_sep_locked = false;
 static bool s_stage_ignite_locked = false;
@@ -52,6 +54,14 @@ static bool s_stage_ignite_locked = false;
 static uint64_t ms_since_launch() {
     if (s_launch_time_ms) {
         return MILLIS() - s_launch_time_ms;
+    }
+
+    return 0;
+}
+
+static uint64_t ms_since_boost() {
+    if (s_boost_time_ms) {
+        return MILLIS() - s_boost_time_ms;
     }
 
     return 0;
@@ -92,6 +102,7 @@ Status fp_init() {
     cond_timer_init(&s_boost_det_timer, s_config_ptr->boost_detect_period_ms);
     cond_timer_init(&s_landing_det_timer, s_config_ptr->min_grounded_time_ms);
     cond_timer_init(&s_drogue_delay_timer, s_config_ptr->drogue_delay_ms);
+    cond_timer_init(&s_stage_sep_timer, s_config_ptr->stage_sep_delay_ms);
 
 #ifdef HWIL_TEST
     // Always start from init for HWIL test
@@ -270,6 +281,7 @@ FlightPhase fp_update_boost(const SensorFrame* sensor_frame) {
     if (state->accVert < s_config_ptr->max_coast_acc_mps2) {
         // If we're above the coast deceleration threshold, transition.
         cond_timer_update(&s_boost_det_timer, false);
+        s_boost_time_ms = MILLIS();
         PAL_LOGI("FP_BOOST -> FP_COAST\n");
         return FP_COAST;
     }
@@ -282,6 +294,7 @@ FlightPhase fp_update_boost(const SensorFrame* sensor_frame) {
         // also transition to coast. This is needed to make sure that we go to
         // coast in low deceleration scenarios or sensor malfunctions.
         cond_timer_update(&s_boost_det_timer, false);
+        s_boost_time_ms = MILLIS();
         PAL_LOGI("FP_BOOST -> FP_COAST\n");
         return FP_COAST;
     }
@@ -309,7 +322,6 @@ FlightPhase fp_update_coast(const SensorFrame* sensor_frame) {
 
     // Check if we should separate
     FlightStageStatus sep_status = fp_stage_check_sep_lockout(state);
-
     if (sep_status == FP_STG_GO) {
         // Separate if GO
         EXPECT_OK(pyros_fire(s_config_ptr->stage_sep_pyro_channel),
@@ -413,7 +425,10 @@ FlightStageStatus fp_stage_check_sep_lockout(const StateEst* state) {
         return FP_STG_WAIT;
     }
 
-    // Since nothing else will cause a wait condition
+    if (ms_since_boost() < s_config_ptr->stage_sep_delay_ms) {
+        return FP_STG_WAIT;
+    }
+
     s_stage_sep_locked = 1;
 
     float velocity = state->velVert;
@@ -453,7 +468,6 @@ FlightStageStatus fp_stage_check_ignite_lockout(const StateEst* state) {
         return FP_STG_WAIT;
     }
 
-    // Since nothing else will cause a wait condition
     s_stage_ignite_locked = 1;
 
     float velocity = state->velVert;

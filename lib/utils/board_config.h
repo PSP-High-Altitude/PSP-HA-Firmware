@@ -51,6 +51,8 @@ typedef struct {
     uint8_t stage_is_separator_bool;
     // lockout after launch in ms to separate stages (NOT TO IGNITE)
     uint32_t stage_sep_lockout_ms;
+    // delay after burnout in ms to separate stages (NOT TO IGNITE)
+    uint32_t stage_sep_delay_ms;
     // minimum velocity in m/s to separate stages
     float stage_min_sep_velocity_mps;
     // maximum velocity in m/s to separate stages

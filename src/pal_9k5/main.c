@@ -185,8 +185,8 @@ int main(void) {
     gpio_write(PIN_GREEN, GPIO_HIGH);
     gpio_write(PIN_BLUE, GPIO_HIGH);
 
-    // Set pull-ups on the button pins
-    gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLUP);
+    // Set pull-down on the button pins
+    gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLDOWN);
 
     // Launch FreeRTOS kernel and init task
     TASK_CREATE(task_init, -1, 8192);

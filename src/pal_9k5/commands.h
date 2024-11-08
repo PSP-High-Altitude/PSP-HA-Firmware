@@ -141,6 +141,7 @@ const char *boardConfigDescription =
     "don’t)\n"
     "stage_sep_lockout_ms: Lockout period post-launch for stage separation "
     "(ms)\n"
+    "stage_sep_delay_ms: Delay after burnout for stage separation (ms)\n"
     "stage_min_sep_velocity_mps: Minimum separation velocity (m/s)\n"
     "stage_max_sep_velocity_mps: Maximum separation velocity (m/s)\n"
     "stage_min_sep_altitude_m: Minimum separation altitude (m)\n"

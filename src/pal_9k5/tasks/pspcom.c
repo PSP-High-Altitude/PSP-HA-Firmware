@@ -540,7 +540,7 @@ void task_pspcom_tx() {
 
         // Then wait until the next period
         FlightPhase flight_phase = fp_get();
-        if (flight_phase < FP_BOOST_1 || flight_phase > FP_DROGUE) {
+        if (flight_phase < FP_BOOST || flight_phase > FP_DROGUE) {
             // If pre-launch, or on main chute, send less frequently
             vTaskDelayUntil(&last_tx_time,
                             s_config_ptr->pspcom_tx_ground_loop_period_ms /
