@@ -111,19 +111,19 @@ void task_init() {
     if (!mtp_mode) {
         // Start tasks if we are in normal mode
         PAL_LOGI("Launching flight tasks\n");
-        TASK_CREATE(task_pyros, +9, 2048);
-        TASK_CREATE(task_control, +8, 2048);
-        TASK_CREATE(task_sensors, +7, 2048);
-        TASK_CREATE(task_pspcom_tx, +6, 2048);
-        TASK_CREATE(task_gps, +5, 2048);
-        TASK_CREATE(task_storage, +4, 4096);
-        TASK_CREATE(task_pspcom_rx, +3, 2048);
+        // TASK_CREATE(task_pyros, +9, 2048);
+        // TASK_CREATE(task_control, +8, 2048);
+        // TASK_CREATE(task_sensors, +7, 2048);
+        // TASK_CREATE(task_pspcom_tx, +6, 2048);
+        // TASK_CREATE(task_gps, +5, 2048);
+        // TASK_CREATE(task_storage, +4, 4096);
+        // TASK_CREATE(task_pspcom_rx, +3, 2048);
         TASK_CREATE(task_buzzer, +2, 512);
-        TASK_CREATE(task_usb, +1, 4096);
+        //  TASK_CREATE(task_usb, +1, 4096);
     } else {
         PAL_LOGI("Started USB MSC mode\n");
         TASK_CREATE(task_buzzer, +2, 512);
-        TASK_CREATE(task_usb, +1, 4096);
+        //  TASK_CREATE(task_usb, +1, 4096);
     }
 
 #ifdef DEBUG_MEMORY_USAGE
