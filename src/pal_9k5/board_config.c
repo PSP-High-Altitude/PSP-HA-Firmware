@@ -31,7 +31,7 @@ const static BoardConfig s_default_config = {
     .max_ready_acc_bias_mps2 = 2,   // m/s^2
 
     // Stage separation settings
-    .stage_is_separator_bool = 1,
+    .stage_is_separator_bool = 0,
     .stage_sep_lockout_ms = 4500,
     .stage_sep_delay_ms = 800,
     .stage_min_sep_velocity_mps = -1e9f,
@@ -59,7 +59,7 @@ const static BoardConfig s_default_config = {
     .deploy_lockout_ms = 10000,  // ms
 
     // Telemetry settings
-    .telemetry_frequency_hz = 433550000,  // Hz
+    .telemetry_frequency_hz = 433750000,  // Hz
 };
 
 // Simple summing checksum with non-zero initialization
@@ -197,7 +197,8 @@ void config_print() {
     printf("\n----- STAGE SEPARATION -----\n");
     printf("Stage is separator: %s\n",
            config->stage_is_separator_bool ? "Yes" : "No");
-    printf("Stage sep delay: %ld ms\n", config->stage_sep_lockout_ms);
+    printf("Stage sep lockout: %ld ms\n", config->stage_sep_lockout_ms);
+    printf("Stage sep delay: %ld ms\n", config->stage_sep_delay_ms);
     printf("Stage min sep vel: %.2f m/s\n", config->stage_min_sep_velocity_mps);
     printf("Stage max sep vel: %.2f m/s\n", config->stage_max_sep_velocity_mps);
     printf("Stage min sep alt: %.2f m\n", config->stage_min_sep_altitude_m);
@@ -209,7 +210,7 @@ void config_print() {
     printf("\n----- STAGE IGNITION -----\n");
     printf("Stage is igniter: %s\n",
            config->stage_is_igniter_bool ? "Yes" : "No");
-    printf("Stage ignite delay: %ld ms\n", config->stage_ignite_lockout_ms);
+    printf("Stage ignite lockout: %ld ms\n", config->stage_ignite_lockout_ms);
     printf("Stage min ignite vel: %.2f m/s\n",
            config->stage_min_ignite_velocity_mps);
     printf("Stage max ignite vel: %.2f m/s\n",
