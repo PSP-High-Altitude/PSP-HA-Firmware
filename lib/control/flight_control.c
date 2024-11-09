@@ -109,8 +109,7 @@ Status fp_init() {
     *s_flight_phase_ptr = FP_INIT;
 #endif
 
-    if (*s_flight_phase_ptr == FP_INIT || *s_flight_phase_ptr == FP_READY ||
-        *s_flight_phase_ptr == FP_LANDED || *s_flight_phase_ptr > FP_LANDED) {
+    if (*s_flight_phase_ptr <= FP_READY || *s_flight_phase_ptr >= FP_LANDED) {
         PAL_LOGI("Resetting flight logic and state estimation\n");
         ASSERT_OK(se_reset(), "failed to reset state\n");
         *s_flight_phase_ptr = FP_INIT;

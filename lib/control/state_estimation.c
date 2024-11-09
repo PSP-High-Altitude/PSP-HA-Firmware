@@ -218,16 +218,15 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
                 }
             }
         }
-    } else if (se_valid_acc(sensor_frame->acc_i_x) &&  ///
-               se_valid_acc(sensor_frame->acc_i_y) &&  ///
-               se_valid_acc(sensor_frame->acc_i_z)) {
+    } else if (se_valid_acc(sensor_frame->acc_h_x) &&  ///
+               se_valid_acc(sensor_frame->acc_h_y) &&  ///
+               se_valid_acc(sensor_frame->acc_h_z)) {
         // If the high-precision values are invalid but the high-range ones are
         // valid, not much to think about -- just go with the high-range ones
         orientation_function(sensor_frame->acc_h_x * G_MAG,  ///
                              sensor_frame->acc_h_y * G_MAG,  ///
                              sensor_frame->acc_h_z * G_MAG,  ///
                              &s_current_acc);
-        vec_iadd(&s_current_acc, &s_grav_vec);
     } else {
         // If neither were valid, then we reuse the acceleration values from
         // last time (which is a no-op since they're in s_current_state).
