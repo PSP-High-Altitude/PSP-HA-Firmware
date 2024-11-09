@@ -31,7 +31,7 @@ const static BoardConfig s_default_config = {
     .max_ready_acc_bias_mps2 = 2,   // m/s^2
 
     // Stage separation settings
-    .stage_is_separator_bool = 0,
+    .stage_is_separator_bool = 1,
     .stage_sep_lockout_ms = 4500,
     .stage_sep_delay_ms = 800,
     .stage_min_sep_velocity_mps = -1e9f,

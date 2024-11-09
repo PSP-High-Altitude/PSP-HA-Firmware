@@ -1,12 +1,14 @@
 #ifndef COMMANDS_H
 #define COMMANDS_H
 
+#include "backup/backup.h"
 #include "board_config.h"
 #include "mt29f4g.h"
 #include "pspcom.h"
 #include "regex.h"
 #include "rtc/rtc.h"
 #include "status.h"
+#include "timer.h"
 
 // Help command
 char regex_help[] = "^help[\n]*$";
@@ -19,6 +21,7 @@ void cmd_help(char *str) {
         "  get_datetime                          gets the RTC time\n"
         "  print_config                          prints the config\n"
         "  invalidate_config                     invalidates the config\n"
+        "  invalidate_backup                     invalidates the backup pointer\n"
         "  erase_flash_chip                      full block-level flash erase\n"
         "  set_frequency [frequency in Hz]       sets the frequency\n"
         "  set_config_value [key] [value]        sets a config value\n"
@@ -56,6 +59,15 @@ char regex_invalidate_config[] = "^invalidate_config[\n]*$";
 void cmd_invalidate_config(char *str) {
     config_invalidate();
     PAL_LOGW("Board config invalidated!\n");
+}
+
+// Backup invalidate command
+char regex_invalidate_backup[] = "^invalidate_backup[\n]*$";
+void cmd_invalidate_backup(char *str) {
+    memset(backup_get_ptr(), 0, sizeof(Backup));
+    PAL_LOGW("Board backup pointer invalidated!\n");
+    DELAY_MICROS(1000);
+    NVIC_SystemReset();
 }
 
 // Config erase chip
