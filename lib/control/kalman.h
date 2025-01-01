@@ -3,14 +3,19 @@
 
 #include "arm_math.h"
 #include "flight_control.h"
+#include "math.h"
 #include "state_estimation.h"
+#include "stdlib.h"
 
 #define NUM_KIN_STATES (3)  // non-rotational states (h,v,a)
 #define NUM_ROT_STATES (4)  // rotation states (quaternion)
 #define NUM_KIN_MEAS (3)
 #define NUM_ROT_MEAS (3)
-#define NUM_TOT_STATES (7)      // total states,
+#define NUM_TOT_STATES (7)      /** total states */
 #define TIME_CONVERSION (1E6f)  //
+#define G (9.81f)
+#define SEA_LEVEL_PRESSURE (1013.25f) /** milibars */
+
 // does time come in as seconds or ns ?
 
 //////////// NOTES ON MATRICES ////////////
@@ -27,6 +32,11 @@
 ///////////////////////////////////////////
 
 // STRUCT DEFINITIONS
+typedef enum {  // TODO: Add more error types
+    KF_SUCCESS = 0,
+    KF_ERROR = 1,
+} kf_status;
+
 typedef struct {
     mat* x;
     mat* P;
@@ -82,25 +92,52 @@ void mat_scale(mat* A, mfloat scale);
  */
 arm_status mat_addTo(mat* A, const mat* B);
 
+void mat_findNans(const mfloat* pData, int size, bool* out);
+
+void mat_setSize(mat* mat, int rows,
+                 int cols); /** Be careful, this doesn't resize memory! */
+
+mfloat mat_val(mat* mat, int i, int j);
+
+int mat_boolSum(bool* vec, int size);
+
 // KF FUNCTIONS
 void kf_init_mats();
+void kf_free_mats();
 void kf_init_state(int num_states, const mfloat* x0, const mfloat* P0);
 
-bool kf_do_kf(StateEst* state_ptr, FlightPhase phase,
-              const SensorFrame* sensor_frame);
+kf_status kf_do_kf(StateEst* state_ptr, FlightPhase phase,
+                   const SensorFrame* sensor_frame);
 
-void kf_predict(KfState* state_ptr, int dt, const mfloat* w);
+/**
+ * @brief
+ *
+ * @param state_ptr
+ * @param dt
+ * @param w
+ * @return kf_status
+ */
+kf_status kf_predict(mfloat dt, const mfloat* w);
 
-void kf_update(KfState* state_ptr, const SensorFrame* sensor_frame,
-               const mfloat* z, const mfloat* R_diag);
+/**
+ * @brief
+ *
+ * @param state_ptr
+ * @param sensor_frame
+ * @param z
+ * @param R_diag
+ * @return kf_status
+ */
+kf_status kf_update(const mfloat* z, const mfloat* R_diag);
 
-void kf_preprocess(const SensorFrame* sensor_frame, KfState* state_ptr,
-                   FlightPhase phase);
+kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase);
 
-void kf_Q_matrix(int dt);                   // process noise matrix
-void kf_F_matrix(int dt);                   // state update matrix (linearized)
-void kf_R_matrix(const mfloat* meas_vars);  // measurement noise matrix
-void kf_H_matrix(const mat* x);             // measurement matrix (linearized)
+void kf_Q_matrix(mfloat dt);  // process noise matrix
+void kf_F_matrix(mfloat dt);  // state update matrix (linearized)
+void kf_R_matrix(const mfloat* meas_vars,
+                 const mfloat* z);  // measurement noise matrix
+void kf_H_matrix(const mat* x,
+                 const mfloat* z);  // measurement matrix (linearized)
 /**
  * @brief
  *
@@ -108,7 +145,8 @@ void kf_H_matrix(const mat* x);             // measurement matrix (linearized)
  * @param dt
  * @param w
  */
-void kf_fx(mat* x, int dt, const mat* w);  // state update function
+void kf_fx(mat* x, mfloat dt, const mfloat* w);  // state update function
+
 /**
  * @brief Converts state to measurement frame (not linearized)
  *
@@ -117,5 +155,11 @@ void kf_fx(mat* x, int dt, const mat* w);  // state update function
  * @param out Output, State in measurement frame (excluding rotation)
  */
 void kf_hx(mat* x, mfloat* z, mat* out);  // measurement function
+
+void kf_resid(
+    const mat* x, const mfloat* z,
+    mat* out);  // Computes residual y = z - h(x), size adjusted for NaNs
+
+mfloat kf_altToPressure(mfloat alt);
 
 #endif  // KALMAN_H

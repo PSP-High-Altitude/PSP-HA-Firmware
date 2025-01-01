@@ -2,6 +2,7 @@
 
 #include "arm_math.h"
 #include "flight_control.h"
+#include "math.h"
 #include "state_estimation.h"
 #include "stdlib.h"
 
@@ -17,9 +18,10 @@ static mat y;          // residual
 static mat S;          // ??? (intermediate update step)
 static mat K;          // Kalman Gain (intermediate update step)
 // static mat z;          // measurements excluding rotation
-// static mat w;          // angular velocity measurements
+static mat w;  // angular velocity measurements
 
 static mfloat Q_vars = {1., 1., 1., 1., 1., 1., 1.};
+static mfloat time;
 
 // MATRIX DEFINITIONS
 
@@ -38,7 +40,7 @@ arm_status mat_edit(mat* mat_ptr, uint16_t i, uint16_t j, mfloat value) {
 arm_status mat_copy(const mat* from, mat* to) {
     // could use arm_copy_f32() instead
     if (mat_size(from) == mat_size(to)) {
-        memcpy(to, from, (mat_size(from) * sizeof(mfloat)));
+        arm_copy_f32(from->pData, to->pData, mat_size(from));
         return ARM_MATH_SUCCESS;
     } else {
         return ARM_MATH_SIZE_MISMATCH;
@@ -48,7 +50,7 @@ arm_status mat_copy(const mat* from, mat* to) {
 arm_status mat_doubleMultiply(const mat* A, const mat* B, const mat* C,
                               mat* out) {
     // TODO: add size check
-    mfloat* tempspace[A->numRows * B->numCols];  // temporary space
+    mfloat tempspace[A->numRows * B->numCols];  // temporary space
     mat temp = {A->numRows, B->numCols, &tempspace};
     arm_mat_mult_f32(A, B, &temp);
     arm_mat_mult_f32(&temp, C, out);
@@ -58,7 +60,7 @@ arm_status mat_doubleMultiply(const mat* A, const mat* B, const mat* C,
 arm_status mat_transposeMultiply(const mat* A, const mat* B, mat* out) {
     // A*B*A'
     // TODO: add size/shape check
-    mfloat* At_space[mat_size(A)];  // A transpose
+    mfloat At_space[mat_size(A)];  // A transpose
     mat At = {A->numCols, A->numRows, &At_space};
     arm_mat_trans_f32(A, &At);
     return mat_doubleMultiply(A, B, &At, out);
@@ -88,6 +90,21 @@ int mat_size(mat* m) {
     return m->numCols * m->numRows;
 }
 
+int mat_findNans(const mfloat* pData, int size, bool* out) {
+    int count = 0;
+    for (int i = 0; i < size; i++) {
+        out[i] = isnan(pData[i]);
+        if (isnan(pData[i])) {
+            count++;
+        }
+    }
+    return count;
+}
+
+mfloat mat_val(mat* mat, int i, int j) {
+    return mat->pData[i * mat->numCols + j];
+}
+
 // KF FUNCTIONS
 void kf_init_mats() {
     // there's probably a less mallocy way to do this but for now this should
@@ -101,12 +118,24 @@ void kf_init_mats() {
     mat_alloc(&R, NUM_KIN_MEAS, NUM_KIN_MEAS);
     mat_alloc(&y, NUM_KIN_MEAS, 1);
     // mat_alloc(&z, NUM_KIN_MEAS, 1);
-    // mat_alloc(&w, 4, 1);  // 4 because quaternions
+    mat_alloc(&w, 3, 1);  //
     mat_alloc(&S, NUM_KIN_MEAS, NUM_KIN_MEAS);
     mat_alloc(&K, NUM_TOT_STATES, NUM_KIN_MEAS);
 
     state.x = &x;
     state.P = &P;
+}
+
+void kf_free_mats() {
+    free(&x.pData);
+    free(&P.pData);
+    free(&F.pData);
+    free(&Q.pData);
+    free(&H.pData);
+    free(&R.pData);
+    free(&y.pData);
+    free(&S.pData);
+    free(&K.pData);
 }
 
 void kf_init_state(int num_states, const mfloat* x0, const mfloat* P0) {
@@ -129,16 +158,57 @@ void mat_diag(mat* mptr, const mfloat* diag_vals, bool zeros) {
     }
 }
 
-bool kf_do_kf(StateEst* state_ptr, FlightPhase phase,
-              const SensorFrame* sensor_frame);
+void mat_setSize(mat* mat, int rows, int cols) {
+    mat->numRows = rows;
+    mat->numCols = cols;
+}
 
-void kf_predict(KfState* state_ptr, int dt, const mfloat* w) {
+int mat_boolSum(bool* vec, int size) {
+    int count = 0;
+    for (int i = 0; i < size; i++) {
+        if (vec[i]) {
+            count++;
+        }
+    }
+}
+
+kf_status kf_do_kf(StateEst* state_ptr, FlightPhase phase,
+                   const SensorFrame* sensor_frame) {
+    mfloat dt = sensor_frame->timestamp / TIME_CONVERSION - time;
+    time = sensor_frame->timestamp / TIME_CONVERSION;
+
+    // measurments
+    // TODO: Get the correct up axis
+    mfloat z[NUM_KIN_MEAS] = {sensor_frame->pressure, sensor_frame->acc_h_x,
+                              sensor_frame->acc_h_z};
+    mfloat w_meas[NUM_ROT_MEAS] = {
+        sensor_frame->rot_i_x, sensor_frame->rot_i_y,
+        sensor_frame->rot_i_z};  // also check the order of these
+    // Use static w so that old w is saved in case of a bad measurement
+    // update w if there are no nans in measurement. Otherwise keep old value
+    bool nans[3];
+    if (!mat_findNans(&w_meas, 3, &nans)) {
+        arm_copy_f32(&w_meas, &w, 3);
+    }
+
+    mfloat R_diag[NUM_KIN_MEAS] = {
+        .1, .1, .1};  // TODO: move this somewhere else and put in actual values
+    kf_preprocess(&z, &R_diag, phase);  // adjust measurements and vars based on
+                                        // current phase and state
+    kf_predict(dt, &w);                 // No NaNs csn go in here!
+    kf_update(&z, &R);                  // z can contain NaNs
+
+    // TODO: Error checking
+    return KF_SUCCESS;
+}
+
+kf_status kf_predict(mfloat dt, const mfloat* w) {
     // kf_Q_matrix(dt)
-    kf_F_matrix(dt);    // update F matrix with dt
+    kf_F_matrix(dt);  // update F matrix with dt. Do this before f(x)!!!
     // self.x = self.f(self.x, dt, w=w) # use f(x) for EKF
     kf_fx(&x, dt, w);  // calculate (integrate) new state
 
-    mfloat* temp_storage[mat_size(&Q)];  // temporary space to build Q
+    mfloat temp_storage[mat_size(&Q)];  // temporary space to build Q
     // NOTE: It might be more efficicient to permanently (staticly?) allocate
     // space for temporary arrays that all functions can use
     mat temp_square = {Q.numRows, Q.numCols, &temp_storage};
@@ -154,26 +224,24 @@ void kf_predict(KfState* state_ptr, int dt, const mfloat* w) {
     arm_mat_add_f32(&temp_square, &Q, &P);        // P = FPF' + Q
 }
 
-void kf_update(KfState* state_ptr, const SensorFrame* sensor_frame,
-               const mfloat* z, const mfloat* R_diag) {
-    mfloat*
+kf_status kf_update(const mfloat* z, const mfloat* R_diag) {
+    mfloat
         temp_space[mat_size(&P)];  // space for all temporary matrices used in
                                    // this function (only 1 is needed at a time)
     mat hx = {NUM_KIN_MEAS, 1, &temp_space};
 
-    kf_H_matrix(&x);  // Make H Matrix (linearized h(x))
-
-    // y = z - hx # use h(x) for EKF
-    kf_hx(&x, z, &hx);            // hx = h(x) (state to meas frame)
-    mat_scale(&hx, -1);           // -hx
-    arm_mat_add_f32(z, &hx, &y);  // y = z + -hx
+    kf_H_matrix(&x, z);   // Make H Matrix (linearized h(x)), resized to exclude
+                          // NaN measurments
+    kf_resid(&x, z, &y);  // Calc residual, resized to exclude NaN measurements
 
     // S = H @ self.P @ H.T + R # system uncertainty (in measurement space)
-    kf_R_matrix(R_diag);                // Make R matrix
+    kf_R_matrix(R_diag, z);                 // Make R matrix, resized for NaNs
+    mat_setSize(&S, R.numRows, R.numCols);  // Resize S to match R
     mat_transposeMultiply(&H, &P, &S);  // HPH'
     mat_addTo(&S, &R);                  // S = HPH' + R
 
     // K = self.P @ H.T @ inv(S) # Kalman Gain
+    mat_setSize(&K, NUM_TOT_STATES, y.numRows);  // Resize K for NaNs
     mat temp = {S.numCols, S.numRows, &temp_space};
     arm_mat_inverse_f32(&S, &temp);                // inv(S)
     mat_copy(&temp, &S);                           // S = inv(S)
@@ -197,14 +265,114 @@ void kf_update(KfState* state_ptr, const SensorFrame* sensor_frame,
     // TODO: Replace this with the more numerically stable version
 }
 
-void kf_preprocess(const SensorFrame* sensor_frame, KfState* state_ptr,
-                   FlightPhase phase);
+kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
+    // TODO: This
+    return KF_SUCCESS;
+}
 
-void kf_Q_matrix(int dt);
-void kf_F_matrix(int dt) {}
-void kf_R_matrix(const mfloat* meas_vars) {
+void kf_Q_matrix(mfloat dt) { mat_diag(&Q, &Q_vars, true); }
+
+void kf_F_matrix(mfloat dt) {
+    // No rotation
+    // NOTE: Remakes entire matrix, could be made more efficient by just
+    // updating dt values
+    mfloat diag[NUM_TOT_STATES];
+    arm_fill_f32(1, diag, NUM_TOT_STATES);  // making identity matrix
+    mat_diag(&F, &diag, true);
+    // upper left: kinematic equations
+    mat_edit(&F, 0, 1, dt);
+    mat_edit(&F, 0, 2, .5 * dt * dt);
+    mat_edit(&F, 1, 2, dt);
+}
+void kf_R_matrix(const mfloat* meas_vars, const mfloat* z) {
     mat_diag(&R, meas_vars, true);  // Make R matrix
 }
-void kf_H_matrix(const mat* x);
-void kf_fx(mat* x, int dt, const mat* w);  // state update function
-void kf_hx(mat* x, mfloat* z, mat* out);   // measurement function
+
+void kf_H_matrix(const mat* x, const mfloat* z) {
+    mfloat a = 44330;
+    mfloat b = 5.25588;
+    mfloat h = max(mat_val(x, 0, 0), 0);  // mat to ensure alt isn't negative
+    mfloat dpdh = (-b * SEA_LEVEL_PRESSURE * pow((a - h), (b - 1))) / pow(a, b);
+
+    // Resize H for NaNs
+    bool* nans[NUM_KIN_MEAS];
+    mat_findNans(z, NUM_KIN_MEAS, &nans);
+    int nanCount = mat_boolSum(&nans, NUM_KIN_MEAS);
+
+    // TODO: Case where all measurements are NaN
+
+    // Fill H
+    mat_setSize(&H, NUM_TOT_STATES, NUM_KIN_MEAS - nanCount);
+    arm_fill_f32(0, H.pData, mat_size(&H));
+    int row = 0;
+    if (!nans[0]) {
+        mat_edit(&H, row, 0, dpdh);
+        row++;
+    }
+    if (!nans[1]) {
+        mat_edit(&H, row, 3, 1 / G);
+        row++;
+    }
+    if (!nans[2]) {
+        mat_edit(&H, row, 3, 1 / G);
+        row++;
+    }
+}
+
+void kf_fx(mat* x, mfloat dt, const mfloat* w) {  // state update function
+    // kf_F() should be called before outside this function so F is updated, so
+    // I won't call it again here
+    mfloat tempspace[4 * 4];  // space for w matrix and temp x
+    mat x_temp = {NUM_TOT_STATES, 1, &tempspace};
+    arm_mat_mult_f32(&F, x, &x_temp);  // integrate kinematic states
+    mat_copy(&x_temp, x);              // copy back into x
+
+    // Make w mat
+    mat w_mat = {4, 4, &tempspace};
+    mfloat* diag = {1, 1, 1, 1};
+    mat_diag(&w_mat, diag, false);  // put ones on diagonal
+    // put values in. This is such a terrible way to write a matrix
+    mat_edit(&w_mat, 0, 1, .5 * dt * (-w[0]));
+    mat_edit(&w_mat, 0, 2, .5 * dt * (-w[1]));
+    mat_edit(&w_mat, 0, 3, .5 * dt * (-w[2]));
+    mat_edit(&w_mat, 1, 0, .5 * dt * (w[0]));
+    mat_edit(&w_mat, 1, 2, .5 * dt * (w[2]));
+    mat_edit(&w_mat, 1, 3, .5 * dt * (-w[1]));
+    mat_edit(&w_mat, 2, 0, .5 * dt * (w[1]));
+    mat_edit(&w_mat, 2, 1, .5 * dt * (-w[2]));
+    mat_edit(&w_mat, 2, 3, .5 * dt * (w[0]));
+    mat_edit(&w_mat, 3, 0, .5 * dt * (w[2]));
+    mat_edit(&w_mat, 3, 1, .5 * dt * (w[1]));
+    mat_edit(&w_mat, 3, 2, .5 * dt * (-w[0]));
+
+    // do that quat integration
+    mfloat qspace = {x->pData[3], x->pData[4], x->pData[5],
+                     x->pData[6]};  // pull quaternion out of current state
+    mat quat = {4, 1, &qspace};
+    mat q_out = {4, 1, &(x->pData[3])};  // points to the memory in x
+    arm_mat_mult_f32(&w_mat, &quat, &q_out);
+}
+
+void kf_hx(mat* x, mfloat* z, mat* out) {
+    mat_edit(out, 0, 0, kf_altToPressure(mat_val(&x, 0, 0)));
+    mat_edit(out, 1, 0, mat_val(&x, 1, 0) / G + 1);  // acc 1
+    mat_edit(out, 2, 0, mat_val(&x, 2, 0) / G + 1);  // acc 2
+    // TODO: Check up direction
+}
+
+void kf_resid(const mat* x, const mfloat* z, mat* out) {
+    mfloat temp_space[NUM_KIN_MEAS];
+    mat hx = {NUM_KIN_MEAS, 1, &temp_space};
+    // y = z - hx # use h(x) for EKF
+    kf_hx(&x, z, &hx);              // hx = h(x) (state to meas frame)
+    mat_scale(&hx, -1);             // -hx
+    arm_mat_add_f32(z, &hx, &out);  // y = z + -hx
+}
+
+mfloat kf_altToPressure(mfloat alt) {
+    // #assert alt> 0 #if altitude is negative it breaks
+    // #alt = np.max([ alt, [0] ]) #it breaks with negative alt.
+    mfloat p = (pow((1 - alt / 44330), 5.25588)) * SEA_LEVEL_PRESSURE;
+    return p;
+    // TODO: Checks for negative alt make NaN pressure
+}
