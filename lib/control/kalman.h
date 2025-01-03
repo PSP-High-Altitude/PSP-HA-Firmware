@@ -16,7 +16,7 @@
 #define G (9.81f)
 #define SEA_LEVEL_PRESSURE (1013.25f) /** milibars */
 
-// does time come in as seconds or ns ?
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 //////////// NOTES ON MATRICES ////////////
 // The mat struct (arm_matrix_instance_f32) contains the number of rows, number
@@ -32,6 +32,12 @@
 ///////////////////////////////////////////
 
 // STRUCT DEFINITIONS
+
+// change these if we want diferent sized floats. You also must change the math
+// functions
+typedef arm_matrix_instance_f32 mat;
+typedef float32_t mfloat;
+
 typedef enum {  // TODO: Add more error types
     KF_SUCCESS = 0,
     KF_ERROR = 1,
@@ -43,16 +49,11 @@ typedef struct {
     /* data */
 } KfState;
 
-// change these if we want diferent sized floats. You also must change the math
-// functions
-typedef arm_matrix_instance_f32 mat;
-typedef float32_t mfloat;
-
 // MATRIX FUNCTIONS
 arm_status mat_copy(const mat* from, mat* to);
 arm_status mat_edit(mat* mat_ptr, uint16_t i, uint16_t j, mfloat value);
 void mat_diag(mat* mat_ptr, const mfloat* diag_vals, bool zeros);
-int mat_size(mat* m);
+int mat_size(const mat* m);
 void mat_alloc(mat* mat_ptr, uint16_t rows, uint16_t cols);
 /**
  * @brief out = (A * B) * C. Make sure the dimensions work
@@ -92,12 +93,12 @@ void mat_scale(mat* A, mfloat scale);
  */
 arm_status mat_addTo(mat* A, const mat* B);
 
-void mat_findNans(const mfloat* pData, int size, bool* out);
+int mat_findNans(const mfloat* pData, int size, bool* out);
 
 void mat_setSize(mat* mat, int rows,
                  int cols); /** Be careful, this doesn't resize memory! */
 
-mfloat mat_val(mat* mat, int i, int j);
+mfloat mat_val(const mat* mat, int i, int j);
 
 int mat_boolSum(bool* vec, int size);
 
@@ -154,7 +155,7 @@ void kf_fx(mat* x, mfloat dt, const mfloat* w);  // state update function
  * @param z Measurements vec (not rotation)
  * @param out Output, State in measurement frame (excluding rotation)
  */
-void kf_hx(mat* x, mfloat* z, mat* out);  // measurement function
+void kf_hx(const mat* x, const mfloat* z, mat* out);  // measurement function
 
 void kf_resid(
     const mat* x, const mfloat* z,
