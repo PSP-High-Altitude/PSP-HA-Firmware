@@ -6,12 +6,10 @@
 #include "state_estimation.h"
 #include "stdlib.h"
 
-#define NATIVE \
-    (true)  // change this to false to run on PAL with real arm library
-#ifdef NATIVE
-#include "fake_arm_math.h"
-#else
+#ifdef __arm__
 #include "arm_math.h"
+#else
+#include "fake_arm_math.h"
 #endif
 
 #define NUM_KIN_STATES (3)  // non-rotational states (h,v,a)
