@@ -1,11 +1,18 @@
 #ifndef KALMAN_H
 #define KALMAN_H
 
-#include "arm_math.h"
 #include "flight_control.h"
-#include "math.h"
+// #include "math.h"
 #include "state_estimation.h"
 #include "stdlib.h"
+
+#define NATIVE \
+    (true)  // change this to false to run on PAL with real arm library
+#ifdef NATIVE
+#include "fake_arm_math.h"
+#else
+#include "arm_math.h"
+#endif
 
 #define NUM_KIN_STATES (3)  // non-rotational states (h,v,a)
 #define NUM_ROT_STATES (4)  // rotation states (quaternion)
@@ -19,22 +26,34 @@
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 //////////// NOTES ON MATRICES ////////////
-// The mat struct (arm_matrix_instance_f32) contains the number of rows, number
-// of cols, and pointer to data. It does not allocate the space for data (see
-// mat_alloc for that)
-// i = row
-// j = col
-// mat[i,j] = mat->pData[i*mat->numCols + j]
-/* https://arm-software.github.io/CMSIS_5/DSP/html/group__groupMatrix.html */
+// The mat struct (arm_matrix_instance_f32) contains the number of rows,
+// number of cols, and pointer to data. It does not allocate the space for
+// data (see mat_alloc for that) i = row j = col mat[i,j] =
+// mat->pData[i*mat->numCols + j]
+/* https://arm-software.github.io/CMSIS_5/DSP/html/group__groupMatrix.html
+ */
 // In the functions below, `const` is used to show arguments that aren't
-// modified, but doesn't actually prevent the data in the matrices from being
-// modified
+// modified, but doesn't actually prevent the data in the matrices from
+// being modified
 ///////////////////////////////////////////
+
+/**
+ * MATRIX FUNCTIONS
+ * arm_mat_init_f32 (remove)
+ * arm_status
+ * arm_copy_f32
+ * arm_mat_mult_f32
+ * arm_mat_trans_f32
+ * arm_mat_scale_f32 (maybe remove)
+ * arm_mat_add_f32
+ * arm_mat_inverse_f32
+ * arm_fill_f32
+ */
 
 // STRUCT DEFINITIONS
 
-// change these if we want diferent sized floats. You also must change the math
-// functions
+// change these if we want diferent sized floats. You also must change the
+// math functions
 typedef arm_matrix_instance_f32 mat;
 typedef float32_t mfloat;
 

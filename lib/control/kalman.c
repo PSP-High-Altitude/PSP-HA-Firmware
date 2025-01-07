@@ -1,9 +1,9 @@
 #include "kalman.h"
 
-#include "arm_math.h"
-#include "flight_control.h"
+// #include "arm_math.h"
+// #include "flight_control.h"
 #include "math.h"
-#include "state_estimation.h"
+// #include "state_estimation.h"
 #include "stdlib.h"
 
 // MATRICES (STATIC)
@@ -29,7 +29,11 @@ void mat_alloc(mat* mat_ptr, uint16_t rows, uint16_t cols) {
     // allocates memory for the matrix
     // yes it's malloc but idk a better way, if someone else does feel free to
     // change it
-    arm_mat_init_f32(mat_ptr, rows, cols, malloc(sizeof(mfloat) * rows * cols));
+    // arm_mat_init_f32(mat_ptr, rows, cols, malloc(sizeof(mfloat) * rows *
+    // cols));
+    mat_ptr->numRows = rows;
+    mat_ptr->numCols = cols;
+    mat_ptr->pData = malloc(sizeof(mfloat) * rows * cols);
 }
 
 arm_status mat_edit(mat* mat_ptr, uint16_t i, uint16_t j, mfloat value) {
@@ -38,7 +42,6 @@ arm_status mat_edit(mat* mat_ptr, uint16_t i, uint16_t j, mfloat value) {
 }
 
 arm_status mat_copy(const mat* from, mat* to) {
-    // could use arm_copy_f32() instead
     if (mat_size(from) == mat_size(to)) {
         arm_copy_f32(from->pData, to->pData, mat_size(from));
         return ARM_MATH_SUCCESS;
@@ -216,9 +219,12 @@ kf_status kf_predict(mfloat dt, const mfloat* w) {
     mat temp_square = {Q.numRows, Q.numCols, temp_storage};
 
     // Q = np.diag(self.Q_var*dt)
-    mat_diag(&temp_square, Q_vars, true);  // make Q in temp_square
-    arm_mat_scale_f32(&temp_square, dt,
-                      &Q);  // scale by dt and copy to static Q
+    mat_diag(&Q, Q_vars, true);  // Make Q from Q_vars
+    mat_scale(&Q, dt);           // multiply by dt
+    // mat_diag(&temp_square, Q_vars, true);  // make Q in temp_square
+    // arm_mat_scale_f32(&temp_square,
+    //                   dt,   // TODO: Replace with other scale function
+    //                   &Q);  // scale by dt and copy to static Q
 
     // P = F @ self.P @ F.T + self.Q
     kf_F_matrix(dt);                              // update F with dt
