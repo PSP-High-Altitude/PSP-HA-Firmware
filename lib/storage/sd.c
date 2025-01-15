@@ -1,50 +1,46 @@
 #include "sd.h"
 
 #include "fatfs/ff.h"
-#include "pb_encode.h"
 #include "stdio.h"
 #include "timer.h"
 
 #define FNAME_LEN 16
-#define HEADER_LEN 64
 
 #define SENSOR_BUF_LEN 256
 #define GPS_BUF_LEN 256
 #define STATE_BUF_LEN 256
 
+#define CSV_BUFFER_SIZE 512
+
 #define SD_MOUNT_POINT "/SD"
 
 static FATFS s_fs;
 
-static char s_filename[FNAME_LEN] = SD_MOUNT_POINT "/dat_00.pb3";
-static char s_gpsfname[FNAME_LEN] = SD_MOUNT_POINT "/gps_00.pb3";
-static char s_statefname[FNAME_LEN] = SD_MOUNT_POINT "/fsl_00.pb3";
+static char s_datfname[FNAME_LEN] = SD_MOUNT_POINT "/dat_00.csv";
 static char s_prffname[FNAME_LEN] = SD_MOUNT_POINT "/prf_00.txt";
 
 static FIL s_datfile;
-static FIL s_gpsfile;
-static FIL s_statefile;
 
-static pb_byte_t s_sensor_buffer[SENSOR_BUF_LEN];
-static pb_byte_t s_gps_buffer[GPS_BUF_LEN];
-static pb_byte_t s_state_buffer[STATE_BUF_LEN];
+static const char s_header[] =
+    "sensor_timestamp,temperature,pressure,mag_x,mag_y,mag_z,"
+    "gps_timestamp,utc_time,num_sats,lon,lat,height,height_msl,"
+    "accuracy_horiz,accuracy_vertical,vel_north,vel_east,vel_down,"
+    "ground_speed,hdg\n";
 
-static const char s_header[HEADER_LEN] = FIRMWARE_SPECIFIER;
-
-static Status sd_create_sensor_file() {
+static Status sd_create_data_file() {
     // Create sensor data file
-    if (f_open(&s_datfile, s_filename, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) {
+    if (f_open(&s_datfile, s_datfname, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
     // Write the header
     UINT bw;
-    if (f_write(&s_datfile, s_header, HEADER_LEN, &bw) != FR_OK) {
+    if (f_write(&s_datfile, s_header, sizeof(s_header), &bw) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
     // Check the correct number of bytes was written
-    if (bw != HEADER_LEN) {
+    if (bw != sizeof(s_header)) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -61,67 +57,6 @@ static Status sd_create_sensor_file() {
     return STATUS_OK;
 }
 
-static Status sd_create_gps_file() {
-    // Create gps data file
-    if (f_open(&s_gpsfile, s_gpsfname, FA_CREATE_ALWAYS | FA_WRITE) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Write the header
-    UINT bw;
-    if (f_write(&s_gpsfile, s_header, HEADER_LEN, &bw) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Check the correct number of bytes was written
-    if (bw != HEADER_LEN) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Flush the header to disk
-    if (f_sync(&s_gpsfile) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Check that the frame will at least nominally fit in our buffer
-    if (SENSOR_BUF_LEN < sizeof(GpsFrame)) {
-        return STATUS_DATA_ERROR;
-    }
-
-    return STATUS_OK;
-}
-
-static Status sd_create_state_file() {
-    // Create state data file
-    if (f_open(&s_statefile, s_statefname, FA_CREATE_ALWAYS | FA_WRITE) !=
-        FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Write the header
-    UINT bw;
-    if (f_write(&s_statefile, s_header, HEADER_LEN, &bw) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Check the correct number of bytes was written
-    if (bw != HEADER_LEN) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Flush the header to disk
-    if (f_sync(&s_statefile) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    // Check that the frame will at least nominally fit in our buffer
-    if (STATE_BUF_LEN < sizeof(StateFrame)) {
-        return STATUS_DATA_ERROR;
-    }
-
-    return STATUS_OK;
-}
-
 Status sd_init(SdDevice* dev) {
     diskio_init(dev);
     if (f_mount(&s_fs, SD_MOUNT_POINT, 0) != FR_OK) {
@@ -130,103 +65,84 @@ Status sd_init(SdDevice* dev) {
 
     // Increment the suffix of the filename until we find an unused name
     // I'll do this properly at some point I swear
-    while (f_stat(s_filename, 0) == FR_OK) {
-        if (s_filename[6 + strlen(SD_MOUNT_POINT)] == '9') {
-            if (s_filename[5 + strlen(SD_MOUNT_POINT)] == '9') {
+    while (f_stat(s_datfname, 0) == FR_OK) {
+        if (s_datfname[6 + strlen(SD_MOUNT_POINT)] == '9') {
+            if (s_datfname[5 + strlen(SD_MOUNT_POINT)] == '9') {
                 return STATUS_DATA_ERROR;
             }
-            s_filename[5 + strlen(SD_MOUNT_POINT)] += 1;
-            s_filename[6 + strlen(SD_MOUNT_POINT)] = '0';
+            s_datfname[5 + strlen(SD_MOUNT_POINT)] += 1;
+            s_datfname[6 + strlen(SD_MOUNT_POINT)] = '0';
         } else {
-            s_filename[6 + strlen(SD_MOUNT_POINT)] += 1;
+            s_datfname[6 + strlen(SD_MOUNT_POINT)] += 1;
         }
     }
-    s_gpsfname[5 + strlen(SD_MOUNT_POINT)] =
-        s_filename[5 + strlen(SD_MOUNT_POINT)];
-    s_gpsfname[6 + strlen(SD_MOUNT_POINT)] =
-        s_filename[6 + strlen(SD_MOUNT_POINT)];
-    s_statefname[5 + strlen(SD_MOUNT_POINT)] =
-        s_filename[5 + strlen(SD_MOUNT_POINT)];
-    s_statefname[6 + strlen(SD_MOUNT_POINT)] =
-        s_filename[6 + strlen(SD_MOUNT_POINT)];
     s_prffname[5 + strlen(SD_MOUNT_POINT)] =
-        s_filename[5 + strlen(SD_MOUNT_POINT)];
+        s_datfname[5 + strlen(SD_MOUNT_POINT)];
     s_prffname[6 + strlen(SD_MOUNT_POINT)] =
-        s_filename[6 + strlen(SD_MOUNT_POINT)];
+        s_datfname[6 + strlen(SD_MOUNT_POINT)];
 
     // Initialize the sensor file and stream
-    Status sensor_status = sd_create_sensor_file();
+    Status sensor_status = sd_create_data_file();
     if (sensor_status != STATUS_OK) {
         return sensor_status;
     }
 
-    // Initialize the GPS file and stream
-    Status gps_status = sd_create_gps_file();
-    if (gps_status != STATUS_OK) {
-        return gps_status;
-    }
-
-    // Initialize the flight state file and stream
-    Status state_status = sd_create_state_file();
-    if (state_status != STATUS_OK) {
-        return state_status;
-    }
-
     return STATUS_OK;
 }
 
-Status sd_write_sensor_data(SensorFrame* frame) {
-    pb_ostream_t sensor_ostream =
-        pb_ostream_from_buffer(s_sensor_buffer, SENSOR_BUF_LEN);
-
-    bool encode_success = pb_encode_ex(&sensor_ostream, &SensorFrame_msg, frame,
-                                       PB_ENCODE_DELIMITED);
-    if (!encode_success) {
+Status sd_write_data(SensorFrame* sensor_frame, GpsFrame* gps_frame) {
+    if (!sensor_frame || !gps_frame) {
         return STATUS_ERROR;
     }
 
-    UINT bw;
-    if (f_write(&s_datfile, s_sensor_buffer, sensor_ostream.bytes_written,
-                &bw) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
+    char buffer[CSV_BUFFER_SIZE];
+    int len = snprintf(
+        buffer, CSV_BUFFER_SIZE,
+        // SensorFrame fields
+        "%lu,"             // sensor_frame->timestamp
+        "%.2f,"            // sensor_frame->temperature
+        "%.2f,"            // sensor_frame->pressure
+        "%.2f,%.2f,%.2f,"  // sensor_frame->mag_i_x, sensor_frame->mag_i_y,
+                           // sensor_frame->mag_i_z
+
+        // GpsFrame fields
+        "%lu,"                                  // gps_frame->timestamp
+        "%04lu-%02lu-%02luT%02lu:%02lu:%02lu,"  // gps_frame time
+        "%lu,"                                  // gps_frame->num_sats
+        "%.6f,"                                 // gps_frame->lon
+        "%.6f,"                                 // gps_frame->lat
+        "%.2f,"                                 // gps_frame->height
+        "%.2f,"                                 // gps_frame->height_msl
+        "%.2f,"                                 // gps_frame->accuracy_horiz
+        "%.2f,"                                 // gps_frame->accuracy_vertical
+        "%.2f,"                                 // gps_frame->vel_north
+        "%.2f,"                                 // gps_frame->vel_east
+        "%.2f,"                                 // gps_frame->vel_down
+        "%.2f,"                                 // gps_frame->ground_speed
+        "%.2f\n",                               // gps_frame->hdg
+
+        // SensorFrame values
+        (uint32_t)sensor_frame->timestamp, sensor_frame->temperature,
+        sensor_frame->pressure, sensor_frame->mag_i_x, sensor_frame->mag_i_y,
+        sensor_frame->mag_i_z,
+
+        // GpsFrame values
+        (uint32_t)gps_frame->timestamp, gps_frame->year, gps_frame->month, gps_frame->day,
+        gps_frame->hour, gps_frame->min, gps_frame->sec, gps_frame->num_sats,
+        gps_frame->lon, gps_frame->lat, gps_frame->height,
+        gps_frame->height_msl, gps_frame->accuracy_horiz,
+        gps_frame->accuracy_vertical, gps_frame->vel_north, gps_frame->vel_east,
+        gps_frame->vel_down, gps_frame->ground_speed, gps_frame->hdg);
+
+    if (len < 0 || len >= CSV_BUFFER_SIZE) {
+        return STATUS_ERROR;  // Error in formatting or buffer overflow
     }
 
-    return STATUS_OK;
-}
+    UINT bytes_written;
+    FRESULT result = f_write(&s_datfile, buffer, len, &bytes_written);
 
-Status sd_write_gps_data(GpsFrame* frame) {
-    pb_ostream_t gps_ostream =
-        pb_ostream_from_buffer(s_gps_buffer, GPS_BUF_LEN);
-
-    bool encode_success =
-        pb_encode_ex(&gps_ostream, &GpsFrame_msg, frame, PB_ENCODE_DELIMITED);
-    if (!encode_success) {
+    if (result != FR_OK || bytes_written != (UINT)len) {
         return STATUS_ERROR;
-    }
-
-    UINT bw;
-    if (f_write(&s_gpsfile, s_gps_buffer, gps_ostream.bytes_written, &bw) !=
-        FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-
-    return STATUS_OK;
-}
-
-Status sd_write_state_data(StateFrame* frame) {
-    pb_ostream_t state_ostream =
-        pb_ostream_from_buffer(s_state_buffer, STATE_BUF_LEN);
-
-    bool encode_success = pb_encode_ex(&state_ostream, &StateFrame_msg, frame,
-                                       PB_ENCODE_DELIMITED);
-    if (!encode_success) {
-        return STATUS_ERROR;
-    }
-
-    UINT bw;
-    if (f_write(&s_statefile, s_state_buffer, state_ostream.bytes_written,
-                &bw) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
     }
 
     return STATUS_OK;
@@ -239,14 +155,7 @@ Status sd_reinit() {
     if (f_mount(&s_fs, SD_MOUNT_POINT, 0) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
-    if (f_open(&s_datfile, s_filename, FA_OPEN_APPEND | FA_WRITE) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-    if (f_open(&s_gpsfile, s_gpsfname, FA_OPEN_APPEND | FA_WRITE) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-    if (f_open(&s_statefile, s_statefname, FA_OPEN_APPEND | FA_WRITE) !=
-        FR_OK) {
+    if (f_open(&s_datfile, s_datfname, FA_OPEN_APPEND | FA_WRITE) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -255,12 +164,6 @@ Status sd_reinit() {
 
 Status sd_deinit() {
     if (f_close(&s_datfile) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-    if (f_close(&s_gpsfile) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-    if (f_close(&s_statefile) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
     if (f_unmount(SD_MOUNT_POINT) != FR_OK) {
@@ -272,12 +175,6 @@ Status sd_deinit() {
 
 Status sd_flush() {
     if (f_sync(&s_datfile) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-    if (f_sync(&s_gpsfile) != FR_OK) {
-        return STATUS_HARDWARE_ERROR;
-    }
-    if (f_sync(&s_statefile) != FR_OK) {
         return STATUS_HARDWARE_ERROR;
     }
 

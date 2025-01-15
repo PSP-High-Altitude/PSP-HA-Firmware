@@ -29,11 +29,10 @@ static SdDevice s_sd_conf = {
 /********************/
 /* STATIC VARIABLES */
 /********************/
-static QueueHandle_t s_sensor_queue_handle;
-static QueueHandle_t s_state_queue_handle;
-static QueueHandle_t s_gps_queue_handle;
+static QueueHandle_t s_sensor_queue_handle = NULL;
+static QueueHandle_t s_gps_queue_handle = NULL;
 
-static bool s_pause_store;
+static bool s_pause_store = false;
 
 uint64_t g_last_tickless_idle_entry_us;
 uint64_t g_total_tickless_idle_us;
@@ -45,20 +44,18 @@ Status init_storage() {
     // For some reason SD init CANNOT go after queue creation
     Status sd_status = EXPECT_OK(sd_init(&s_sd_conf), "SD init");
 
-    // Initialize pause flag
-    s_pause_store = false;
-
-    // Create the queues
     s_sensor_queue_handle =
         xQueueCreate(SENSOR_QUEUE_LENGTH, SENSOR_QUEUE_ITEM_SIZE);
-    s_state_queue_handle =
-        xQueueCreate(STATE_QUEUE_LENGTH, STATE_QUEUE_ITEM_SIZE);
     s_gps_queue_handle = xQueueCreate(GPS_QUEUE_LENGTH, GPS_QUEUE_ITEM_SIZE);
 
     return sd_status;
 }
 
 Status queue_sensor_store(SensorFrame* sensor_frame) {
+    if (!s_sensor_queue_handle) {
+        return STATUS_ERROR;
+    }
+
     if (xQueueSend(s_sensor_queue_handle, sensor_frame, 0) != pdPASS) {
         return STATUS_BUSY;
     }
@@ -66,15 +63,11 @@ Status queue_sensor_store(SensorFrame* sensor_frame) {
     return STATUS_OK;
 }
 
-Status queue_state_store(StateFrame* state_frame) {
-    if (xQueueSend(s_state_queue_handle, state_frame, 0) != pdPASS) {
-        return STATUS_BUSY;
+Status queue_gps_store(GpsFrame* gps_frame) {
+    if (!s_gps_queue_handle) {
+        return STATUS_ERROR;
     }
 
-    return STATUS_OK;
-}
-
-Status queue_gps_store(GpsFrame* gps_frame) {
     if (xQueueSend(s_gps_queue_handle, gps_frame, 0) != pdPASS) {
         return STATUS_BUSY;
     }
@@ -96,36 +89,43 @@ void storage_task() {
         gpio_write(PIN_YELLOW, GPIO_HIGH);
 
         // Empty the sensor queue
+        bool write_successful = false;
         SensorFrame sensor_frame;
-        while (xQueueReceive(s_sensor_queue_handle, &sensor_frame, 1) ==
-               pdPASS) {
-            if (sd_write_sensor_data(&sensor_frame) != STATUS_OK) {
-                break;
-            }
-        }
-
-        // Empty the state queue
-        StateFrame state_frame;
-        while (xQueueReceive(s_state_queue_handle, &state_frame, 1) == pdPASS) {
-            if (sd_write_state_data(&state_frame) != STATUS_OK) {
-                break;
-            }
-        }
-
-        // Empty the GPS queue
         GpsFrame gps_frame;
-        while (xQueueReceive(s_gps_queue_handle, &gps_frame, 1) == pdPASS) {
-            if (sd_write_gps_data(&gps_frame) != STATUS_OK) {
-                break;
-            }
+
+        if (xQueueReceive(s_sensor_queue_handle, &sensor_frame, 1) != pdPASS) {
+            memset(&sensor_frame, 0, sizeof(sensor_frame));
+        }
+        if (xQueueReceive(s_gps_queue_handle, &gps_frame, 10000) == pdPASS) {
+            sd_write_data(&sensor_frame, &gps_frame);
+            write_successful = true;
         }
 
         // Flush everything to SD card
         Status flush_status = EXPECT_OK(sd_flush(), "SD flush");
-        gpio_write(PIN_GREEN, flush_status == STATUS_OK);
+        gpio_write(PIN_GREEN, flush_status == STATUS_OK && write_successful);
 
         // Unset disk activity warning LED
         gpio_write(PIN_YELLOW, GPIO_LOW);
+
+        printf("GPS Frame:\n");
+        printf("  Timestamp: %lu\n", (uint32_t)gps_frame.timestamp);
+        printf("  UTC Time: %04lu-%02lu-%02lu %02lu:%02lu:%02lu\n",
+               gps_frame.year, gps_frame.month, gps_frame.day, gps_frame.hour,
+               gps_frame.min, gps_frame.sec);
+        printf("  Number of Satellites: %lu\n", gps_frame.num_sats);
+        printf("  Longitude: %.6f\n", gps_frame.lon);
+        printf("  Latitude: %.6f\n", gps_frame.lat);
+        printf("  Height: %.2f m\n", gps_frame.height);
+        printf("  Height MSL: %.2f m\n", gps_frame.height_msl);
+        printf("  Horizontal Accuracy: %.2f m\n", gps_frame.accuracy_horiz);
+        printf("  Vertical Accuracy: %.2f m\n", gps_frame.accuracy_vertical);
+        printf("  Velocity (North): %.2f m/s\n", gps_frame.vel_north);
+        printf("  Velocity (East): %.2f m/s\n", gps_frame.vel_east);
+        printf("  Velocity (Down): %.2f m/s\n", gps_frame.vel_down);
+        printf("  Ground Speed: %.2f m/s\n", gps_frame.ground_speed);
+        printf("  Heading: %.2f degrees\n", gps_frame.hdg);
+        printf("\n");
 
         // Check if the pause flag is set
         if (s_pause_store) {

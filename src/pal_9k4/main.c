@@ -94,13 +94,9 @@ int main(void) {
 
     uint32_t init_error = 0;  // Set if error occurs during initialization
 
-    DELAY(4700);
     printf("Starting initialization...\n");
     init_error |= (EXPECT_OK(init_storage(), "init storage") != STATUS_OK) << 0;
     init_error |= (EXPECT_OK(init_sensors(), "init sensors") != STATUS_OK) << 1;
-    init_error |= (EXPECT_OK(init_state_est(), "init state") != STATUS_OK) << 2;
-    init_error |= (EXPECT_OK(init_pyros(), "init pyros") != STATUS_OK) << 3;
-    init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK) << 4;
 
     // One beep for initialization complete
     gpio_write(PIN_RED, GPIO_LOW);
@@ -126,11 +122,7 @@ int main(void) {
 
     printf("Launching tasks\n");
 
-    TASK_CREATE(pyros_task, +5);
     TASK_CREATE(read_sensors_task, +4);
-    TASK_CREATE(state_est_task, +3);
-    TASK_CREATE(pspcom_process_bytes, +3);
-    TASK_CREATE(pspcom_send_standard, +2);
     TASK_CREATE(read_gps_task, +2);
     TASK_CREATE(storage_task, +1);
 

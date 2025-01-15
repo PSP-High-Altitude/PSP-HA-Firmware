@@ -44,11 +44,7 @@ Status sd_deinit();
 
 Status sd_flush();
 
-Status sd_write_sensor_data(SensorFrame* sensor_frame);
-
-Status sd_write_gps_data(GpsFrame* gps_frame);
-
-Status sd_write_state_data(StateFrame* state_frame);
+Status sd_write_data(SensorFrame* sensor_frame, GpsFrame* gps_frame);
 
 Status sd_dump_prf_stats(char stats[]);
 

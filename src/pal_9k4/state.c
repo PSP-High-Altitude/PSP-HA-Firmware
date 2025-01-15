@@ -87,6 +87,10 @@ Status reset_state_est() {
 }
 
 void update_latest_sensor_frame(SensorFrame* sensor_frame) {
+    if (!s_last_sensor_data_handle) {
+        return;
+    }
+
     xQueueOverwrite(s_last_sensor_data_handle, sensor_frame);
 }
 

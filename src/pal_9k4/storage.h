@@ -18,7 +18,6 @@
 
 // Item sizes
 #define SENSOR_QUEUE_ITEM_SIZE (sizeof(SensorFrame))
-#define STATE_QUEUE_ITEM_SIZE (sizeof(StateFrame))
 #define GPS_QUEUE_ITEM_SIZE (sizeof(GpsFrame))
 
 Status init_storage();
