@@ -1,0 +1,40 @@
+// Use IntelliSense to learn about possible attributes.
+// Hover to view descriptions of existing attributes.
+// For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+{
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Debug",
+        "type": "cppdbg",
+        "request": "launch",
+        // "program": "${fileDirname}/${fileBasenameNoExtension}",
+        "program": "${workspaceFolder}/kf_test.exe",
+        "args": [],
+        "stopAtEntry": false,
+        // "cwd": "C:/Users/hkadl/OneDrive - purdue.edu/Documents/PSP/PSP-HA-Firmware/lib/control",
+        "cwd": "${workspaceFolder}",
+        "environment": [],
+        "externalConsole": false,
+        "MIMode": "gdb",
+        "setupCommands": [
+          {
+            "description": "Enable pretty-printing for gdb",
+            "text": "-enable-pretty-printing",
+            "ignoreFailures": true
+          },
+          {
+            "description": "Break on exceptions",
+            "text": "catch throw",
+            "ignoreFailures": true
+          },
+          {
+            "description": "Stop on SIGSEGV or SIGFPE",
+            "text": "handle SIGSEGV stop\nhandle SIGFPE stop",
+            "ignoreFailures": true
+          }
+        ],
+        "preLaunchTask": "build"
+      }
+    ]
+  }

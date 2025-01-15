@@ -1,0 +1,1 @@
+This .vscode folder is just for independently running/debugging the kf. In kalman.h, you must make COMPILE_SEPARATE true to build here (and make the working directory /control) Make it false to build with PIO. 

@@ -1,15 +1,23 @@
 #ifndef KALMAN_H
 #define KALMAN_H
 
-#include "flight_control.h"
 // #include "math.h"
-#include "state_estimation.h"
+#include "float.h"
+#include "stdbool.h"
 #include "stdlib.h"
 
 #ifdef __arm__
 #include "arm_math.h"
 #else
 #include "fake_arm_math.h"
+#endif
+#define COMPILE_SEPARATE \
+    (false)  // make false for PIO build, true for kf only build
+#ifdef COMPILE_SEPARATE
+#include "state_est_structs.h"
+#else
+#include "flight_control.h"
+#include "state_estimation.h"
 #endif
 
 #define NUM_KIN_STATES (3)  // non-rotational states (h,v,a)
@@ -36,13 +44,11 @@
 ///////////////////////////////////////////
 
 /**
- * MATRIX FUNCTIONS
- * arm_mat_init_f32 (remove)
+ * MATRIX FUNCTIONS -- implemented in fake_arm_math for running not on PAL
  * arm_status
  * arm_copy_f32
  * arm_mat_mult_f32
  * arm_mat_trans_f32
- * arm_mat_scale_f32 (maybe remove)
  * arm_mat_add_f32
  * arm_mat_inverse_f32
  * arm_fill_f32
@@ -58,12 +64,15 @@ typedef float32_t mfloat;
 typedef enum {  // TODO: Add more error types
     KF_SUCCESS = 0,
     KF_ERROR = 1,
+    KF_NO_VALID_MEAS = 2,
+    KF_INVALID_W = 3,
 } kf_status;
 
 typedef struct {
+    mfloat time;
     mat* x;
     mat* P;
-    /* data */
+    int dim;
 } KfState;
 
 // MATRIX FUNCTIONS
@@ -122,10 +131,12 @@ int mat_boolSum(bool* vec, int size);
 // KF FUNCTIONS
 void kf_init_mats();
 void kf_free_mats();
-void kf_init_state(int num_states, const mfloat* x0, const mfloat* P0);
+void kf_init_state(const mfloat* x0, const mfloat* P0_diag);
 
-kf_status kf_do_kf(StateEst* state_ptr, FlightPhase phase,
-                   const SensorFrame* sensor_frame);
+kf_status kf_do_kf(
+    void* state_ptr, FlightPhase phase,
+    const SensorFrame* sensor_frame);  // 1st input should be StateEst but I
+                                       // don't want to include that rn
 
 /**
  * @brief
@@ -154,8 +165,8 @@ void kf_Q_matrix(mfloat dt);  // process noise matrix
 void kf_F_matrix(mfloat dt);  // state update matrix (linearized)
 void kf_R_matrix(const mfloat* meas_vars,
                  const mfloat* z);  // measurement noise matrix
-void kf_H_matrix(const mat* x,
-                 const mfloat* z);  // measurement matrix (linearized)
+kf_status kf_H_matrix(const mat* x,
+                      const mfloat* z);  // measurement matrix (linearized)
 /**
  * @brief
  *
@@ -179,5 +190,7 @@ void kf_resid(
     mat* out);  // Computes residual y = z - h(x), size adjusted for NaNs
 
 mfloat kf_altToPressure(mfloat alt);
+
+KfState kf_getState();
 
 #endif  // KALMAN_H
