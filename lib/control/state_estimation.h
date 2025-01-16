@@ -37,6 +37,25 @@ typedef struct {
     Vector angVelBody;       // rad/s
     Quaternion orientation;  // rad (ish)
 
+    // EKF outputs
+    float posEkf;
+    float velEkf;
+    float accEkf;
+
+    float orientEkf1;
+    float orientEkf2;
+    float orientEkf3;
+    float orientEkf4;
+
+    float posVarEkf;
+    float velVarEkf;
+    float accVarEkf;
+
+    float orientVarEkf1;
+    float orientVarEkf2;
+    float orientVarEkf3;
+    float orientVarEkf4;
+
     // Intermediate variables (NOT LOGGED)
     float posImu;  // m
     float velImu;  // m/s

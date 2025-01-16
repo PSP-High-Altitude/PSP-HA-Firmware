@@ -156,12 +156,17 @@ int create_state_csv(const char* file_path) {
 
     // Write the CSV header
     const char* header =
-        "timestamp,flight_phase,pos_vert,vel_vert,acc_vert,"
+        "timestamp,flight_phase,"
+        "pos_vert,vel_vert,acc_vert,"
         "pos_geo_x,pos_geo_y,pos_geo_z,"
         "vel_geo_x,vel_geo_y,vel_geo_z,"
         "acc_geo_x,acc_geo_y,acc_geo_z,"
         "angvel_body_x,angvel_body_y,angvel_body_z,"
-        "orientation_w,orientation_x,orientation_y,orientation_z\n";
+        "orient_geo_w,orient_geo_x,orient_geo_y,orient_geo_z,"
+        "pos_ekf,vel_ekf,acc_ekf,"
+        "orient_ekf_1,orient_ekf_2,orient_ekf_3,orient_ekf_4,"
+        "pos_var_ekf,vel_var_ekf,acc_var_ekf,"
+        "orient_var_ekf_1,orient_var_ekf_2,orient_var_ekf_3,orient_var_ekf_4\n";
 
     if (fprintf(state_csv_file, "%s", header) < 0) {
         perror("Error writing State CSV header");
@@ -204,6 +209,10 @@ int store_state_frame(const StateFrame* state_frame) {
         "%.3f,%.3f,%.3f,"
         "%.3f,%.3f,%.3f,"
         "%.3f,%.3f,%.3f,"
+        "%.4f,%.4f,%.4f,%.4f,"
+        "%.2f,%.2f,%.2f,"
+        "%.4f,%.4f,%.4f,%.4f,"
+        "%.4f,%.4f,%.4f,"
         "%.4f,%.4f,%.4f,%.4f\n",
         state_frame->timestamp, state_frame->flight_phase,
         state_frame->pos_vert, state_frame->vel_vert, state_frame->acc_vert,
@@ -211,9 +220,15 @@ int store_state_frame(const StateFrame* state_frame) {
         state_frame->vel_geo_x, state_frame->vel_geo_y, state_frame->vel_geo_z,
         state_frame->acc_geo_x, state_frame->acc_geo_y, state_frame->acc_geo_z,
         state_frame->angvel_body_x, state_frame->angvel_body_y,
-        state_frame->angvel_body_z, state_frame->orientation_w,
-        state_frame->orientation_x, state_frame->orientation_y,
-        state_frame->orientation_z);
+        state_frame->angvel_body_z, state_frame->orient_geo_w,
+        state_frame->orient_geo_x, state_frame->orient_geo_y,
+        state_frame->orient_geo_z, state_frame->pos_ekf, state_frame->vel_ekf,
+        state_frame->acc_ekf, state_frame->orient_ekf_1,
+        state_frame->orient_ekf_2, state_frame->orient_ekf_3,
+        state_frame->orient_ekf_4, state_frame->pos_var_ekf,
+        state_frame->vel_var_ekf, state_frame->acc_var_ekf,
+        state_frame->orient_var_ekf_1, state_frame->orient_var_ekf_2,
+        state_frame->orient_var_ekf_3, state_frame->orient_var_ekf_4);
 
     if (result < 0) {
         perror("Error writing StateFrame to CSV");

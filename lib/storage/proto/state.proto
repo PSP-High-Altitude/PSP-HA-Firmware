@@ -39,9 +39,39 @@ message StateFrame {
   float angvel_body_y = 17;
   float angvel_body_z = 18;
 
-  // Orientation (quarternion)
-  float orientation_w = 19;
-  float orientation_x = 20;
-  float orientation_y = 21;
-  float orientation_z = 22;
+  // Inertial orientation (quarternion)
+  float orient_geo_w = 19;
+  float orient_geo_x = 20;
+  float orient_geo_y = 21;
+  float orient_geo_z = 22;
+
+  // EKF position (m)
+  float pos_ekf = 23;
+
+  // EKF velocity (m/s)
+  float vel_ekf = 24;
+
+  // EKF acceleration (m/s^2)
+  float acc_ekf = 25;
+
+  // EKF orientation (quarternion)
+  float orient_ekf_1 = 26;
+  float orient_ekf_2 = 27;
+  float orient_ekf_3 = 28;
+  float orient_ekf_4 = 29;
+
+  // EKF position variance
+  float pos_var_ekf = 30;
+
+  // EKF velocity variance
+  float vel_var_ekf = 31;
+
+  // EKF acceleration variance
+  float acc_var_ekf = 32;
+
+  // EKF orientation variance
+  float orient_var_ekf_1 = 33;
+  float orient_var_ekf_2 = 34;
+  float orient_var_ekf_3 = 35;
+  float orient_var_ekf_4 = 36;
 }

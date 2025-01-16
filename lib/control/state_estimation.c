@@ -167,11 +167,28 @@ StateFrame se_as_frame() {
         .angvel_body_y = s_state_ptr->angVelBody.y,
         .angvel_body_z = s_state_ptr->angVelBody.z,
 
-        // Orientation
-        .orientation_w = s_state_ptr->orientation.w,
-        .orientation_x = s_state_ptr->orientation.x,
-        .orientation_y = s_state_ptr->orientation.y,
-        .orientation_z = s_state_ptr->orientation.z,
+        .orient_geo_w = s_state_ptr->orientation.w,
+        .orient_geo_x = s_state_ptr->orientation.x,
+        .orient_geo_y = s_state_ptr->orientation.y,
+        .orient_geo_z = s_state_ptr->orientation.z,
+
+        .pos_ekf = s_state_ptr->posEkf,
+        .vel_ekf = s_state_ptr->velEkf,
+        .acc_ekf = s_state_ptr->accEkf,
+
+        .orient_ekf_1 = s_state_ptr->orientEkf1,
+        .orient_ekf_2 = s_state_ptr->orientEkf2,
+        .orient_ekf_3 = s_state_ptr->orientEkf3,
+        .orient_ekf_4 = s_state_ptr->orientEkf4,
+
+        .pos_var_ekf = s_state_ptr->posVarEkf,
+        .vel_var_ekf = s_state_ptr->velVarEkf,
+        .acc_var_ekf = s_state_ptr->accVarEkf,
+
+        .orient_var_ekf_1 = s_state_ptr->orientVarEkf1,
+        .orient_var_ekf_2 = s_state_ptr->orientVarEkf2,
+        .orient_var_ekf_3 = s_state_ptr->orientVarEkf3,
+        .orient_var_ekf_4 = s_state_ptr->orientVarEkf4,
     };
 
     return frame;
@@ -356,6 +373,10 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     quat_step(&(s_state_ptr->orientation), &(s_state_ptr->angVelBody), dt,
               &quat_temp);
     quat_copy(&quat_temp, &(s_state_ptr->orientation));
+
+    /********************/
+    /* EKF MODEL UPDATE */
+    /********************/
 
     return STATUS_OK;
 }
