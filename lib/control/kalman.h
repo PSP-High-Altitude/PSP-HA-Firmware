@@ -11,14 +11,20 @@
 #else
 #include "fake_arm_math.h"
 #endif
-#define COMPILE_SEPARATE \
-    (false)  // make false for PIO build, true for kf only build
-#ifdef COMPILE_SEPARATE
-#include "state_est_structs.h"
-#else
+
+// make false for PIO build, true for kf only build
+// #define COMPILE_SEPARATE (false)
+// #ifdef COMPILE_SEPARATE
+// // #ifdef false
+// #include "state_est_structs.h"
+// #else
+// #include "flight_control.h"
+// #include "state_estimation.h"
+// #include "status.h"
+// #endif
 #include "flight_control.h"
 #include "state_estimation.h"
-#endif
+#include "status.h"
 
 #define NUM_KIN_STATES (3)  // non-rotational states (h,v,a)
 #define NUM_ROT_STATES (4)  // rotation states (quaternion)
@@ -80,7 +86,7 @@ arm_status mat_copy(const mat* from, mat* to);
 arm_status mat_edit(mat* mat_ptr, uint16_t i, uint16_t j, mfloat value);
 void mat_diag(mat* mat_ptr, const mfloat* diag_vals, bool zeros);
 int mat_size(const mat* m);
-void mat_alloc(mat* mat_ptr, uint16_t rows, uint16_t cols);
+kf_status mat_alloc(mat* mat_ptr, uint16_t rows, uint16_t cols);
 /**
  * @brief out = (A * B) * C. Make sure the dimensions work
  *
@@ -129,7 +135,7 @@ mfloat mat_val(const mat* mat, int i, int j);
 int mat_boolSum(bool* vec, int size);
 
 // KF FUNCTIONS
-void kf_init_mats();
+Status kf_init_mats();
 void kf_free_mats();
 void kf_init_state(const mfloat* x0, const mfloat* P0_diag);
 
@@ -192,5 +198,7 @@ void kf_resid(
 mfloat kf_altToPressure(mfloat alt);
 
 KfState kf_getState();
+
+void kf_wrtie_state(StateEst* s_statest);
 
 #endif  // KALMAN_H

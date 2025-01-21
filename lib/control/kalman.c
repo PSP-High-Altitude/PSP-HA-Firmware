@@ -40,9 +40,11 @@ static const mfloat R_DIAG_1[NUM_KIN_MEAS] = {5.e-01, 3.e-04, 3.e-04};
 static const mfloat R_DIAG_2[NUM_KIN_MEAS] = {0.5, 1., 1.};
 // static const int up_axis = 1;
 
+// TODO: Initial height?
+
 // MATRIX DEFINITIONS
 
-void mat_alloc(mat* mat_ptr, uint16_t rows, uint16_t cols) {
+kf_status mat_alloc(mat* mat_ptr, uint16_t rows, uint16_t cols) {
     // allocates memory for the matrix
     // yes it's malloc but idk a better way, if someone else does feel free to
     // change it
@@ -51,6 +53,11 @@ void mat_alloc(mat* mat_ptr, uint16_t rows, uint16_t cols) {
     mat_ptr->numRows = rows;
     mat_ptr->numCols = cols;
     mat_ptr->pData = malloc(sizeof(mfloat) * rows * cols);
+    if (!(mat_ptr->pData)) {
+        return KF_ERROR;
+    } else {
+        return KF_SUCCESS;
+    }
 }
 
 arm_status mat_edit(mat* mat_ptr, uint16_t i, uint16_t j, mfloat value) {
@@ -84,12 +91,16 @@ arm_status mat_transposeMultiply(const mat* A, const mat* B, mat* out) {
     // A*B*A'
     mfloat At_space[mat_size(A)];  // A transpose
     mat At = {A->numCols, A->numRows, At_space};
-    arm_mat_trans_f32(A, &At);
-    return mat_doubleMultiply(A, B, &At, out);
+    arm_status status;
+    status = arm_mat_trans_f32(A, &At);
+    if (status == ARM_MATH_SUCCESS) {
+        status = mat_doubleMultiply(A, B, &At, out);
+    }
+    return status;
 }
 
 void mat_scale(mat* A, mfloat scale) {
-    int n = sizeof(A);
+    int n = mat_size(A);
     for (int i = 0; i < n; i++) {
         (A->pData)[i] *= scale;
     }
@@ -158,24 +169,31 @@ int mat_boolSum(bool* vec, int size) {
 
 // KF FUNCTIONS
 
-void kf_init_mats() {
+Status kf_init_mats() {
     // there's probably a less mallocy way to do this but for now this should
     // work (The arm_matrix_instance_f32 just points to an array of the data, so
     // it needs to be allocated somewhere)
-    mat_alloc(&x, NUM_TOT_STATES, 1);
-    mat_alloc(&P, NUM_TOT_STATES, NUM_TOT_STATES);
-    mat_alloc(&F, NUM_TOT_STATES, NUM_TOT_STATES);
-    mat_alloc(&Q, NUM_TOT_STATES, NUM_TOT_STATES);
-    mat_alloc(&H, NUM_KIN_MEAS, NUM_TOT_STATES);
-    mat_alloc(&R, NUM_KIN_MEAS, NUM_KIN_MEAS);
-    mat_alloc(&y, NUM_KIN_MEAS, 1);
+    int malloc_errors = 0;  // mat_alloc returns 0 if no erros, 1 if fails
+    malloc_errors += (int)mat_alloc(&x, NUM_TOT_STATES, 1);
+    malloc_errors += mat_alloc(&P, NUM_TOT_STATES, NUM_TOT_STATES);
+    malloc_errors += mat_alloc(&F, NUM_TOT_STATES, NUM_TOT_STATES);
+    malloc_errors += mat_alloc(&Q, NUM_TOT_STATES, NUM_TOT_STATES);
+    malloc_errors += mat_alloc(&H, NUM_KIN_MEAS, NUM_TOT_STATES);
+    malloc_errors += mat_alloc(&R, NUM_KIN_MEAS, NUM_KIN_MEAS);
+    malloc_errors += mat_alloc(&y, NUM_KIN_MEAS, 1);
     // mat_alloc(&z, NUM_KIN_MEAS, 1);
-    mat_alloc(&w, 3, 1);  //
-    mat_alloc(&S, NUM_KIN_MEAS, NUM_KIN_MEAS);
-    mat_alloc(&K, NUM_TOT_STATES, NUM_KIN_MEAS);
+    malloc_errors += mat_alloc(&w, 3, 1);  //
+    malloc_errors += mat_alloc(&S, NUM_KIN_MEAS, NUM_KIN_MEAS);
+    malloc_errors += mat_alloc(&K, NUM_TOT_STATES, NUM_KIN_MEAS);
 
     state.x = &x;
     state.P = &P;
+
+    if (malloc_errors == 0) {
+        return STATUS_OK;
+    } else {
+        return STATUS_MEMORY_ERROR;
+    }
 }
 
 void kf_free_mats() {
@@ -191,10 +209,11 @@ void kf_free_mats() {
 }
 
 void kf_init_state(const mfloat* x0, const mfloat* P0_diag) {
-    mat_setSize(&x, NUM_TOT_STATES, 1);
+    // mat_setSize(&x, NUM_TOT_STATES, 1);
     arm_copy_f32(x0, x.pData, mat_size(&x));
-    mat_setSize(&P, NUM_TOT_STATES, NUM_TOT_STATES);
+    // mat_setSize(&P, NUM_TOT_STATES, NUM_TOT_STATES);
     mat_diag(&P, P0_diag, true);
+    // TODO: Ititialize height based on current pressure
 }
 
 kf_status kf_do_kf(void* state_ptr, FlightPhase phase,
@@ -210,7 +229,7 @@ kf_status kf_do_kf(void* state_ptr, FlightPhase phase,
     // measurments
     // TODO: Get the correct up axis - using y for now from skyshot test
     mfloat z[NUM_KIN_MEAS] = {sensor_frame->pressure, sensor_frame->acc_h_y,
-                              sensor_frame->acc_h_y};
+                              sensor_frame->acc_i_y};
     // TODO: How does up axis affect oreintation? Do they need reordered?
     mfloat w_meas[NUM_ROT_MEAS] = {
         sensor_frame->rot_i_x, sensor_frame->rot_i_y,
@@ -226,7 +245,7 @@ kf_status kf_do_kf(void* state_ptr, FlightPhase phase,
     // DO FILTER!
     kf_preprocess(z, R_diag, phase);  // adjust measurements and vars based on
                                       // current phase and state
-    kf_predict(dt, w.pData);          // No NaNs csn go in here!
+    kf_predict(dt, w.pData);          // No NaNs can go in here!
     kf_update(z, R_diag);             // z can contain NaNs
 
     // TODO: Error checking
@@ -237,21 +256,18 @@ kf_status kf_do_kf(void* state_ptr, FlightPhase phase,
 }
 
 kf_status kf_predict(mfloat dt, const mfloat* w) {
-    // kf_Q_matrix(dt)
     kf_F_matrix(dt);  // update F matrix with dt. Do this before f(x)!!!
     // self.x = self.f(self.x, dt, w=w) # use f(x) for EKF
     kf_fx(&x, dt, w);  // calculate (integrate) new state
 
-    mfloat temp_storage[mat_size(&Q)];  // temporary space to build Q
+    mfloat temp_storage[NUM_TOT_STATES *
+                        NUM_TOT_STATES];  // temporary space to do matrix math
     // NOTE: It might be more efficicient to permanently (staticly?) allocate
     // space for temporary arrays that all functions can use
-    mat temp_square = {Q.numRows, Q.numCols, temp_storage};
-
-    // Q = np.diag(self.Q_var*dt)
-    mat_diag(&Q, Q_vars, true);  // Make Q from Q_vars
-    mat_scale(&Q, dt);           // multiply by dt
+    mat temp_square = {NUM_TOT_STATES, NUM_TOT_STATES, temp_storage};
 
     // P = F @ self.P @ F.T + self.Q
+    kf_Q_matrix(dt);                              // update Q matrix with dt
     kf_F_matrix(dt);                              // update F with dt
     mat_transposeMultiply(&F, &P, &temp_square);  // FPF'
     arm_mat_add_f32(&temp_square, &Q, &P);        // P = FPF' + Q
@@ -276,32 +292,33 @@ kf_status kf_update(const mfloat* z, const mfloat* R_diag) {
     // S = H @ self.P @ H.T + R # system uncertainty (in measurement space)
     kf_R_matrix(R_diag, z);                 // Make R matrix, resized for NaNs
     mat_setSize(&S, R.numRows, R.numCols);  // Resize S to match R
-    mat_transposeMultiply(&H, &P, &S);      // HPH'
-    mat_addTo(&S, &R);                      // S = HPH' + R
+    math_status = mat_transposeMultiply(&H, &P, &S);  // HPH'
+    math_status = mat_addTo(&S, &R);                  // S = HPH' + R
 
     // K = self.P @ H.T @ inv(S) # Kalman Gain
     mat_setSize(&K, NUM_TOT_STATES, y.numRows);  // Resize K for NaNs
     mat temp = {S.numCols, S.numRows, temp_space};
-    arm_mat_inverse_f32(&S, &temp);               // inv(S)
-    mat_copy(&temp, &S);                          // S = inv(S)
+    math_status = arm_mat_inverse_f32(&S, &temp);  // inv(S)
+    math_status = mat_copy(&temp, &S);             // S = inv(S)
     mat Ht = {H.numCols, H.numRows, temp_space};  // H'
-    arm_mat_trans_f32(&H, &Ht);                   // H'
-    mat_doubleMultiply(&P, &Ht, &S, &K);          // K = P*H'*inv(S)
+    math_status = arm_mat_trans_f32(&H, &Ht);     // H'
+    math_status = mat_doubleMultiply(&P, &Ht, &S, &K);  // K = P*H'*inv(S)
 
     // x += K @ self.y # update state
     mat Ky = {NUM_TOT_STATES, 1, temp_space};
-    arm_mat_mult_f32(&K, &y, &Ky);  // Ky = K*y'
-    mat_addTo(&x, &Ky);             // x += Ky
+    math_status = arm_mat_mult_f32(&K, &y, &Ky);  // Ky = K*y'
+    math_status = mat_addTo(&x, &Ky);             // x += Ky
 
     // P = (np.eye(n) - K @ H) @ self.P @ (np.eye(n) - K @ H).T + K @ R @ K.T
     // ^more numerically stable version of P = P - KHP
     mat KHP = {K.numRows, P.numCols,
                temp_space};  // NOTE: temp_space might be too small if there
                              // are more measurements than states
-    mat_doubleMultiply(&K, &H, &P, &KHP);  // K*H*P
+    math_status = mat_doubleMultiply(&K, &H, &P, &KHP);  // K*H*P
     mat_scale(&KHP, -1);                   // -KHP
-    mat_addTo(&P, &KHP);                   // P = P + -KHP
+    math_status = mat_addTo(&P, &KHP);     // P = P + -KHP
     // TODO: Replace this with the more numerically stable version
+    // TODO: check math for P
     return KF_SUCCESS;
 }
 
@@ -309,13 +326,17 @@ kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
     // TODO: Copying is a bad and inefficient way to do this but I don't want to
     // deal with pointers rn
     if (!(x.pData[1] <
-          5)) {  // TODO: This logic shouldn't happen here, for now it's just
-                 // for independednt testing and making variables not unused.
+          -6)) {  // TODO: This logic shouldn't happen here, for now it's just
+                  // for independednt testing and making variables not unused.
         arm_copy_f32(R_DIAG_1, R_diag, NUM_KIN_STATES);
         arm_copy_f32(Q_VARS_1, Q_vars, NUM_TOT_STATES);
     } else {
         arm_copy_f32(R_DIAG_2, R_diag, NUM_KIN_STATES);
         arm_copy_f32(Q_VARS_2, Q_vars, NUM_TOT_STATES);
+    }
+    int LOW_ACCEL_CUTOFF = 16 * 9.8;
+    if (abs(x.pData[2]) > LOW_ACCEL_CUTOFF) {
+        z[2] = NAN;
     }
     // R_diag = R_DIAG_1;
     // Q_vars = Q_VARS_1;
@@ -324,7 +345,12 @@ kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
     return KF_SUCCESS;
 }
 
-void kf_Q_matrix(mfloat dt) { mat_diag(&Q, Q_vars, true); }
+void kf_Q_matrix(mfloat dt) {
+    // Q = np.diag(self.Q_var*dt)
+    mat_diag(&Q, Q_vars, true);  // Make Q from Q_vars
+    mat_scale(&Q, dt);           // multiply by dt
+    // TODO: Something wrong here
+}
 
 void kf_F_matrix(mfloat dt) {
     // No rotation
@@ -358,7 +384,7 @@ kf_status kf_H_matrix(const mat* x, const mfloat* z) {
     }
 
     // Fill H
-    mat_setSize(&H, NUM_TOT_STATES, NUM_KIN_MEAS - nanCount);
+    mat_setSize(&H, NUM_KIN_MEAS - nanCount, NUM_TOT_STATES);
     arm_fill_f32(0, H.pData, mat_size(&H));
     int row = 0;
     if (!nans[0]) {
@@ -366,11 +392,11 @@ kf_status kf_H_matrix(const mat* x, const mfloat* z) {
         row++;
     }
     if (!nans[1]) {
-        mat_edit(&H, row, 3, 1 / G);
+        mat_edit(&H, row, 2, 1 / G);
         row++;
     }
     if (!nans[2]) {
-        mat_edit(&H, row, 3, 1 / G);
+        mat_edit(&H, row, 2, 1 / G);
         row++;
     }
     return KF_SUCCESS;
@@ -437,4 +463,28 @@ mfloat kf_altToPressure(mfloat alt) {
 KfState kf_getState() {
     KfState state = {time, &x, &P, NUM_TOT_STATES};
     return state;
+}
+
+void kf_wrtie_state(StateEst* s_statest) {
+    s_statest->posEkf = x.pData[0];
+    s_statest->velEkf = x.pData[1];
+    s_statest->accEkf = x.pData[2];
+
+    s_statest->posVarEkf = mat_val(&P, 0, 0);
+    s_statest->velVarEkf = mat_val(&P, 1, 1);
+    s_statest->accVarEkf = mat_val(&P, 2, 2);
+
+    s_statest->orientEkf1 = x.pData[NUM_KIN_STATES + 1];
+    s_statest->orientEkf2 = x.pData[NUM_KIN_STATES + 2];
+    s_statest->orientEkf3 = x.pData[NUM_KIN_STATES + 3];
+    s_statest->orientEkf4 = x.pData[NUM_KIN_STATES + 4];
+
+    s_statest->orientVarEkf1 =
+        mat_val(&P, NUM_KIN_STATES + 1, NUM_KIN_STATES + 1);
+    s_statest->orientVarEkf2 =
+        mat_val(&P, NUM_KIN_STATES + 2, NUM_KIN_STATES + 2);
+    s_statest->orientVarEkf3 =
+        mat_val(&P, NUM_KIN_STATES + 3, NUM_KIN_STATES + 3);
+    s_statest->orientVarEkf4 =
+        mat_val(&P, NUM_KIN_STATES + 4, NUM_KIN_STATES + 4);
 }

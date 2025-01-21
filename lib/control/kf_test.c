@@ -4,14 +4,15 @@
 int get_data(FILE* file, SensorFrame* sf);
 int save_state(FILE* file, uint64_t timestamp, KfState* state,
                FlightPhase phase);
+int print_mat(const mat* m);
 
 int main() {
-    char* strrr = "test\n";
+    char* strrr = "test\nStarting\n";
     printf(strrr);
-    mfloat test = .0394568657645342;
-    printf("%f mfloat\n", test);
+    // mfloat test = .0394568657645342;
+    // printf("%f mfloat\n", test);
 
-    printf("Starting\n");
+    // printf("Starting\n");
     SensorFrame data = {3135426224, 27.62, 983.41, 0.033,  1.07,
                         0.043,      0.015, 1.004,  -0.003, 0.018,
                         -0.333,     -0.35, 3.895,  -4.941, -5.142};
@@ -23,12 +24,25 @@ int main() {
     // .1, .1, .1]), 'Q_var2' :   np.array([apo["q_h"],apo["q_v"],apo["q_a"],
     // .1, .1, .1, .1]), 'measurement_vars2': np.array([apo["p_var"],
     // apo["a_var"], apo["a_var"], .1, .1, .1]),
-    mfloat x0[] = {0., 0, 0, 1, 0, 0, 0};
-    mfloat P0_diag[] = {1, 1, 1, 1, 1, 1, 1};
+    mfloat x0[] = {251.40557961, 0, 0, 1, 0, 0, 0}; // set for pal test
+    mfloat P0_diag[] = {5.0e-02, 3.2e-03, 4.0e+00, 1.0e+00, 1.0e+00, 1.0e+00, 1.0e+00};
 
     // initialize kf
     kf_init_mats();
     kf_init_state(x0, P0_diag);
+
+    // TEST SOME MATH
+    // mfloat mdata[9] = {1,2,3,4,5,6,7,8,9};
+    // mat M = {3, 3, mdata};
+    // mfloat edata[9] = {1,2,3,1,2,3,0,0,1};
+    // mat eye = {2,3,edata};
+    // mfloat odata[4];
+    // mat out = {2,2,odata};
+    // arm_status st = mat_transposeMultiply(&eye, &M, &out);
+    // // arm_mat_trans_f32(&M, &eye);
+    // print_mat(&out);
+    printf("math test done\n");
+
 
     // const char* dataFoleder =
     //     "C:\\Users\\hkadl\\OneDrive -
@@ -112,4 +126,17 @@ int save_state(FILE* file, uint64_t timestamp, KfState* state,
     // timestamp, (int) phase, -1*h, -1*v, -1*a, 0.0,0.0,0.0); fflush(stdout);
     // // makes stuff not wait until the end to print in debug mode
     return out;
+}
+
+int print_mat(const mat* m) {
+    int n = mat_size(m);
+    for (int i = 0; i<m->numRows; i++) {
+        printf("r%d: ", i);
+        for (int j = 0; j < m->numCols; j++) {
+            printf("%f, ", mat_val(m,i,j));
+        }
+        printf("\n");
+    }
+    fflush(stdout);
+    return n;
 }

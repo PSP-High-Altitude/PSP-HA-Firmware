@@ -6,6 +6,7 @@
 #include "backup/backup.h"
 #include "filter/median_filter.h"
 #include "filter/sma_filter.h"
+#include "kalman.h"
 #include "quat.h"
 #include "vector.h"
 
@@ -118,6 +119,14 @@ Status se_init() {
 
     s_state_ptr = &(backup_get_ptr()->state_estimate);
 
+    // kf init
+    ASSERT_OK(kf_init_mats(), "failed to allocate memory for kf matrices");
+    mfloat x0[NUM_TOT_STATES] = {0, 0, 0, 1,
+                                 0, 0, 0};  // TODO: get these from config file
+    mfloat P0_diag[NUM_TOT_STATES] = {1, 1, 1, 1,
+                                      1, 1, 1};  // These are palceholder values
+    kf_init_state(x0, P0_diag);
+
     return STATUS_OK;
 }
 
@@ -172,6 +181,7 @@ StateFrame se_as_frame() {
         .orient_geo_y = s_state_ptr->orientation.y,
         .orient_geo_z = s_state_ptr->orientation.z,
 
+        // ekf values
         .pos_ekf = s_state_ptr->posEkf,
         .vel_ekf = s_state_ptr->velEkf,
         .acc_ekf = s_state_ptr->accEkf,
@@ -189,6 +199,8 @@ StateFrame se_as_frame() {
         .orient_var_ekf_2 = s_state_ptr->orientVarEkf2,
         .orient_var_ekf_3 = s_state_ptr->orientVarEkf3,
         .orient_var_ekf_4 = s_state_ptr->orientVarEkf4,
+        // We could change these to w x y z but I tried to change it and it
+        // broke
     };
 
     return frame;
@@ -377,6 +389,8 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     /********************/
     /* EKF MODEL UPDATE */
     /********************/
+    kf_do_kf(s_state_ptr, phase, sensor_frame);  // TODO: status output here
+    kf_wrtie_state(s_state_ptr);                 // write new state to StateEst
 
     return STATUS_OK;
 }
