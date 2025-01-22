@@ -24,7 +24,8 @@ int main() {
     // .1, .1, .1]), 'Q_var2' :   np.array([apo["q_h"],apo["q_v"],apo["q_a"],
     // .1, .1, .1, .1]), 'measurement_vars2': np.array([apo["p_var"],
     // apo["a_var"], apo["a_var"], .1, .1, .1]),
-    mfloat x0[] = {251.40557961, 0, 0, 1, 0, 0, 0}; // set for pal test
+    // mfloat x0[] = {251.40557961, 0, 0, 1, 0, 0, 0}; // set for pal test
+    mfloat x0[] = {250.8086361473069, 0, 0, 1, 0, 0, 0}; // set for pal test
     mfloat P0_diag[] = {5.0e-02, 3.2e-03, 4.0e+00, 1.0e+00, 1.0e+00, 1.0e+00, 1.0e+00};
 
     // initialize kf
@@ -48,16 +49,22 @@ int main() {
     //     "C:\\Users\\hkadl\\OneDrive -
     //     purdue.edu\\Documents\\PSP\\Python\\Data " "Files";
     // const char* filename = "\\pal_test\\pal_fsl_test_dat.csv";
-    const char* path =
-        "C:\\Users\\hkadl\\OneDrive - purdue.edu\\Documents\\PSP\\Python\\Data "
-        "Files\\pal_test\\pal_fsl_test_dat.csv";
     // const char* outPath = "C:\\Users\\hkadl\\OneDrive -
     // purdue.edu\\Documents\\PSP\\Python\\Data
     // Files\\pal_test\\pal_fsl_test_fsl.csv"; const char* outPath =
     // "C:\\Users\\hkadl\\OneDrive -
     // purdue.edu\\Documents\\PSP\\Python\\pal_kf_dat\\pal_test_kf.csv";
+
+    // const char* path =
+    //     "C:\\Users\\hkadl\\OneDrive - purdue.edu\\Documents\\PSP\\Python\\Data "
+    //     "Files\\pal_test\\pal_fsl_test_dat.csv";    
+    const char* path =
+        "C:\\Users\\hkadl\\OneDrive - purdue.edu\\Documents\\PSP\\Python\\Data "
+        "Files\\pal_test\\dat_trimmed.csv";    
+
     const char* outPath = "kf_out.csv";
-    mfloat tstop = 3150;
+    // mfloat tstop = 3150;
+    mfloat tstop = 3137.9;
 
     FILE* outFile = fopen(outPath, "w");
     if (!outFile) {

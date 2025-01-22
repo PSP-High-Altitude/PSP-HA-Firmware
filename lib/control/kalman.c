@@ -29,6 +29,7 @@ static mfloat time = -1;  // in seconds
 
 static arm_status math_status;   // Watch this for math debugging
 static kf_status filter_status;  // Watch this for kf debugging
+int iteration = 0;
 
 // TODO: Better place for all this config stuff
 // These copied from the values I used during python testing
@@ -63,6 +64,7 @@ kf_status mat_alloc(mat* mat_ptr, uint16_t rows, uint16_t cols) {
 arm_status mat_edit(mat* mat_ptr, uint16_t i, uint16_t j, mfloat value) {
     mat_ptr->pData[i * mat_ptr->numCols + j] = value;
     return ARM_MATH_SUCCESS;
+    // TODO: fail if out of bounds
 }
 
 arm_status mat_copy(const mat* from, mat* to) {
@@ -252,6 +254,7 @@ kf_status kf_do_kf(void* state_ptr, FlightPhase phase,
     // These don't do anything now just had to make them used.
     math_status = ARM_MATH_SUCCESS;
     filter_status = KF_SUCCESS;
+    iteration++;
     return KF_SUCCESS;
 }
 
@@ -304,7 +307,7 @@ kf_status kf_update(const mfloat* z, const mfloat* R_diag) {
     math_status = arm_mat_trans_f32(&H, &Ht);     // H'
     math_status = mat_doubleMultiply(&P, &Ht, &S, &K);  // K = P*H'*inv(S)
 
-    // x += K @ self.y # update state
+    // x += K @ self.y # update state 
     mat Ky = {NUM_TOT_STATES, 1, temp_space};
     math_status = arm_mat_mult_f32(&K, &y, &Ky);  // Ky = K*y'
     math_status = mat_addTo(&x, &Ky);             // x += Ky
@@ -334,7 +337,7 @@ kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
         arm_copy_f32(R_DIAG_2, R_diag, NUM_KIN_STATES);
         arm_copy_f32(Q_VARS_2, Q_vars, NUM_TOT_STATES);
     }
-    int LOW_ACCEL_CUTOFF = 16 * 9.8;
+    int LOW_ACCEL_CUTOFF = 16. * .98;
     if (abs(x.pData[2]) > LOW_ACCEL_CUTOFF) {
         z[2] = NAN;
     }
@@ -349,7 +352,6 @@ void kf_Q_matrix(mfloat dt) {
     // Q = np.diag(self.Q_var*dt)
     mat_diag(&Q, Q_vars, true);  // Make Q from Q_vars
     mat_scale(&Q, dt);           // multiply by dt
-    // TODO: Something wrong here
 }
 
 void kf_F_matrix(mfloat dt) {
@@ -365,7 +367,22 @@ void kf_F_matrix(mfloat dt) {
     mat_edit(&F, 1, 2, dt);
 }
 void kf_R_matrix(const mfloat* meas_vars, const mfloat* z) {
-    mat_diag(&R, meas_vars, true);  // Make R matrix
+    bool nans[NUM_KIN_MEAS];
+    mat_findNans(z, NUM_KIN_MEAS, nans);
+    int nanCount = mat_boolSum(nans, NUM_KIN_MEAS);
+
+    mfloat new_R[NUM_KIN_MEAS - nanCount];
+    int j = 0;
+    for (int i = 0; i < NUM_KIN_MEAS; i++) {
+        if (!nans[i]) {
+            new_R[j] = R_diag[i];
+            j++;
+        }
+    }
+    mat_setSize(&R, NUM_KIN_MEAS-nanCount, NUM_KIN_MEAS-nanCount);
+    mat_diag(&R, new_R, true);  // Make R matrix
+    // TODO: resize for nans
+
 }
 
 kf_status kf_H_matrix(const mat* x, const mfloat* z) {
@@ -434,22 +451,46 @@ void kf_fx(mat* x, mfloat dt, const mfloat* w) {  // state update function
     mat quat = {4, 1, qspace};
     mat q_out = {4, 1, &(x->pData[3])};  // points to the memory in x
     arm_mat_mult_f32(&w_mat, &quat, &q_out);
+    // make quat mag = 1
+    mfloat q_mag = sqrt(pow(q_out.pData[0], 2) + pow(q_out.pData[1], 2) + pow(q_out.pData[2], 2) + pow(q_out.pData[3], 2));
+    mat_scale(&q_out, 1./q_mag);
 }
 
 void kf_hx(const mat* x, const mfloat* z, mat* out) {
     mat_edit(out, 0, 0, kf_altToPressure(mat_val(x, 0, 0)));
-    mat_edit(out, 1, 0, mat_val(x, 1, 0) / G + 1);  // acc 1
+    mat_edit(out, 1, 0, mat_val(x, 2, 0) / G + 1);  // acc 1
     mat_edit(out, 2, 0, mat_val(x, 2, 0) / G + 1);  // acc 2
     // TODO: Check up direction
 }
 
 void kf_resid(const mat* x, const mfloat* z, mat* out) {
     mfloat temp_space[NUM_KIN_MEAS];
+
+    bool nans[NUM_KIN_MEAS];
+    mat_findNans(z, NUM_KIN_MEAS, nans);
+    int nanCount = mat_boolSum(nans, NUM_KIN_MEAS);
+
     mat hx_mat = {NUM_KIN_MEAS, 1, temp_space};
     // y = z - hx # use h(x) for EKF
     kf_hx(x, z, &hx_mat);    // hx = h(x) (state to meas frame)
-    mat_scale(&hx_mat, -1);  // -hx
-    arm_add_f32(z, hx_mat.pData, out->pData, NUM_KIN_MEAS);  // y = z + -hx
+    // mat_scale(&hx_mat, -1);  // -hx
+    // arm_add_f32(z, hx_mat.pData, out->pData, NUM_KIN_MEAS);  // y = z + -hx
+
+    // y = z + -hx  --but resized
+    mat_setSize(out, NUM_KIN_MEAS - nanCount, 1);
+    int row = 0;
+    if (!nans[0]) {
+        mat_edit(out, row, 0, z[0] - mat_val(&hx_mat, 0, 0));
+        row++;
+    }
+    if (!nans[1]) {
+        mat_edit(out, row, 0, z[1] - mat_val(&hx_mat, 1, 0));
+        row++;
+    }
+    if (!nans[2]) {
+        mat_edit(out, row, 0, z[2] - mat_val(&hx_mat, 2, 0));
+        row++;
+    }
 }
 
 mfloat kf_altToPressure(mfloat alt) {

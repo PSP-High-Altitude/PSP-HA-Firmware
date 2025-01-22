@@ -69,4 +69,60 @@ typedef enum {
     IMU_Z_DOWN
 } SensorDirection;
 
+typedef enum {
+    STATUS_OK,
+    STATUS_BUSY,
+    STATUS_ERROR,
+    STATUS_DATA_ERROR,
+    STATUS_STATE_ERROR,
+    STATUS_MEMORY_ERROR,
+    STATUS_HARDWARE_ERROR,
+    STATUS_TESTING_ERROR,
+    STATUS_PARAMETER_ERROR,  // Error with invalid parameter being passed
+    STATUS_TIMEOUT_ERROR,
+} Status;
+
+typedef struct {
+    float time;  // seconds
+
+    // Linear model outputs
+    float posVert;  // m
+    float velVert;  // m/s
+    float accVert;  // m/s^2
+
+    // // Inertial model outputs
+    // Vector posGeo;           // m
+    // Vector velGeo;           // m/s
+    // Vector accGeo;           // m/s^2
+    // Vector angVelBody;       // rad/s
+    // Quaternion orientation;  // rad (ish)
+
+    // EKF outputs
+    float posEkf;
+    float velEkf;
+    float accEkf;
+
+    float orientEkf1;
+    float orientEkf2;
+    float orientEkf3;
+    float orientEkf4;
+
+    float posVarEkf;
+    float velVarEkf;
+    float accVarEkf;
+
+    float orientVarEkf1;
+    float orientVarEkf2;
+    float orientVarEkf3;
+    float orientVarEkf4;
+
+    // Intermediate variables (NOT LOGGED)
+    float posImu;  // m
+    float velImu;  // m/s
+    float accImu;  // m/s^2
+
+    float posBaro;  // m
+    float velBaro;  // m/s
+    float accBaro;  // m/s^2
+} StateEst;
 #define DEFAULT_ORIENTATION (IMU_Z_UP)

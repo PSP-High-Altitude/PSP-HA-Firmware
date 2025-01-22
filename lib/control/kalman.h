@@ -13,18 +13,17 @@
 #endif
 
 // make false for PIO build, true for kf only build
-// #define COMPILE_SEPARATE (false)
-// #ifdef COMPILE_SEPARATE
-// // #ifdef false
-// #include "state_est_structs.h"
-// #else
-// #include "flight_control.h"
-// #include "state_estimation.h"
-// #include "status.h"
-// #endif
+#define COMPILE_SEPARATE (true)
+#ifdef COMPILE_SEPARATE
+#include "state_est_structs.h"
+#else
 #include "flight_control.h"
 #include "state_estimation.h"
 #include "status.h"
+#endif
+// #include "flight_control.h"
+// #include "state_estimation.h"
+// #include "status.h"
 
 #define NUM_KIN_STATES (3)  // non-rotational states (h,v,a)
 #define NUM_ROT_STATES (4)  // rotation states (quaternion)

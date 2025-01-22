@@ -88,6 +88,7 @@ void arm_add_f32(const float32_t* pSrcA, const float32_t* pSrcB,
 
 arm_status arm_mat_trans_f32(const arm_matrix_instance_f32* pSrc,
                              arm_matrix_instance_f32* pDst) {
+    // VERIFIED this works
     // Check for size mismatch
     if (pSrc->numRows != pDst->numCols || pSrc->numCols != pDst->numRows) {
         return ARM_MATH_SIZE_MISMATCH;
