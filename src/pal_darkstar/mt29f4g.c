@@ -1,7 +1,7 @@
 #include "mt29f4g.h"
 
 #include "ospi.h"
-#include "pal_9k5/board.h"
+#include "pal_darkstar/board.h"
 #include "stdio.h"
 #include "timer.h"
 

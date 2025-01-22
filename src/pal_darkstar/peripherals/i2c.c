@@ -1,6 +1,6 @@
 #include "i2c/i2c.h"
 
-#include "pal_9k5/board.h"
+#include "pal_darkstar/board.h"
 #include "stm32h7xx_hal.h"
 
 #define I2C_PIN_AF_COUNT 10

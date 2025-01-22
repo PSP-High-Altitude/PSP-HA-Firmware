@@ -13,7 +13,7 @@ receive telemetry and flight data.
 Hardware
 --------
 
-The latest version of PAL is PAL 9000 Version 5 (PAL 9K5). This version is based on the STM32H735 microcontroller and has
+The latest version of PAL is PAL 9000 Darkstar (PAL Darkstar). This version is based on the STM32H735 microcontroller and has
 1.25" x 3.25" footprint with mounting holes that are compatible with the TeleMega. The board has the following sensors
 and peripheral devices:
 
@@ -22,8 +22,8 @@ and peripheral devices:
     * MS5637 barometer for altitude determination
     * IIS2MDC magnetometer
     * MAX-M10S-00B GPS module
-    * MT29F4G 4Gbit SPI flash memory
-    * STM32WLE5 MCU with LoRa for telemetry
+    * IS21ES08GA 8Gb eMMC for data storage
+    * SX1276 radio with LoRa for telemetry
 
 Table of Contents
 -----------------

@@ -16,7 +16,7 @@
 #include "timer.h"
 #include "timers.h"
 
-#define PSPCOM_DEVICE_ID 0x10  // PAL 9k5
+#define PSPCOM_DEVICE_ID 0x10  // PAL darkstar
 
 #define SENSOR_TELEM_PERIOD 5000
 #define GPS_TELEM_PERIOD 5000

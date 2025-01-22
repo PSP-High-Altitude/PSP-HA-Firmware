@@ -34,9 +34,9 @@ void SystemClock_Config() {
     RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
     RCC_OscInitStruct.PLL.PLLM = 24;
     RCC_OscInitStruct.PLL.PLLN = 300;
-    RCC_OscInitStruct.PLL.PLLP = 3;
-    RCC_OscInitStruct.PLL.PLLQ = 10;
-    RCC_OscInitStruct.PLL.PLLR = 2;
+    RCC_OscInitStruct.PLL.PLLP = 3;   // 200 Mhz
+    RCC_OscInitStruct.PLL.PLLQ = 10;  // 60 Mhz
+    RCC_OscInitStruct.PLL.PLLR = 2;   // 300 Mhz
     RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1VCIRANGE_1;
     RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1VCOWIDE;
     RCC_OscInitStruct.PLL.PLLFRACN = 0;
@@ -65,9 +65,9 @@ void SystemClock_Config() {
         RCC_PERIPHCLK_SDMMC | RCC_PERIPHCLK_USB;
     PeriphClkInitStruct.PLL2.PLL2M = 48;
     PeriphClkInitStruct.PLL2.PLL2N = 160;
-    PeriphClkInitStruct.PLL2.PLL2P = 4;
-    PeriphClkInitStruct.PLL2.PLL2Q = 4;
-    PeriphClkInitStruct.PLL2.PLL2R = 2;
+    PeriphClkInitStruct.PLL2.PLL2P = 4;  // 40 Mhz
+    PeriphClkInitStruct.PLL2.PLL2Q = 4;  // 40 Mhz
+    PeriphClkInitStruct.PLL2.PLL2R = 2;  // 80 Mhz
     PeriphClkInitStruct.PLL2.PLL2RGE = RCC_PLL2VCIRANGE_0;
     PeriphClkInitStruct.PLL2.PLL2VCOSEL = RCC_PLL2VCOMEDIUM;
     PeriphClkInitStruct.PLL2.PLL2FRACN = 0;
@@ -79,6 +79,7 @@ void SystemClock_Config() {
     PeriphClkInitStruct.Usart16ClockSelection = RCC_USART16910CLKSOURCE_HSI;
     PeriphClkInitStruct.SdmmcClockSelection = RCC_SDMMCCLKSOURCE_PLL;
     PeriphClkInitStruct.UsbClockSelection = RCC_USBCLKSOURCE_HSI48;
+    PeriphClkInitStruct.AdcClockSelection = RCC_ADCCLKSOURCE_PLL2;  // 40 Mhz
 
     HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
 

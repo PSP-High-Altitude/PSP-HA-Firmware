@@ -114,6 +114,7 @@
                 "format": "c",
                 "initializer_list": "c",
                 "span": "c",
-                "chrono": "c"
+                "chrono": "c",
+                "utils.h": "c"
         }
 }
