@@ -1,6 +1,7 @@
 #include "voltage.h"
 
 #include "adc/adc.h"
+#include "board.h"
 #include "gpio/gpio.h"
 
 Status voltage_init() {
@@ -18,20 +19,25 @@ Status voltage_init() {
     /***************************/
 
     ADCDevice vadc = {
-        .periph = ADC2,
+        .periph = P_ADC2,
         .resolution_bits = 16,
         .sample_time_cycles_x2 = 5,
         .channel_mask = 0x000506B1,
     };
 
-    // Close PC0 analog switch
-    adc_set_pc0_sw(true);
     // Close PA0 analog switch
     adc_set_pa0_sw(true);
     // Set INP16 alternate to Vbat/4
     adc_set_ch16_alt_sw(true);
 
     // GPIO modes
+    gpio_mode(PIN_PA0, GPIO_INPUT);
+    gpio_mode(PIN_PC4, GPIO_INPUT);
+    gpio_mode(PIN_PB1, GPIO_INPUT);
+    gpio_mode(PIN_PA7, GPIO_INPUT);
+    gpio_mode(PIN_PB0, GPIO_INPUT);
+    gpio_mode(PIN_PC0, GPIO_INPUT);
+    gpio_mode(PIN_PA4, GPIO_INPUT);
 
     // Initialize ADC
     if (adc_init(&vadc) != STATUS_OK) {

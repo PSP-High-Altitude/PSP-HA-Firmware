@@ -115,6 +115,7 @@
                 "initializer_list": "c",
                 "span": "c",
                 "chrono": "c",
-                "utils.h": "c"
+                "utils.h": "c",
+                "gps.h": "c"
         }
 }

@@ -9,9 +9,9 @@
 
 #define WAIT_COND_BLOCKING_TIMEOUT(cond, timeout, result) \
     do {                                                  \
-        uint64_t start = MICROS();                        \
+        uint64_t start = MILLIS();                        \
         while (!(cond)) {                                 \
-            if (MICROS() - start > (timeout)) {           \
+            if (MILLIS() - start > (timeout)) {           \
                 result = STATUS_TIMEOUT_ERROR;            \
                 break;                                    \
             }                                             \

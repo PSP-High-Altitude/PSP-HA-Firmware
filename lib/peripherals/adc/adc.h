@@ -7,9 +7,9 @@
 #include "status.h"
 
 typedef enum {
-    ADC1 = 0,
-    ADC2 = 1,
-    ADC3 = 2,
+    P_ADC1 = 0,
+    P_ADC2 = 1,
+    P_ADC3 = 2,
 } ADCPeriph;
 
 typedef struct {
