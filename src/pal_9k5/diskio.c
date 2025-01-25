@@ -116,10 +116,10 @@ uint8_t get_cmd_crc(BYTE cmd, DWORD arg) {
 /*-----------------------------------------------------------------------*/
 struct dhara_nand s_nand;
 struct dhara_map s_map;
-static uint8_t s_map_buffer[1U << MT29F4G_PAGE_SIZE_LOG2];
+RAM_D2 static uint8_t s_map_buffer[1U << MT29F4G_PAGE_SIZE_LOG2];
 static dhara_error_t s_map_error = DHARA_E_NONE;
-
 static SemaphoreHandle_t s_mutex = NULL;
+extern int g_nand_ready;
 
 /* Initialize NAND interface */
 Status diskio_init(SdDevice *device) {
@@ -127,7 +127,7 @@ Status diskio_init(SdDevice *device) {
 
     // Initialize NAND
     memset(&s_map, 0, sizeof(s_map));
-    memset(&s_map_buffer, 0, sizeof(s_map_buffer));
+    memset(s_map_buffer, 0, sizeof(s_map_buffer));
     memset(&s_nand, 0, sizeof(s_nand));
 
     // Virtual pages
@@ -142,7 +142,7 @@ Status diskio_init(SdDevice *device) {
     s_nand.num_blocks = MT29F4G_BLOCK_COUNT;
 
     // Create mutex
-    s_mutex = xSemaphoreCreateRecursiveMutex();
+    s_mutex = xSemaphoreCreateMutex();
     configASSERT(s_mutex);
 
     return STATUS_OK;
@@ -162,22 +162,31 @@ DWORD get_fattime() { return 0; }
 
 DSTATUS disk_initialize(BYTE drv /* Physical drive number (0) */
 ) {
-    if (drv == 1) {
-        if ((Stat[1] & STA_NOINIT) == 0)
-            return Stat[1]; /* Check if drive is ready */
+    if (drv == 0) {
+        if ((Stat[0] & STA_NOINIT) == 0)
+            return Stat[0]; /* Check if drive is ready */
 
+        Stat[0] = STA_NOINIT;
         if (mt29f4g_init() != STATUS_OK) {
             printf("Failed to initialize NAND hardware\n");
-            Stat[1] = STA_NOINIT;
-            return Stat[1];
+            return Stat[0];
         }
-
         dhara_map_init(&s_map, &s_nand, s_map_buffer, 4);
-        dhara_map_resume(&s_map, &s_map_error);
-        dhara_map_sync(&s_map, &s_map_error);
+        int ret = dhara_map_resume(
+            &s_map, &s_map_error);  // ret = -1 means new journal created
+        if (ret >= 0 && s_map_error != DHARA_E_NONE) {
+            return Stat[0];
+        }
+        s_map_error = DHARA_E_NONE;
+        ret = dhara_map_sync(&s_map, &s_map_error);
+        if (s_map_error != DHARA_E_NONE) {
+            return Stat[0];
+        }
+        s_map_error = DHARA_E_NONE;
+        g_nand_ready = 1;
 
-        Stat[1] &= ~STA_NOINIT; /* Clear STA_NOINIT flag */
-        return Stat[1];
+        Stat[0] &= ~STA_NOINIT; /* Clear STA_NOINIT flag */
+        return Stat[0];
     }
     return STA_NOINIT;
 }
@@ -202,7 +211,7 @@ static BaseType_t diskioENTER_CRITICAL() {
 
     // Acquire the mutex before proceeding if the scheduler is running
     if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-        while (xSemaphoreTakeRecursive(s_mutex, 1) != pdPASS);
+        while (xSemaphoreTake(s_mutex, 1) != pdPASS);
     }
 
     return ctx;
@@ -212,7 +221,7 @@ static void diskioEXIT_CRITICAL(BaseType_t ctx) {
     // Release the mutex regardless of whether the scheduler is running, since
     // it's technically possible for the scheduler to be stopped with held
     // locks, and we don't want a lockup in that case
-    xSemaphoreGiveRecursive(s_mutex);
+    xSemaphoreGive(s_mutex);
 }
 
 /*-----------------------------------------------------------------------*/
@@ -229,7 +238,7 @@ DRESULT disk_read(
     BaseType_t ctx = diskioENTER_CRITICAL();
 
     DWORD sect = (DWORD)sector;
-    if (drv == 1) {
+    if (drv == 0) {
         unsigned int i = 0;
         while (i < count) {
             if (dhara_map_read(&s_map, sect, (uint8_t *)buff, &s_map_error) !=
@@ -263,7 +272,7 @@ DRESULT disk_write(BYTE drv,         /* Physical drive number (0) */
     BaseType_t ctx = diskioENTER_CRITICAL();
 
     DWORD sect = (DWORD)sector;
-    if (drv == 1) {
+    if (drv == 0) {
         unsigned int i = 0;
         while (i < count) {
             if (dhara_map_write(&s_map, sect, (uint8_t *)buff, &s_map_error) !=
@@ -294,48 +303,43 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
 ) {
     DWORD st, ed;
     LBA_t *dp;
+    DRESULT res = RES_OK;
 
     // Non reentrant, and USB will try it
     BaseType_t ctx = diskioENTER_CRITICAL();
 
-    if (drv == 1) {
+    if (drv == 0) {
         switch (cmd) {
             case CTRL_SYNC:
                 if (dhara_map_sync(&s_map, &s_map_error) != 0) {
-                    diskioEXIT_CRITICAL(ctx);
-                    return RES_ERROR;
+                    res = RES_ERROR;
                 }
-                diskioEXIT_CRITICAL(ctx);
-                return RES_OK;
+                break;
             case GET_SECTOR_COUNT:
                 *(DWORD *)buff = (DWORD)dhara_map_capacity(&s_map);
-                diskioEXIT_CRITICAL(ctx);
-                return RES_OK;
+                break;
             case GET_SECTOR_SIZE:
                 *(DWORD *)buff = 1U << s_nand.log2_page_size;
-                diskioEXIT_CRITICAL(ctx);
-                return RES_OK;
+                break;
             case GET_BLOCK_SIZE:
                 *(DWORD *)buff = 1U << s_nand.log2_ppb;
-                diskioEXIT_CRITICAL(ctx);
-                return RES_OK;
+                break;
             case CTRL_TRIM:
                 dp = buff;
                 st = (DWORD)dp[0];
                 ed = (DWORD)dp[1];
                 for (int i = st; i < ed; i++) {
                     if (dhara_map_trim(&s_map, i, &s_map_error) != 0) {
-                        diskioEXIT_CRITICAL(ctx);
-                        return RES_ERROR;
+                        res = RES_ERROR;
+                        break;
                     }
                 }
-                diskioEXIT_CRITICAL(ctx);
-                return RES_OK;
+                break;
             default:
-                diskioEXIT_CRITICAL(ctx);
-                return RES_PARERR;
+                res = RES_PARERR;
         }
     }
+
     diskioEXIT_CRITICAL(ctx);
-    return RES_PARERR;
+    return res;
 }

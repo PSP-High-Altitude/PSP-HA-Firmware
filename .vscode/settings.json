@@ -116,6 +116,11 @@
                 "span": "c",
                 "chrono": "c",
                 "utils.h": "c",
-                "gps.h": "c"
+                "gps.h": "c",
+                "map.h": "c",
+                "fs_common.h": "c",
+                "fs_core.h": "c",
+                "fs_config_ram_0.h": "c",
+                "rl_fs.h": "c"
         }
 }

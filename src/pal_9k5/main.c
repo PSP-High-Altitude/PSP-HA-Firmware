@@ -7,11 +7,15 @@
 #include "buttons.h"
 #include "clocks.h"
 #include "data.h"
+#include "dhara/map.h"
+#include "fatfs/diskio.h"
 #include "gpio/gpio.h"
 #include "malloc.h"
 #include "pspcom.h"
 #include "pyros.h"
+#include "rl_fs.h"
 #include "rtc/rtc.h"
+#include "sd.h"
 #include "status.h"
 #include "stdio.h"
 #include "stm32h7xx.h"
@@ -29,6 +33,7 @@
 
 uint8_t mtp_mode = 0;
 static ADCDevice adc2;
+extern int g_nand_ready;
 /*****************/
 /* HELPER MACROS */
 /*****************/
@@ -36,9 +41,9 @@ static ADCDevice adc2;
 #define PANIC(msg, ...)                                       \
     do {                                                      \
         gpio_write(PIN_RED, GPIO_HIGH);                       \
-        DELAY(1000);                                          \
+        DELAY_MICROS(1000000);                                \
         gpio_write(PIN_RED, GPIO_LOW);                        \
-        DELAY(1000);                                          \
+        DELAY_MICROS(1000000);                                \
         /* Print might itself cause a fault, so do it last */ \
         PAL_LOGE("PANIC @ %s:%d: ", __FILE__, __LINE__);      \
         PAL_LOGE(msg, ##__VA_ARGS__);                         \
@@ -100,6 +105,30 @@ void adc_test(TaskHandle_t *handle_ptr) {
     }
 }
 
+void storage_test(TaskHandle_t *handle_ptr) {
+    diskio_init(NULL);
+    disk_initialize(0);
+    DELAY(5000);
+    fsStatus status;
+    status = finit("");
+    printf("finit: %d\n", status);
+    status = fmount("");
+    printf("fmount: %d\n", status);
+    if (status == fsNoFileSystem) {
+        printf("Drive not formatted! Formatting...\n");
+        status = fformat("", "/FAT32");
+        printf("fformat: %d\n", status);
+        status = fmount("");
+        printf("fmount: %d\n", status);
+    }
+    if (status == fsOK) {
+        printf("Drive ready!\n");
+    }
+    while (1) {
+        DELAY(1000);
+    }
+}
+
 /**
  * Entry point function.
  */
@@ -112,9 +141,13 @@ int main(void) {
     rtc_init();
     button_event_init();
 
+    // https://www.freertos.org/RTOS-Cortex-M3-M4.html
+    NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_4);
+
     usb_init();
     TASK_CREATE(task_usb, 3, 8192);
     TASK_CREATE(adc_test, 2, 1024);
+    TASK_CREATE(storage_test, 2, 16384);
 
     vTaskStartScheduler();
 }
@@ -147,7 +180,11 @@ void Error_Handler(void) { PANIC("unexpected exception\n"); }
 
 void NMI_Handler(void) { PANIC("unexpected exception\n"); }
 
-void HardFault_Handler(void) { PANIC("unexpected exception\n"); }
+void HardFault_Handler(void) {
+    while (1) {
+    }
+    PANIC("unexpected exception\n");
+}
 
 void MemManage_Handler(void) { PANIC("unexpected exception\n"); }
 

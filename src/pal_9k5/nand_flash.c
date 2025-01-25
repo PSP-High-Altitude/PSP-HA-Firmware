@@ -336,19 +336,23 @@ int f_ls(const char* path, int depth) {
 }
 
 void nand_flash_capacity(uint32_t* block_count, uint16_t* block_size) {
-    disk_ioctl(1, GET_SECTOR_COUNT, block_count);
-    disk_ioctl(1, GET_SECTOR_SIZE, block_size);
+    DWORD b_count;
+    disk_ioctl(0, GET_SECTOR_COUNT, &b_count);
+    *block_count = (uint32_t)b_count;
+    DWORD b_size;
+    disk_ioctl(0, GET_SECTOR_SIZE, &b_size);
+    *block_size = (uint32_t)b_size;
 }
 
 Status nand_flash_raw_write(const BYTE* buff, LBA_t sector, UINT count) {
-    if (disk_write(1, buff, sector, count) == RES_OK) {
+    if (disk_write(0, buff, sector, count) == RES_OK) {
         return STATUS_OK;
     }
     return STATUS_ERROR;
 }
 
 Status nand_flash_raw_read(BYTE* buff, LBA_t sector, UINT count) {
-    if (disk_read(1, buff, sector, count) == RES_OK) {
+    if (disk_read(0, buff, sector, count) == RES_OK) {
         return STATUS_OK;
     }
     return STATUS_ERROR;
