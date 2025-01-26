@@ -27,10 +27,6 @@ static mfloat R_diag[NUM_KIN_MEAS];    // get set in preprocess
 
 static mfloat time = -1;  // in seconds
 
-static arm_status math_status;   // Watch this for math debugging
-static kf_status filter_status;  // Watch this for kf debugging
-int iteration = 0;
-
 // TODO: Better place for all this config stuff
 // These copied from the values I used during python testing
 static const mfloat Q_VARS_1[NUM_TOT_STATES] = {
@@ -39,9 +35,14 @@ static const mfloat Q_VARS_2[NUM_TOT_STATES] = {10., 1.,  1., 0.1,
                                                 0.1, 0.1, 0.1};
 static const mfloat R_DIAG_1[NUM_KIN_MEAS] = {5.e-01, 3.e-04, 3.e-04};
 static const mfloat R_DIAG_2[NUM_KIN_MEAS] = {0.5, 1., 1.};
-// static const int up_axis = 1;
+static const kf_up kf_axis = Y_POS;  // using y for now from skyshot test
 
 // TODO: Initial height?
+
+// Just for debugging
+static arm_status math_status;   // Watch this for math debugging
+static kf_status filter_status;  // Watch this for kf debugging
+int iteration = 0;
 
 // MATRIX DEFINITIONS
 
@@ -62,9 +63,12 @@ kf_status mat_alloc(mat* mat_ptr, uint16_t rows, uint16_t cols) {
 }
 
 arm_status mat_edit(mat* mat_ptr, uint16_t i, uint16_t j, mfloat value) {
-    mat_ptr->pData[i * mat_ptr->numCols + j] = value;
-    return ARM_MATH_SUCCESS;
-    // TODO: fail if out of bounds
+    if (i < mat_ptr->numRows && j < mat_ptr->numCols) {
+        mat_ptr->pData[i * mat_ptr->numCols + j] = value;
+        return ARM_MATH_SUCCESS;
+    } else {
+        return ARM_MATH_SIZE_MISMATCH;
+    }
 }
 
 arm_status mat_copy(const mat* from, mat* to) {
@@ -228,10 +232,43 @@ kf_status kf_do_kf(void* state_ptr, FlightPhase phase,
     }
     time = sensor_frame->timestamp / TIME_CONVERSION;
 
-    // measurments
-    // TODO: Get the correct up axis - using y for now from skyshot test
-    mfloat z[NUM_KIN_MEAS] = {sensor_frame->pressure, sensor_frame->acc_h_y,
-                              sensor_frame->acc_i_y};
+    // get measurements from correct axis
+    mfloat z[NUM_KIN_MEAS];
+    switch (kf_axis) {  // theres probably a shorter way to do this
+        case X_POS:
+            z[0] = sensor_frame->pressure;
+            z[1] = sensor_frame->acc_h_x;
+            z[2] = sensor_frame->acc_i_x;
+            break;
+        case Y_POS:
+            z[0] = sensor_frame->pressure;
+            z[1] = sensor_frame->acc_h_y;
+            z[2] = sensor_frame->acc_i_y;
+            break;
+        case Z_POS:
+            z[0] = sensor_frame->pressure;
+            z[1] = sensor_frame->acc_h_z;
+            z[2] = sensor_frame->acc_i_z;
+            break;
+        case X_NEG:
+            z[0] = sensor_frame->pressure;
+            z[1] = -sensor_frame->acc_h_x;
+            z[2] = -sensor_frame->acc_i_x;
+            break;
+        case Y_NEG:
+            z[0] = sensor_frame->pressure;
+            z[1] = -sensor_frame->acc_h_y;
+            z[2] = -sensor_frame->acc_i_y;
+            break;
+        case Z_NEG:
+            z[0] = sensor_frame->pressure;
+            z[1] = -sensor_frame->acc_h_z;
+            z[2] = -sensor_frame->acc_i_z;
+            break;
+        default:
+            return KF_ERROR;
+    }
+
     // TODO: How does up axis affect oreintation? Do they need reordered?
     mfloat w_meas[NUM_ROT_MEAS] = {
         sensor_frame->rot_i_x, sensor_frame->rot_i_y,
@@ -244,18 +281,17 @@ kf_status kf_do_kf(void* state_ptr, FlightPhase phase,
         arm_copy_f32(w_meas, w.pData, 3);
     }
 
-    // DO FILTER!
-    kf_preprocess(z, R_diag, phase);  // adjust measurements and vars based on
-                                      // current phase and state
-    kf_predict(dt, w.pData);          // No NaNs can go in here!
-    kf_update(z, R_diag);             // z can contain NaNs
+    // DO FILTER! // ///////////////////////////////////////////////
+    filter_status =
+        kf_preprocess(z, R_diag, phase);  // adjust measurements and vars based
+                                          // on current phase and state
+    if (filter_status != KF_SUCCESS) {
+        filter_status = kf_predict(dt, w.pData);  // No NaNs can go in here!
+        filter_status = kf_update(z, R_diag);     // z can contain NaNs
+    }
 
-    // TODO: Error checking
-    // These don't do anything now just had to make them used.
-    math_status = ARM_MATH_SUCCESS;
-    filter_status = KF_SUCCESS;
-    iteration++;
-    return KF_SUCCESS;
+    iteration++;  // this counter is just for debugging purposes
+    return filter_status;
 }
 
 kf_status kf_predict(mfloat dt, const mfloat* w) {
@@ -321,31 +357,57 @@ kf_status kf_update(const mfloat* z, const mfloat* R_diag) {
     mat_scale(&KHP, -1);                   // -KHP
     math_status = mat_addTo(&P, &KHP);     // P = P + -KHP
     // TODO: Replace this with the more numerically stable version
-    // TODO: check math for P
     return KF_SUCCESS;
 }
 
 kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
+    // if (!(x.pData[1] <
+    //       -6)) {  // TODO: This logic shouldn't happen here, for now it's
+    //       just
+    //               // for independednt testing and making variables not
+    //               unused.
+    //     arm_copy_f32(R_DIAG_1, R_diag, NUM_KIN_STATES);
+    //     arm_copy_f32(Q_VARS_1, Q_vars, NUM_TOT_STATES);
+    // } else {
+    //     arm_copy_f32(R_DIAG_2, R_diag, NUM_KIN_STATES);
+    //     arm_copy_f32(Q_VARS_2, Q_vars, NUM_TOT_STATES);
+    // }
+
+    if (abs(x.pData[KF_ACC_I]) >
+        IMU_ACCEL_MAX) {    // remove saturated imu accel meas
+        z[KF_ACC_I] = NAN;  // use x or z?
+    }
+    if (x.pData[KF_BARO] > BARO_SPEED_MAX) {
+        z[KF_BARO] = NAN;
+    }
+
     // TODO: Copying is a bad and inefficient way to do this but I don't want to
     // deal with pointers rn
-    if (!(x.pData[1] <
-          -6)) {  // TODO: This logic shouldn't happen here, for now it's just
-                  // for independednt testing and making variables not unused.
-        arm_copy_f32(R_DIAG_1, R_diag, NUM_KIN_STATES);
-        arm_copy_f32(Q_VARS_1, Q_vars, NUM_TOT_STATES);
-    } else {
-        arm_copy_f32(R_DIAG_2, R_diag, NUM_KIN_STATES);
-        arm_copy_f32(Q_VARS_2, Q_vars, NUM_TOT_STATES);
+    switch (phase) {
+        case FP_INIT:
+            return KF_PASS;
+        case FP_WAIT:
+            // TODO: low pass/ rolling average to initialize altitude. With
+            // temperature?
+            return KF_PASS;
+        case FP_BOOST:
+        case FP_COAST:
+            arm_copy_f32(R_DIAG_1, R_diag, NUM_KIN_STATES);
+            arm_copy_f32(Q_VARS_1, Q_vars, NUM_TOT_STATES);
+            return KF_SUCCESS;
+        case FP_DROGUE:
+        case FP_MAIN:
+            arm_copy_f32(R_DIAG_2, R_diag, NUM_KIN_STATES);
+            arm_copy_f32(Q_VARS_2, Q_vars, NUM_TOT_STATES);
+            z[KF_ACC_H] =
+                NAN;  // remove accel measuremnts bc they aren't helpful anymore
+            z[KF_ACC_I] = NAN;
+            return KF_SUCCESS;
+        case FP_LANDED:
+            return KF_PASS;
+        default:
+            return KF_ERROR;
     }
-    int LOW_ACCEL_CUTOFF = 16. * .98;
-    if (abs(x.pData[2]) > LOW_ACCEL_CUTOFF) {
-        z[2] = NAN;
-    }
-    // R_diag = R_DIAG_1;
-    // Q_vars = Q_VARS_1;
-
-    // TODO: This (post apo stuff)
-    return KF_SUCCESS;
 }
 
 void kf_Q_matrix(mfloat dt) {
@@ -381,11 +443,10 @@ void kf_R_matrix(const mfloat* meas_vars, const mfloat* z) {
     }
     mat_setSize(&R, NUM_KIN_MEAS-nanCount, NUM_KIN_MEAS-nanCount);
     mat_diag(&R, new_R, true);  // Make R matrix
-    // TODO: resize for nans
-
 }
 
 kf_status kf_H_matrix(const mat* x, const mfloat* z) {
+    // This is the linearized state -> meas conversion
     mfloat a = 44330;
     mfloat b = 5.25588;
     mfloat h = MAX(mat_val(x, 0, 0), 0);  // mat to ensure alt isn't negative
@@ -404,15 +465,15 @@ kf_status kf_H_matrix(const mat* x, const mfloat* z) {
     mat_setSize(&H, NUM_KIN_MEAS - nanCount, NUM_TOT_STATES);
     arm_fill_f32(0, H.pData, mat_size(&H));
     int row = 0;
-    if (!nans[0]) {
+    if (!nans[KF_BARO]) {
         mat_edit(&H, row, 0, dpdh);
         row++;
     }
-    if (!nans[1]) {
+    if (!nans[KF_ACC_H]) {
         mat_edit(&H, row, 2, 1 / G);
         row++;
     }
-    if (!nans[2]) {
+    if (!nans[KF_ACC_I]) {
         mat_edit(&H, row, 2, 1 / G);
         row++;
     }
@@ -446,10 +507,11 @@ void kf_fx(mat* x, mfloat dt, const mfloat* w) {  // state update function
     mat_edit(&w_mat, 3, 2, .5 * dt * (-w[0]));
 
     // do that quat integration
-    mfloat qspace[] = {x->pData[3], x->pData[4], x->pData[5],
-                       x->pData[6]};  // pull quaternion out of current state
+    mfloat qspace[] = {
+        x->pData[KF_Q0], x->pData[KF_Q0 + 1], x->pData[KF_Q0 + 2],
+        x->pData[KF_Q0 + 3]};  // pull quaternion out of current state
     mat quat = {4, 1, qspace};
-    mat q_out = {4, 1, &(x->pData[3])};  // points to the memory in x
+    mat q_out = {4, 1, &(x->pData[KF_Q0])};  // points to the memory in x
     arm_mat_mult_f32(&w_mat, &quat, &q_out);
     // make quat mag = 1
     mfloat q_mag = sqrt(pow(q_out.pData[0], 2) + pow(q_out.pData[1], 2) + pow(q_out.pData[2], 2) + pow(q_out.pData[3], 2));
@@ -460,7 +522,7 @@ void kf_hx(const mat* x, const mfloat* z, mat* out) {
     mat_edit(out, 0, 0, kf_altToPressure(mat_val(x, 0, 0)));
     mat_edit(out, 1, 0, mat_val(x, 2, 0) / G + 1);  // acc 1
     mat_edit(out, 2, 0, mat_val(x, 2, 0) / G + 1);  // acc 2
-    // TODO: Check up direction
+    // TODO: Check up direction (positive or negative)
 }
 
 void kf_resid(const mat* x, const mfloat* z, mat* out) {
@@ -507,25 +569,21 @@ KfState kf_getState() {
 }
 
 void kf_wrtie_state(StateEst* s_statest) {
-    s_statest->posEkf = x.pData[0];
-    s_statest->velEkf = x.pData[1];
-    s_statest->accEkf = x.pData[2];
+    s_statest->posEkf = x.pData[KF_POS];
+    s_statest->velEkf = x.pData[KF_VEL];
+    s_statest->accEkf = x.pData[KF_ACC];
 
-    s_statest->posVarEkf = mat_val(&P, 0, 0);
-    s_statest->velVarEkf = mat_val(&P, 1, 1);
-    s_statest->accVarEkf = mat_val(&P, 2, 2);
+    s_statest->posVarEkf = mat_val(&P, KF_POS, KF_POS);
+    s_statest->velVarEkf = mat_val(&P, KF_VEL, KF_VEL);
+    s_statest->accVarEkf = mat_val(&P, KF_ACC, KF_ACC);
 
-    s_statest->orientEkf1 = x.pData[NUM_KIN_STATES + 1];
-    s_statest->orientEkf2 = x.pData[NUM_KIN_STATES + 2];
-    s_statest->orientEkf3 = x.pData[NUM_KIN_STATES + 3];
-    s_statest->orientEkf4 = x.pData[NUM_KIN_STATES + 4];
+    s_statest->orientEkf1 = x.pData[KF_Q0 + 0];
+    s_statest->orientEkf2 = x.pData[KF_Q0 + 1];
+    s_statest->orientEkf3 = x.pData[KF_Q0 + 2];
+    s_statest->orientEkf4 = x.pData[KF_Q0 + 3];
 
-    s_statest->orientVarEkf1 =
-        mat_val(&P, NUM_KIN_STATES + 1, NUM_KIN_STATES + 1);
-    s_statest->orientVarEkf2 =
-        mat_val(&P, NUM_KIN_STATES + 2, NUM_KIN_STATES + 2);
-    s_statest->orientVarEkf3 =
-        mat_val(&P, NUM_KIN_STATES + 3, NUM_KIN_STATES + 3);
-    s_statest->orientVarEkf4 =
-        mat_val(&P, NUM_KIN_STATES + 4, NUM_KIN_STATES + 4);
+    s_statest->orientVarEkf1 = mat_val(&P, KF_Q0 + 0, KF_Q0 + 0);
+    s_statest->orientVarEkf2 = mat_val(&P, KF_Q0 + 1, KF_Q0 + 1);
+    s_statest->orientVarEkf3 = mat_val(&P, KF_Q0 + 2, KF_Q0 + 2);
+    s_statest->orientVarEkf4 = mat_val(&P, KF_Q0 + 3, KF_Q0 + 3);
 }

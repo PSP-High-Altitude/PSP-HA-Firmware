@@ -13,17 +13,18 @@
 #endif
 
 // make false for PIO build, true for kf only build
-#define COMPILE_SEPARATE (true)
-#ifdef COMPILE_SEPARATE
-#include "state_est_structs.h"
-#else
-#include "flight_control.h"
-#include "state_estimation.h"
-#include "status.h"
-#endif
+// #define COMPILE_SEPARATE (false)
+// #ifdef COMPILE_SEPARATE
+// #include "state_est_structs.h"
+// #else
 // #include "flight_control.h"
 // #include "state_estimation.h"
 // #include "status.h"
+// #endif
+
+#include "flight_control.h"
+#include "state_estimation.h"
+#include "status.h"
 
 #define NUM_KIN_STATES (3)  // non-rotational states (h,v,a)
 #define NUM_ROT_STATES (4)  // rotation states (quaternion)
@@ -33,6 +34,8 @@
 #define TIME_CONVERSION (1E6f)  //
 #define G (9.81f)
 #define SEA_LEVEL_PRESSURE (1013.25f) /** milibars */
+#define IMU_ACCEL_MAX (16. * 1)       // accel limit, g
+#define BARO_SPEED_MAX (200)          // m/s
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
@@ -50,13 +53,13 @@
 
 /**
  * MATRIX FUNCTIONS -- implemented in fake_arm_math for running not on PAL
- * arm_status
- * arm_copy_f32
- * arm_mat_mult_f32
- * arm_mat_trans_f32
- * arm_mat_add_f32
- * arm_mat_inverse_f32
- * arm_fill_f32
+ * arm_status()
+ * arm_copy_f32()
+ * arm_mat_mult_f32()
+ * arm_mat_trans_f32()
+ * arm_mat_add_f32()
+ * arm_mat_inverse_f32()
+ * arm_fill_f32()
  */
 
 // STRUCT DEFINITIONS
@@ -71,7 +74,31 @@ typedef enum {  // TODO: Add more error types
     KF_ERROR = 1,
     KF_NO_VALID_MEAS = 2,
     KF_INVALID_W = 3,
+    KF_PASS = 4,  // Don't do anything
 } kf_status;
+
+typedef enum {
+    X_POS = 1,
+    Y_POS = 2,
+    Z_POS = 3,
+    X_NEG = -1,
+    Y_NEG = -2,
+    Z_NEG = -3,
+} kf_up;
+
+// Use these enums for indexing x and z for readability and changeability
+typedef enum {
+    KF_POS = 0,  // position index in state vector
+    KF_VEL = 1,  // velocity index in state vector
+    KF_ACC = 2,  // acceleration index in state vector
+    KF_Q0 = 3,   // first index of quaternion in state vector
+} kf_x_idx;
+
+typedef enum {
+    KF_BARO = 0,
+    KF_ACC_H = 1,
+    KF_ACC_I = 2,
+} kf_z_idx;
 
 typedef struct {
     mfloat time;
