@@ -35,7 +35,7 @@ static const mfloat Q_VARS_2[NUM_TOT_STATES] = {10., 1.,  1., 0.1,
                                                 0.1, 0.1, 0.1};
 static const mfloat R_DIAG_1[NUM_KIN_MEAS] = {5.e-01, 3.e-04, 3.e-04};
 static const mfloat R_DIAG_2[NUM_KIN_MEAS] = {0.5, 1., 1.};
-static const kf_up kf_axis = Y_POS;  // using y for now from skyshot test
+static kf_up kf_axis = Y_POS;  // using y for now from skyshot test
 
 // TODO: Initial height?
 
@@ -214,11 +214,11 @@ void kf_free_mats() {
     free(K.pData);
 }
 
-void kf_init_state(const mfloat* x0, const mfloat* P0_diag) {
-    // mat_setSize(&x, NUM_TOT_STATES, 1);
+void kf_init_state(const mfloat* x0, const mfloat* P0_diag, kf_up upaxis) {
     arm_copy_f32(x0, x.pData, mat_size(&x));
-    // mat_setSize(&P, NUM_TOT_STATES, NUM_TOT_STATES);
     mat_diag(&P, P0_diag, true);
+    kf_axis = upaxis;
+    // TODO: set up axis here
     // TODO: Ititialize height based on current pressure
 }
 

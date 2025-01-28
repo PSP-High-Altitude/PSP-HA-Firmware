@@ -163,7 +163,7 @@ int mat_boolSum(bool* vec, int size);
 // KF FUNCTIONS
 Status kf_init_mats();
 void kf_free_mats();
-void kf_init_state(const mfloat* x0, const mfloat* P0_diag);
+void kf_init_state(const mfloat* x0, const mfloat* P0_diag, kf_up upaxis);
 
 kf_status kf_do_kf(
     void* state_ptr, FlightPhase phase,

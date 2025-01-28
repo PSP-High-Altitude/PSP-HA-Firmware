@@ -30,7 +30,7 @@ int main() {
 
     // initialize kf
     kf_init_mats();
-    kf_init_state(x0, P0_diag);
+    kf_init_state(x0, P0_diag, Y_POS);
 
     // TEST SOME MATH
     // mfloat mdata[9] = {1,2,3,4,5,6,7,8,9};

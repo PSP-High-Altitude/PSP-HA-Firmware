@@ -109,6 +109,7 @@ static float se_baro_alt_m(float p_mbar) {
 
 Status se_init() {
     orientation_function = get_orientation_function(DEFAULT_ORIENTATION);
+    // TODO: make up a config thing
 
     ASSERT_OK(median_filter_init(&s_baro_alt_median, BARO_ALT_MEDIAN_WINDOW),
               "failed to init baro alt median filter\n");
@@ -125,7 +126,7 @@ Status se_init() {
                                  0, 0, 0};  // TODO: get these from config file
     mfloat P0_diag[NUM_TOT_STATES] = {1, 1, 1, 1,
                                       1, 1, 1};  // These are palceholder values
-    kf_init_state(x0, P0_diag);
+    kf_init_state(x0, P0_diag, DEFAULT_ORIENTATION);
 
     return STATUS_OK;
 }
