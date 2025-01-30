@@ -22,6 +22,8 @@
 // #include "status.h"
 // #endif
 
+// #include "state_est_structs.h"
+
 #include "flight_control.h"
 #include "state_estimation.h"
 #include "status.h"

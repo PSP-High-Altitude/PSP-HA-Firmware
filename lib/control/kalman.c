@@ -215,9 +215,9 @@ void kf_free_mats() {
 }
 
 void kf_init_state(const mfloat* x0, const mfloat* P0_diag, kf_up upaxis) {
+    kf_axis = upaxis;
     arm_copy_f32(x0, x.pData, mat_size(&x));
     mat_diag(&P, P0_diag, true);
-    kf_axis = upaxis;
     // TODO: set up axis here
     // TODO: Ititialize height based on current pressure
 }
@@ -285,7 +285,7 @@ kf_status kf_do_kf(void* state_ptr, FlightPhase phase,
     filter_status =
         kf_preprocess(z, R_diag, phase);  // adjust measurements and vars based
                                           // on current phase and state
-    if (filter_status != KF_SUCCESS) {
+    if (filter_status == KF_SUCCESS) {
         filter_status = kf_predict(dt, w.pData);  // No NaNs can go in here!
         filter_status = kf_update(z, R_diag);     // z can contain NaNs
     }
@@ -373,7 +373,7 @@ kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
     //     arm_copy_f32(Q_VARS_2, Q_vars, NUM_TOT_STATES);
     // }
 
-    if (abs(x.pData[KF_ACC_I]) >
+    if (fabs(x.pData[KF_ACC_I]) >
         IMU_ACCEL_MAX) {    // remove saturated imu accel meas
         z[KF_ACC_I] = NAN;  // use x or z?
     }
