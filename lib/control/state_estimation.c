@@ -130,6 +130,7 @@ Status se_init() {
         x0, P0_diag,
         (int)DEFAULT_ORIENTATION + 1);  // + 1 converts between the state_est
                                         // enum and kf enum for defining axes
+                                        // TODO: Actually fix this axis stuff
 
     return STATUS_OK;
 }
