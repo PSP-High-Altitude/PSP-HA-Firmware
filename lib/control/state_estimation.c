@@ -383,7 +383,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
                  &vec_temp);
     vec_copy(&vec_temp, &(s_state_ptr->velGeo));
 
-    vec_int_step(&(s_state_ptr->posGeo), &ivel_old, &(s_state_ptr->posGeo), dt,
+    vec_int_step(&(s_state_ptr->posGeo), &ivel_old, &(s_state_ptr->velGeo), dt,
                  &vec_temp);
     vec_copy(&vec_temp, &(s_state_ptr->posGeo));
 
