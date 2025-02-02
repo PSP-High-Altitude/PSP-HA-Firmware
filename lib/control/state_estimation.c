@@ -1,7 +1,7 @@
 #include "state_estimation.h"
 
-#include <malloc.h>
 #include <math.h>
+#include <string.h>
 
 #include "backup/backup.h"
 #include "filter/median_filter.h"

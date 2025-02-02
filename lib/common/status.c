@@ -19,8 +19,9 @@ const char* STATUS_NAMES[] = {
     [STATUS_TIMEOUT_ERROR] = "STATUS_TIMEOUT_ERROR",
 };
 
+#ifndef __arm64
 extern int _write(int file, char* data, int len);
-
+#endif
 void fnoprintf(int file_no, const char* format, ...) {
     va_list args;
     va_start(args, format);
@@ -30,7 +31,9 @@ void fnoprintf(int file_no, const char* format, ...) {
     va_start(args, format);
     char* buf = malloc(len + 1);
     vsnprintf(buf, len + 1, format, args);
+#ifndef __arm64
     _write(file_no, buf, len);
+#endif
     free(buf);
     va_end(args);
 }
