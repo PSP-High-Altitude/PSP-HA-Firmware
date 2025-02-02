@@ -3,11 +3,11 @@
 
 #include "backup/backup.h"
 #include "board_config.h"
-#include "mt29f4g.h"
 #include "pspcom.h"
 #include "regex.h"
 #include "rtc/rtc.h"
 #include "status.h"
+#include "stm32h7xx_hal.h"
 #include "timer.h"
 
 // Help command
@@ -73,11 +73,7 @@ void cmd_invalidate_backup(char *str) {
 // Config erase chip
 char regex_erase_flash_chip[] = "^erase_flash_chip[\n]*$";
 void cmd_erase_flash_chip(char *str) {
-    if (mt29f4g_erase_chip() == STATUS_OK) {
-        PAL_LOGI("Successfully erased flash chip\n");
-    } else {
-        PAL_LOGE("Failed to erase flash chip\n");
-    }
+    PAL_LOGE("No raw flash device present in system\n");
 }
 
 // Config set frequency command

@@ -7,14 +7,25 @@
 #include <stdint.h>
 
 // PSPHAA library
-#include "sd.h"
 #include "status.h"
 
-#define SdmmcPeriph SdPeriph
-#define SdmmcSpeed SdSpeed
-#define SD_SPEED_HIGH SD_SPEED_50MHz
-#define SD_SPEED_DEFAULT SD_SPEED_25MHz
-#define SdmmcDevice SdDevice
+typedef enum {
+    P_SD1 = 0,
+    P_SD2 = 1,
+    P_SD3 = 2,
+    P_SD4 = 3,
+} SdmmcPeriph;
+
+typedef enum {
+    SD_SPEED_INVALID = 0,
+    SD_SPEED_DEFAULT = 25000000,
+    SD_SPEED_HIGH = 50000000,
+} SdmmcSpeed;
+
+typedef struct {
+    SdmmcSpeed clk;
+    SdmmcPeriph periph;
+} SdmmcDevice;
 
 // From the HAL states
 typedef enum {

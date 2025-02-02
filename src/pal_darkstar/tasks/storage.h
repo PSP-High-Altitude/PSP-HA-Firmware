@@ -1,7 +1,6 @@
 #ifndef STORAGE_H
 #define STORAGE_H
 
-#include "nand_flash.h"
 #include "sd.h"
 #include "state_estimation.h"
 #include "status.h"
@@ -27,10 +26,21 @@
 #define STATE_QUEUE_ITEM_SIZE (sizeof(StateFrame))
 #define GPS_QUEUE_ITEM_SIZE (sizeof(GpsFrame))
 
+// Enum for distinguishing pause reasons
+// NOTE: all enum members must have a value
+// representing a distinct bit pos (1, 2, 4, 8, ...)
+typedef enum {
+    STORAGE_PAUSE_RESET = 1,
+    STORAGE_PAUSE_SAFE = 2,
+    STORAGE_PAUSE_MSC = 4,
+} StoragePauseMode;
+
 Status storage_init();
 
-void storage_pause();
-void storage_start();
+bool storage_is_active();
+
+void storage_pause(StoragePauseMode mode);
+void storage_start(StoragePauseMode mode);
 
 Status storage_queue_sensors(const SensorFrame* sensor_frame);
 Status storage_queue_state(const StateFrame* state_frame);

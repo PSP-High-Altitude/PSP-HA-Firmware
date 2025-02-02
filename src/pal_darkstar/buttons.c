@@ -6,8 +6,8 @@
 #include "button_event.h"
 #include "gpio/gpio.h"
 #include "main.h"
-#include "nand_flash.h"
 #include "stdio.h"
+#include "tasks/storage.h"
 #include "timer.h"
 #include "timers.h"
 
@@ -66,10 +66,12 @@ static void mtp_button_handler() {
     button_event_destroy(&g_mtp_button);
     xTimerStopFromISR(g_mtp_button_timer, 0);
 
-    // Save the NAND flash
-    nand_flash_deinit();
+    // Stop the storage task
+    storage_pause(STORAGE_PAUSE_RESET);
+    while (storage_is_active()) {
+        DELAY_MICROS(1000);
+    }
 
-    DELAY_MICROS(1000000);
     backup_get_ptr()->flag_mtp_pressed = 1;
     config_invalidate();
 

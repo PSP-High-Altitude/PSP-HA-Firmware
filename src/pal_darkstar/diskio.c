@@ -18,19 +18,11 @@
 #include "fatfs/diskio.h"
 
 #include "FreeRTOS.h"
-#include "dhara/map.h"
-#include "dhara/nand.h"
 #include "gpio/gpio.h"
-#include "mt29f4g.h"
-#include "sd.h"
+#include "rtc/rtc.h"
 #include "sdmmc/sdmmc.h"
-#include "semphr.h"
-#include "spi/spi.h"
-#include "stdio.h"
 #include "task.h"
-
-// SD or SPI
-#define SD
+#include "timer.h"
 
 /* MMC/SD command */
 #define CMD0 (0)           /* GO_IDLE_STATE */
@@ -56,12 +48,8 @@
 
 static volatile DSTATUS Stat[FF_VOLUMES] = {
     STA_NOINIT, STA_NOINIT}; /* Physical drive status */
-static volatile UINT Timer1,
-    Timer2; /* 1kHz decrement timer stopped at zero (disk_timerproc()) */
 
-#ifndef SD
-BYTE CardType; /* Card type flags */
-#endif
+#define SD
 
 /*-----------------------------------------------------------------------*/
 /* CRC functions (from https://github.com/hazelnusse/crc7)               */
@@ -112,43 +100,44 @@ uint8_t get_cmd_crc(BYTE cmd, DWORD arg) {
 }
 
 /*-----------------------------------------------------------------------*/
-/* SPI controls (Platform dependent)                                     */
+/* Peripheral controls (Platform dependent)                              */
 /*-----------------------------------------------------------------------*/
-struct dhara_nand s_nand;
-struct dhara_map s_map;
-static uint8_t s_map_buffer[1U << MT29F4G_PAGE_SIZE_LOG2];
-static dhara_error_t s_map_error = DHARA_E_NONE;
+static SdmmcDevice s_sd_sdmmc_device;
 
-static SemaphoreHandle_t s_mutex = NULL;
-
-/* Initialize NAND interface */
-Status diskio_init(SdDevice *device) {
+/* Initialize MMC interface */
+Status diskio_init(SdmmcDevice *device) {
+    // Create a local copy (actual setup will be done later)
+    s_sd_sdmmc_device.periph = device->periph;
+    s_sd_sdmmc_device.clk = device->clk;
     generate_crc_table();
-
-    // Initialize NAND
-    memset(&s_map, 0, sizeof(s_map));
-    memset(&s_map_buffer, 0, sizeof(s_map_buffer));
-    memset(&s_nand, 0, sizeof(s_nand));
-
-    // Virtual pages
-    // s_nand.log2_page_size = MT29F4G_PAGE_SIZE_LOG2 - 2;  // 4 partial pages
-    // s_nand.log2_ppb =
-    //    MT29F4G_PAGE_PER_BLOCK_LOG2 + 2;  // 64*4 partial pages per block
-    // s_nand.num_blocks = MT29F4G_BLOCK_COUNT;
-
-    // No virtual pages
-    s_nand.log2_page_size = MT29F4G_PAGE_SIZE_LOG2;
-    s_nand.log2_ppb = MT29F4G_PAGE_PER_BLOCK_LOG2;
-    s_nand.num_blocks = MT29F4G_BLOCK_COUNT;
-
-    // Create mutex
-    s_mutex = xSemaphoreCreateRecursiveMutex();
-    configASSERT(s_mutex);
-
     return STATUS_OK;
 }
 
-DWORD get_fattime() { return 0; }
+DWORD get_fattime() {
+    RTCDateTime datetime = rtc_get_datetime();
+
+    return (DWORD)(datetime.year - 80) << 25 |  // Year
+           (DWORD)(datetime.month + 1) << 21 |  // Month
+           (DWORD)datetime.day << 16 |          // Day
+           (DWORD)datetime.hour << 11 |         // Hour
+           (DWORD)datetime.minute << 5 |        // Minute
+           (DWORD)datetime.second >> 1;         // Second
+}
+
+/*-----------------------------------------------------------------------*/
+/* Check status with timeout                                             */
+/*-----------------------------------------------------------------------*/
+static Status check_status(uint64_t timeout) {
+    SdmmcState res;
+    uint64_t start_time = xTaskGetTickCount();
+    do {
+        res = sdmmc_status(&s_sd_sdmmc_device);
+        // Yield until timeout
+        DELAY(0);
+    } while ((res != SD_CARD_TRANSFER) &&
+             (xTaskGetTickCount() - start_time < timeout));
+    return res == SD_CARD_TRANSFER ? STATUS_OK : STATUS_ERROR;
+}
 
 /*--------------------------------------------------------------------------
 
@@ -162,23 +151,18 @@ DWORD get_fattime() { return 0; }
 
 DSTATUS disk_initialize(BYTE drv /* Physical drive number (0) */
 ) {
-    if (drv == 1) {
-        if ((Stat[1] & STA_NOINIT) == 0)
-            return Stat[1]; /* Check if drive is ready */
+    if (drv == 0) {
+        if (Stat[0] & STA_NODISK)
+            return Stat[0]; /* Is card existing in the soket? */
 
-        if (mt29f4g_init() != STATUS_OK) {
-            printf("Failed to initialize NAND hardware\n");
-            Stat[1] = STA_NOINIT;
-            return Stat[1];
+        if (sdmmc_setup(&s_sd_sdmmc_device) != STATUS_OK) {
+            Stat[0] = STA_NOINIT;
+            return Stat[0];
         }
-
-        dhara_map_init(&s_map, &s_nand, s_map_buffer, 4);
-        dhara_map_resume(&s_map, &s_map_error);
-        dhara_map_sync(&s_map, &s_map_error);
-
-        Stat[1] &= ~STA_NOINIT; /* Clear STA_NOINIT flag */
-        return Stat[1];
+        Stat[0] &= ~STA_NOINIT; /* Clear STA_NOINIT flag */
+        return Stat[0];
     }
+
     return STA_NOINIT;
 }
 
@@ -188,31 +172,9 @@ DSTATUS disk_initialize(BYTE drv /* Physical drive number (0) */
 
 DSTATUS disk_status(BYTE drv /* Physical drive number (0) */
 ) {
-    if (drv > 1) return STA_NOINIT;
+    if (drv > 0) return STA_NOINIT;
 
     return Stat[drv]; /* Return disk status */
-}
-
-/*-----------------------------------------------------------------------*/
-/* Locking functions                                                     */
-/*-----------------------------------------------------------------------*/
-
-static BaseType_t diskioENTER_CRITICAL() {
-    BaseType_t ctx = 0;
-
-    // Acquire the mutex before proceeding if the scheduler is running
-    if (xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-        while (xSemaphoreTakeRecursive(s_mutex, 1) != pdPASS);
-    }
-
-    return ctx;
-}
-
-static void diskioEXIT_CRITICAL(BaseType_t ctx) {
-    // Release the mutex regardless of whether the scheduler is running, since
-    // it's technically possible for the scheduler to be stopped with held
-    // locks, and we don't want a lockup in that case
-    xSemaphoreGiveRecursive(s_mutex);
 }
 
 /*-----------------------------------------------------------------------*/
@@ -225,27 +187,16 @@ DRESULT disk_read(
     LBA_t sector, /* Start sector number (LBA) */
     UINT count    /* Number of sectors to read (1..128) */
 ) {
-    // Non reentrant, and USB will try it
-    BaseType_t ctx = diskioENTER_CRITICAL();
-
     DWORD sect = (DWORD)sector;
-    if (drv == 1) {
-        unsigned int i = 0;
-        while (i < count) {
-            if (dhara_map_read(&s_map, sect, (uint8_t *)buff, &s_map_error) !=
-                0) {
-                diskioEXIT_CRITICAL(ctx);
-                return RES_ERROR;
-            }
-            i++;
-            sect++;
-            buff += (1U << s_nand.log2_page_size);
+
+    if (drv == 0) {
+        if (sdmmc_read_blocks(&s_sd_sdmmc_device, (uint8_t *)buff, sect,
+                              count) != STATUS_OK) {
+            return RES_ERROR;
         }
-        diskioEXIT_CRITICAL(ctx);
         return RES_OK;
     }
 
-    diskioEXIT_CRITICAL(ctx);
     return RES_PARERR;
 }
 
@@ -259,27 +210,16 @@ DRESULT disk_write(BYTE drv,         /* Physical drive number (0) */
                    LBA_t sector,     /* Start sector number (LBA) */
                    UINT count        /* Number of sectors to write (1..128) */
 ) {
-    // Non reentrant, and USB will try it
-    BaseType_t ctx = diskioENTER_CRITICAL();
-
     DWORD sect = (DWORD)sector;
-    if (drv == 1) {
-        unsigned int i = 0;
-        while (i < count) {
-            if (dhara_map_write(&s_map, sect, (uint8_t *)buff, &s_map_error) !=
-                0) {
-                diskioEXIT_CRITICAL(ctx);
-                return RES_ERROR;
-            }
-            i++;
-            sect++;
-            buff += (1U << s_nand.log2_page_size);
+
+    if (drv == 0) {
+        if (sdmmc_write_blocks(&s_sd_sdmmc_device, (uint8_t *)buff, sect,
+                               count) != STATUS_OK) {
+            return RES_ERROR;
         }
-        diskioEXIT_CRITICAL(ctx);
         return RES_OK;
     }
 
-    diskioEXIT_CRITICAL(ctx);
     return RES_PARERR;
 }
 #endif
@@ -292,50 +232,81 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
                    BYTE cmd,  /* Control command code */
                    void *buff /* Pointer to the conrtol data */
 ) {
+    SdmmcInfo info;
     DWORD st, ed;
+    DRESULT res;
     LBA_t *dp;
 
-    // Non reentrant, and USB will try it
-    BaseType_t ctx = diskioENTER_CRITICAL();
+    if (drv == 0) {
+        if (Stat[0] & STA_NOINIT)
+            return RES_NOTRDY; /* Check if drive is ready */
 
-    if (drv == 1) {
+        res = RES_ERROR;
+
         switch (cmd) {
-            case CTRL_SYNC:
-                if (dhara_map_sync(&s_map, &s_map_error) != 0) {
-                    diskioEXIT_CRITICAL(ctx);
-                    return RES_ERROR;
+            case CTRL_SYNC: /* Wait for end of internal write process of the
+                             * drive
+                             */
+                if (check_status(200) != STATUS_OK) {
+                    res = RES_ERROR;
+                    break;
                 }
-                diskioEXIT_CRITICAL(ctx);
-                return RES_OK;
-            case GET_SECTOR_COUNT:
-                *(DWORD *)buff = (DWORD)dhara_map_capacity(&s_map);
-                diskioEXIT_CRITICAL(ctx);
-                return RES_OK;
-            case GET_SECTOR_SIZE:
-                *(DWORD *)buff = 1U << s_nand.log2_page_size;
-                diskioEXIT_CRITICAL(ctx);
-                return RES_OK;
-            case GET_BLOCK_SIZE:
-                *(DWORD *)buff = 1U << s_nand.log2_ppb;
-                diskioEXIT_CRITICAL(ctx);
-                return RES_OK;
-            case CTRL_TRIM:
+                res = RES_OK;
+                break;
+
+            case GET_SECTOR_COUNT: /* Get drive capacity in unit of sector
+                                    * (DWORD)
+                                    */
+                if (sdmmc_info(&s_sd_sdmmc_device, &info) != STATUS_OK) {
+                    res = RES_ERROR;
+                    break;
+                }
+                *(DWORD *)buff = info.LogBlockNbr;
+                res = RES_OK;
+                break;
+
+            case GET_SECTOR_SIZE: /* Get sector size (WORD) */
+                if (sdmmc_info(&s_sd_sdmmc_device, &info) != STATUS_OK) {
+                    res = RES_ERROR;
+                    break;
+                }
+                *(WORD *)buff = info.LogBlockSize;
+                res = RES_OK;
+                break;
+
+            case GET_BLOCK_SIZE: /* Get erase block size in unit of sector
+                                  * (DWORD)
+                                  */
+                if (sdmmc_info(&s_sd_sdmmc_device, &info) != STATUS_OK) {
+                    res = RES_ERROR;
+                    break;
+                }
+                *(WORD *)buff = info.LogBlockSize / 512;
+                res = RES_OK;
+                break;
+
+            case CTRL_TRIM: /* Erase a block of sectors (used when _USE_ERASE ==
+                             * 1)
+                             */
                 dp = buff;
                 st = (DWORD)dp[0];
                 ed = (DWORD)dp[1];
-                for (int i = st; i < ed; i++) {
-                    if (dhara_map_trim(&s_map, i, &s_map_error) != 0) {
-                        diskioEXIT_CRITICAL(ctx);
-                        return RES_ERROR;
-                    }
+                if (sdmmc_erase(&s_sd_sdmmc_device, st, ed) != STATUS_OK) {
+                    res = RES_ERROR;
+                    break;
                 }
-                diskioEXIT_CRITICAL(ctx);
-                return RES_OK;
+                if (check_status(30000) != STATUS_OK) {
+                    res = RES_ERROR;
+                    break;
+                }
+                res = RES_OK;
+                break;
+
             default:
-                diskioEXIT_CRITICAL(ctx);
-                return RES_PARERR;
+                res = RES_PARERR;
         }
+        return res;
     }
-    diskioEXIT_CRITICAL(ctx);
+
     return RES_PARERR;
 }

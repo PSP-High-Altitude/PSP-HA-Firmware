@@ -23,12 +23,31 @@
  *
  */
 
-#include "nand_flash.h"
+#include "fatfs/diskio.h"
+#include "tasks/storage.h"
 #include "tusb.h"
 
 #if CFG_TUD_MSC
 
-extern int g_nand_ready;
+#define MAX_BLOCK_SIZE (512)
+
+static uint8_t s_buf[MAX_BLOCK_SIZE];
+
+static uint32_t s_block_count;
+static uint16_t s_block_size;
+
+static void get_disk_capacity() {
+    DWORD count;
+    DWORD size;
+
+    // Here block == sector (for MMC)
+    disk_ioctl(0, GET_SECTOR_COUNT, &count);
+    disk_ioctl(0, GET_SECTOR_SIZE, &size);
+
+    // Do this to ensure no resizing shenanigans
+    s_block_count = count;
+    s_block_size = size;
+}
 
 // Invoked when received SCSI_CMD_INQUIRY
 // Application fill vendor id, product id and revision with string up to 8, 16,
@@ -38,7 +57,7 @@ void tud_msc_inquiry_cb(uint8_t lun, uint8_t vendor_id[8],
     (void)lun;
 
     const char vid[] = "PSPHA";
-    const char pid[] = "PAL 9000 Ver. 5";
+    const char pid[] = "PAL Darkstar";
     const char rev[] = "1.0";
 
     memcpy(vendor_id, vid, strlen(vid));
@@ -49,12 +68,23 @@ void tud_msc_inquiry_cb(uint8_t lun, uint8_t vendor_id[8],
 // Invoked when received Test Unit Ready command.
 // return true allowing host to read/write this LUN e.g SD card inserted
 bool tud_msc_test_unit_ready_cb(uint8_t lun) {
-    (void)lun;
+    // Tell the storage task to stop for MSC
+    storage_pause(STORAGE_PAUSE_MSC);
 
-    // RAM disk is ready until ejected
-    if (!g_nand_ready) {
+    // Wait for storage task to clean up
+    if (storage_is_active()) {
         // Additional Sense 3A-00 is NOT_FOUND
         tud_msc_set_sense(lun, SCSI_SENSE_NOT_READY, 0x3a, 0x00);
+        return false;
+    }
+
+    // Do this here to make sure the cached values are correct
+    // In case read/writes are issued before capacity read
+    get_disk_capacity();
+
+    // Make sure we can actually support this
+    if (s_block_size > MAX_BLOCK_SIZE) {
+        tud_msc_set_sense(lun, SCSI_SENSE_HARDWARE_ERROR, 0x00, 0x00);
         return false;
     }
 
@@ -68,7 +98,10 @@ void tud_msc_capacity_cb(uint8_t lun, uint32_t* block_count,
                          uint16_t* block_size) {
     (void)lun;
 
-    nand_flash_capacity(block_count, block_size);
+    get_disk_capacity();
+
+    *block_count = s_block_count;
+    *block_size = s_block_size;
 }
 
 // Invoked when received Start Stop Unit command
@@ -81,16 +114,14 @@ bool tud_msc_start_stop_cb(uint8_t lun, uint8_t power_condition, bool start,
 
     if (load_eject) {
         if (start) {
-            // load disk storage
+            storage_start(STORAGE_PAUSE_MSC);
         } else {
-            // unload disk storage
+            storage_pause(STORAGE_PAUSE_MSC);
         }
     }
 
     return true;
 }
-
-#define MIN(x, y) (((x) < (y)) ? (x) : (y))
 
 // Callback invoked when received READ10 command.
 // Copy disk's data to buffer (up to bufsize) and return number of copied bytes.
@@ -98,35 +129,48 @@ int32_t tud_msc_read10_cb(uint8_t lun, uint32_t lba, uint32_t offset,
                           void* buffer, uint32_t bufsize) {
     (void)lun;
 
-    uint32_t block_count;
-    uint16_t block_size;
-    nand_flash_capacity(&block_count, &block_size);
+    DRESULT res;
 
-    int to_read = bufsize;
-    int read_curr = 0;
-    BYTE temp_buffer[block_size];
+    uint32_t btr = bufsize;
+    uint32_t br = 0;
 
-    while (to_read) {
-        // Read the block
-        if (nand_flash_raw_read(temp_buffer, lba, 1) != STATUS_OK) {
-            return read_curr;
+    // If we have a large aligned access, do a burst transfer
+    if (offset == 0 && bufsize > s_block_size) {
+        uint32_t blocks_to_read = bufsize / s_block_size;
+        res = disk_read(0, buffer, lba, blocks_to_read);
+        if (res != RES_OK) {
+            return br;
+        }
+        lba += blocks_to_read;
+        br += blocks_to_read * s_block_size;
+        btr -= br;
+    }
+
+    while (btr) {
+        // Read a single block into the intermediate buffer
+        res = disk_read(0, s_buf, lba, 1);
+        if (res != RES_OK) {
+            return br;
         }
 
         // Size of data to copy from the block
-        int data_size = MIN(to_read, block_size - offset);
+        uint32_t btc = btr;
+        if (offset + btc > s_block_size) {
+            btc = s_block_size - offset;
+        }
 
         // Copy the appropriate part of the block to the buffer
-        memcpy((BYTE*)buffer + read_curr, temp_buffer + offset, data_size);
+        memcpy((BYTE*)buffer + br, s_buf + offset, btc);
 
-        to_read -= data_size;
-        read_curr += data_size;
+        btr -= btc;
+        br += btc;
 
         // Move to the next block
         offset = 0;
         lba++;
     }
 
-    return read_curr;
+    return br;
 }
 
 bool tud_msc_is_writable_cb(uint8_t lun) {
@@ -145,46 +189,54 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset,
                            uint8_t* buffer, uint32_t bufsize) {
     (void)lun;
 
-    uint32_t block_count;
-    uint16_t block_size;
-    nand_flash_capacity(&block_count, &block_size);
+    DRESULT res;
 
-    int to_write = bufsize;
-    int wrote_curr = 0;
-    BYTE temp_buffer[block_size];
+    uint32_t btw = bufsize;
+    uint32_t bw = 0;
 
-    while (to_write) {
-        if (offset) {
-            // Read the block if offset
-            if (nand_flash_raw_read(temp_buffer, lba, 1) != STATUS_OK) {
-                return wrote_curr;
-            }
+    // If we have a large aligned access, do a burst transfer
+    if (offset == 0 && bufsize > s_block_size) {
+        uint32_t blocks_to_write = bufsize / s_block_size;
+        res = disk_write(0, buffer, lba, blocks_to_write);
+        if (res != RES_OK) {
+            return bw;
+        }
+        lba += blocks_to_write;
+        bw += blocks_to_write * s_block_size;
+        btw -= bw;
+    }
+
+    while (btw) {
+        // Size of data to copy into the intermediate buffer
+        uint32_t btc = btw;
+        if (offset + btc > s_block_size) {
+            btc = s_block_size - offset;
         }
 
-        // Size of data to copy to the buffer
-        int data_size = MIN(to_write, block_size - offset);
-
-        // Copy the buffer to the working buffer
-        memcpy(temp_buffer + offset, (BYTE*)buffer + wrote_curr, data_size);
-
-        // Pad the rest of the block with ones
-        memset(temp_buffer + offset + data_size, 0xFF,
-               block_size - offset - data_size);
-
-        // Write the block
-        if (nand_flash_raw_write(temp_buffer, lba, 1) != STATUS_OK) {
-            return wrote_curr;
+        // If we're not copying a whole block, read it first
+        res = disk_read(0, s_buf, lba, 1);
+        if (res != RES_OK) {
+            return bw;
         }
 
-        to_write -= data_size;
-        wrote_curr += data_size;
+        // Copy the appropriate part of the block to the buffer
+        memcpy((BYTE*)buffer + bw, s_buf + offset, btc);
+
+        // Write a single block from the intermediate buffer
+        res = disk_write(0, s_buf, lba, 1);
+        if (res != RES_OK) {
+            return bw;
+        }
+
+        btw -= btc;
+        bw += btc;
 
         // Move to the next block
         offset = 0;
         lba++;
     }
 
-    return wrote_curr;
+    return bw;
 }
 
 // Callback invoked when received an SCSI command not in built-in list below
