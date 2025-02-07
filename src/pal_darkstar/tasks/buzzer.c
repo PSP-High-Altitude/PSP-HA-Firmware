@@ -9,21 +9,21 @@
 
 QueueHandle_t buzzer_queue;
 
-TIM_HandleTypeDef tim15_handle = {0};
+TIM_HandleTypeDef tim1_handle = {0};
 
 #define GET_DIVIDER(base, freq) ((base) / (freq) - 1)
 #define BASE_FREQ 50000000
 #define GET_NOTE_TIME(bpm, note) ((note / 4.0) * (1000.0 / (bpm / 60.0)))
 
 Status buzzer_init() {
-    __HAL_RCC_TIM15_CLK_ENABLE();
-    tim15_handle.Instance = TIM15;
+    __HAL_RCC_TIM1_CLK_ENABLE();
+    tim1_handle.Instance = TIM1;
 
     // Prescaler to 50MHz, period to 4khz
     // 50Mhz seems high, but we don't care about hitting low notes (they
     // don't sound good) and in return we get a higher resolution between
     // notes in the range we care about
-    TIM_Base_InitTypeDef tim15_conf = {
+    TIM_Base_InitTypeDef tim1_conf = {
         .Prescaler = (200000000 / BASE_FREQ) - 1,
         .CounterMode = TIM_COUNTERMODE_UP,
         .Period = GET_DIVIDER(BASE_FREQ, BUZZER_FREQ_4KHZ),
@@ -31,9 +31,9 @@ Status buzzer_init() {
         .AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE,
     };
 
-    tim15_handle.Init = tim15_conf;
+    tim1_handle.Init = tim1_conf;
 
-    TIM_OC_InitTypeDef tim15_oc_conf = {
+    TIM_OC_InitTypeDef tim1_oc_conf = {
         .OCMode = TIM_OCMODE_TOGGLE,
         .Pulse = 0,
         .OCPolarity = TIM_OCPOLARITY_HIGH,
@@ -48,12 +48,12 @@ Status buzzer_init() {
         .Mode = GPIO_MODE_AF_PP,
         .Pull = GPIO_NOPULL,
         .Speed = GPIO_SPEED_FREQ_LOW,
-        .Alternate = GPIO_AF4_TIM15,
+        .Alternate = GPIO_AF1_TIM1,
     };
     HAL_GPIO_Init(PAL_GPIO_PORT(PIN_BUZZER), &gpio_conf);
 
-    HAL_TIM_OC_Init(&tim15_handle);
-    HAL_TIM_OC_ConfigChannel(&tim15_handle, &tim15_oc_conf, TIM_CHANNEL_1);
+    HAL_TIM_OC_Init(&tim1_handle);
+    HAL_TIM_OC_ConfigChannel(&tim1_handle, &tim1_oc_conf, TIM_CHANNEL_1);
 
     // Configure queue
     buzzer_queue = xQueueCreate(BUZZER_QUEUE_LEN, sizeof(BuzzerSound));
@@ -64,20 +64,20 @@ Status buzzer_init() {
 
 Status buzzer_set(uint32_t freq) {
     // Initialize if not initialized
-    if (tim15_handle.State == 0) {
+    if (tim1_handle.State == 0) {
         buzzer_init();
     }
 
-    HAL_TIM_OC_Stop(&tim15_handle, TIM_CHANNEL_1);
-    tim15_handle.Init.Period = GET_DIVIDER(BASE_FREQ, freq);
-    HAL_TIM_OC_Init(&tim15_handle);
-    HAL_TIM_OC_Start(&tim15_handle, TIM_CHANNEL_1);
+    HAL_TIM_OC_Stop(&tim1_handle, TIM_CHANNEL_1);
+    tim1_handle.Init.Period = GET_DIVIDER(BASE_FREQ, freq);
+    HAL_TIM_OC_Init(&tim1_handle);
+    HAL_TIM_OC_Start(&tim1_handle, TIM_CHANNEL_1);
 
     return STATUS_OK;
 }
 
 Status buzzer_clear() {
-    HAL_TIM_OC_Stop(&tim15_handle, TIM_CHANNEL_1);
+    HAL_TIM_OC_Stop(&tim1_handle, TIM_CHANNEL_1);
     return STATUS_OK;
 }
 
@@ -210,7 +210,7 @@ static void sound_song() {
 
 void buzzer_play(BuzzerSound sound) {
     // Initialize if not initialized
-    if (tim15_handle.State == 0) {
+    if (tim1_handle.State == 0) {
         buzzer_init();
     }
 

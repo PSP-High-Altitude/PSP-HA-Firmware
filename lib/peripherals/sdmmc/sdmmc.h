@@ -53,6 +53,8 @@ typedef struct {
     uint32_t CardSpeed;
 } SdmmcInfo;
 
+Status diskio_init(SdmmcDevice* device);
+
 Status sdmmc_setup(SdmmcDevice* dev);
 
 Status sdmmc_init_card(SdmmcDevice* dev);

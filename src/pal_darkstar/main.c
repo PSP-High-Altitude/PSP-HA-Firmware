@@ -87,7 +87,8 @@ void task_init() {
     init_error |= (EXPECT_OK(gps_init(), "init GPS") != STATUS_OK) << 4;
     init_error |= (EXPECT_OK(control_init(), "init control") != STATUS_OK) << 5;
     init_error |= (EXPECT_OK(pyros_init(), "init pyros") != STATUS_OK) << 6;
-    init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK) << 7;
+    // init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK) <<
+    // 7;
 
     // Play init tune
     gpio_write(PIN_RED, GPIO_LOW);
@@ -190,20 +191,13 @@ int main(void) {
 
     // Launch FreeRTOS kernel and init task
 
-    while (1) {
-        gpio_write(PIN_BLUE, GPIO_HIGH);
-        DELAY(500);
-        gpio_write(PIN_BLUE, GPIO_LOW);
-        DELAY(500);
-    }
+    TASK_CREATE(task_init, -1, 8192);
 
-    // TASK_CREATE(task_init, -1, 8192);
+    PAL_LOGI("Starting scheduler\n");
 
-    // PAL_LOGI("Starting scheduler\n");
+    vTaskStartScheduler();
 
-    // vTaskStartScheduler();
-
-    // PANIC("kernel exited\n");
+    PANIC("kernel exited\n");
 }
 
 /**********************/

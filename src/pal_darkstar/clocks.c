@@ -5,7 +5,7 @@
 #include "stm32h7xx_hal.h"
 #include "stm32h7xx_hal_tim.h"
 
-TIM_HandleTypeDef htim1;
+TIM_HandleTypeDef htim4;
 
 void SystemClock_Config() {
     // CORE FREQUENCY: 200Mhz
@@ -77,7 +77,8 @@ void SystemClock_Config() {
     PeriphClkInitStruct.I2c1235ClockSelection = RCC_I2C1235CLKSOURCE_HSI;
     PeriphClkInitStruct.I2c4ClockSelection = RCC_I2C4CLKSOURCE_HSI;
     PeriphClkInitStruct.Usart16ClockSelection = RCC_USART16910CLKSOURCE_HSI;
-    PeriphClkInitStruct.SdmmcClockSelection = RCC_SDMMCCLKSOURCE_PLL;
+    PeriphClkInitStruct.SdmmcClockSelection =
+        RCC_SDMMCCLKSOURCE_PLL2;  // 80 Mhz
     PeriphClkInitStruct.UsbClockSelection = RCC_USBCLKSOURCE_HSI48;
     PeriphClkInitStruct.AdcClockSelection = RCC_ADCCLKSOURCE_PLL2;  // 40 Mhz
 
@@ -120,50 +121,50 @@ HAL_StatusTypeDef HAL_InitTick(uint32_t TickPriority) {
 
     uint32_t uwPrescalerValue;
     uint32_t pFLatency;
-    /*Configure the TIM1 IRQ priority */
+    /*Configure the TIM4 IRQ priority */
 #ifdef TICK_INT_PRIORITY_OVERRIDE
     TickPriority = TICK_INT_PRIORITY_OVERRIDE;
 #endif
     if (TickPriority < (1UL << __NVIC_PRIO_BITS)) {
-        HAL_NVIC_SetPriority(TIM1_UP_IRQn, TickPriority, 0U);
+        HAL_NVIC_SetPriority(TIM4_IRQn, TickPriority, 0U);
 
-        /* Enable the TIM1 global Interrupt */
-        HAL_NVIC_EnableIRQ(TIM1_UP_IRQn);
+        /* Enable the TIM4 global Interrupt */
+        HAL_NVIC_EnableIRQ(TIM4_IRQn);
         uwTickPrio = TickPriority;
     } else {
         return HAL_ERROR;
     }
 
-    /* Enable TIM1 clock */
-    __HAL_RCC_TIM1_CLK_ENABLE();
+    /* Enable TIM4 clock */
+    __HAL_RCC_TIM4_CLK_ENABLE();
 
     /* Get clock configuration */
     HAL_RCC_GetClockConfig(&clkconfig, &pFLatency);
 
-    /* Compute TIM1 clock */
+    /* Compute TIM4 clock */
     uwTimclock = 2 * HAL_RCC_GetPCLK2Freq();
 
-    /* Compute the prescaler value to have TIM1 counter clock equal to 1MHz */
+    /* Compute the prescaler value to have TIM4 counter clock equal to 1MHz */
     uwPrescalerValue = (uint32_t)((uwTimclock / 1000000U) - 1U);
 
-    /* Initialize TIM1 */
-    htim1.Instance = TIM1;
+    /* Initialize TIM4 */
+    htim4.Instance = TIM4;
 
     /* Initialize TIMx peripheral as follow:
 
-    + Period = [(TIM1CLK/1000) - 1]. to have a (1/1000) s time base.
+    + Period = [(TIM4CLK/1000) - 1]. to have a (1/1000) s time base.
     + Prescaler = (uwTimclock/1000000 - 1) to have a 1MHz counter clock.
     + ClockDivision = 0
     + Counter direction = Up
     */
-    htim1.Init.Period = (1000000U / 1000U) - 1U;
-    htim1.Init.Prescaler = uwPrescalerValue;
-    htim1.Init.ClockDivision = 0;
-    htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim4.Init.Period = (1000000U / 1000U) - 1U;
+    htim4.Init.Prescaler = uwPrescalerValue;
+    htim4.Init.ClockDivision = 0;
+    htim4.Init.CounterMode = TIM_COUNTERMODE_UP;
 
-    if (HAL_TIM_Base_Init(&htim1) == HAL_OK) {
+    if (HAL_TIM_Base_Init(&htim4) == HAL_OK) {
         /* Start the TIM time Base generation in interrupt mode */
-        return HAL_TIM_Base_Start_IT(&htim1);
+        return HAL_TIM_Base_Start_IT(&htim4);
     }
 
     /* Return function status */
@@ -172,31 +173,31 @@ HAL_StatusTypeDef HAL_InitTick(uint32_t TickPriority) {
 
 /**
  * @brief  Suspend Tick increment.
- * @note   Disable the tick increment by disabling TIM1 update interrupt.
+ * @note   Disable the tick increment by disabling TIM4 update interrupt.
  * @param  None
  * @retval None
  */
 void HAL_SuspendTick(void) {
-    /* Disable TIM1 update Interrupt */
+    /* Disable TIM4 update Interrupt */
     printf("disabled tick\n");
-    __HAL_TIM_DISABLE_IT(&htim1, TIM_IT_UPDATE);
+    __HAL_TIM_DISABLE_IT(&htim4, TIM_IT_UPDATE);
 }
 
 /**
  * @brief  Resume Tick increment.
- * @note   Enable the tick increment by Enabling TIM1 update interrupt.
+ * @note   Enable the tick increment by Enabling TIM4 update interrupt.
  * @param  None
  * @retval None
  */
 void HAL_ResumeTick(void) {
-    /* Enable TIM1 Update interrupt */
-    __HAL_TIM_ENABLE_IT(&htim1, TIM_IT_UPDATE);
+    /* Enable TIM4 Update interrupt */
+    __HAL_TIM_ENABLE_IT(&htim4, TIM_IT_UPDATE);
 }
 
-void TIM1_UP_IRQHandler(void) { HAL_TIM_IRQHandler(&htim1); }
+void TIM4_IRQHandler(void) { HAL_TIM_IRQHandler(&htim4); }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
-    if (htim->Instance == TIM1) {
+    if (htim->Instance == TIM4) {
         HAL_IncTick();
     }
 }

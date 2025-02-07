@@ -1,5 +1,6 @@
 #include "fatlog.h"
 
+#include "main.h"
 #include "rtc/rtc.h"
 #include "stdio.h"
 #include "stdlib.h"
@@ -12,7 +13,7 @@
 #define HEADER_LEN 64
 #define MAXPATH_LEN 256
 
-static FATFS s_fs;
+RAM_D2 static FATFS s_fs;
 
 static void snfmtspace(char* str, size_t str_size, uint64_t bytes) {
     static const char* prefixes[] = {"", "K", "M", "G"};
@@ -105,6 +106,25 @@ Status fatlog_read_data(FIL* fp, uint8_t* data, size_t size) {
 Status fatlog_init() {
     FRESULT res = f_mount(&s_fs, MOUNT_POINT, 1);
     if (res != FR_OK) {
+#ifdef NAND_ALLOW_REFORMAT
+        if (res == FR_NO_FILESYSTEM) {
+            BYTE work[FF_MAX_SS];
+            memset(work, 0, sizeof(work));
+            MKFS_PARM format_opts;
+            memset(&format_opts, 0, sizeof(format_opts));
+            format_opts.fmt = FM_FAT32;
+
+            res = f_mkfs(MOUNT_POINT, &format_opts, work, FF_MAX_SS);
+            if (res != FR_OK) {
+                return STATUS_HARDWARE_ERROR;
+            }
+            res = f_setlabel(MOUNT_POINT "/" VOLUME_LABEL);
+            if (res != FR_OK) {
+                return STATUS_HARDWARE_ERROR;
+            }
+            res = f_mount(&s_fs, MOUNT_POINT, 1);
+        }
+#endif
         return STATUS_HARDWARE_ERROR;
     }
 
@@ -241,8 +261,8 @@ Status fatlog_space(uint64_t* total_bytes, uint64_t* free_bytes) {
         return STATUS_HARDWARE_ERROR;
     }
 
-    *total_bytes = (fs->n_fatent - 2) * fs->csize * fs->ssize;
-    *free_bytes = fre_clust * fs->csize * fs->ssize;
+    *total_bytes = (fs->n_fatent - 2) * fs->csize * 512;
+    *free_bytes = fre_clust * fs->csize * 512;
 
     return STATUS_OK;
 }

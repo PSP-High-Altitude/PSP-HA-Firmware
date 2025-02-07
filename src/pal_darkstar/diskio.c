@@ -24,6 +24,10 @@
 #include "task.h"
 #include "timer.h"
 
+#ifndef FF_VOLUME_STRS
+const char *VolumeStr[FF_VOLUMES] = {"MMC"};
+#endif
+
 /* MMC/SD command */
 #define CMD0 (0)           /* GO_IDLE_STATE */
 #define CMD1 (1)           /* SEND_OP_COND (MMC) */

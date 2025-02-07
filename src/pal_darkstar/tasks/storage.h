@@ -1,7 +1,8 @@
 #ifndef STORAGE_H
 #define STORAGE_H
 
-#include "sd.h"
+#include "gps.pb.h"
+#include "sensor.pb.h"
 #include "state_estimation.h"
 #include "status.h"
 

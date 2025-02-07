@@ -2,6 +2,7 @@
 
 #include "board.h"
 #include "board_config.h"
+#include "gpio/gpio.h"
 #include "gps.pb.h"
 #include "i2c/i2c.h"
 #include "max_m10s.h"
@@ -26,9 +27,9 @@
 static I2cDevice s_gps_conf = {
     .address = 0x42,
     .clk = I2C_SPEED_STANDARD,
-    .periph = P_I2C2,
-    .scl = PIN_PB10,
-    .sda = PIN_PB11,
+    .periph = P_I2C5,
+    .scl = PIN_PC11,
+    .sda = PIN_PC10,
 };
 
 /********************/

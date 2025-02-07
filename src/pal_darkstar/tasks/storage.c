@@ -10,6 +10,7 @@
 #include "main.h"
 #include "pb_create.h"
 #include "rtc/rtc.h"
+#include "sdmmc/sdmmc.h"
 #include "stdio.h"
 #include "stdlib.h"
 #include "timer.h"
@@ -56,6 +57,11 @@ static FIFO_t s_log_fifo = {
     .head = 0,
     .tail = 0,
     .count = 0,
+};
+
+static SdmmcDevice s_sdmmc_device = {
+    .clk = SD_SPEED_DEFAULT,
+    .periph = P_SD2,
 };
 
 static char s_prf_buf[1024];  // 40 bytes per task
@@ -186,7 +192,7 @@ static Status storage_open_files() {
 
 Status storage_init() {
     // Initialize FATFS
-    ASSERT_OK(diskio_init(NULL), "diskio init");
+    ASSERT_OK(diskio_init(&s_sdmmc_device), "diskio init");
     ASSERT_OK(fatlog_init(), "fatlog init");
 
     // Initialize config
