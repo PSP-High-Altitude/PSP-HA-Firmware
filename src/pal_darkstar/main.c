@@ -189,13 +189,21 @@ int main(void) {
     gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLDOWN);
 
     // Launch FreeRTOS kernel and init task
-    TASK_CREATE(task_init, -1, 8192);
 
-    PAL_LOGI("Starting scheduler\n");
+    while (1) {
+        gpio_write(PIN_BLUE, GPIO_HIGH);
+        DELAY(500);
+        gpio_write(PIN_BLUE, GPIO_LOW);
+        DELAY(500);
+    }
 
-    vTaskStartScheduler();
+    // TASK_CREATE(task_init, -1, 8192);
 
-    PANIC("kernel exited\n");
+    // PAL_LOGI("Starting scheduler\n");
+
+    // vTaskStartScheduler();
+
+    // PANIC("kernel exited\n");
 }
 
 /**********************/
