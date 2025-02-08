@@ -12,6 +12,7 @@
 #include "stdlib.h"
 #include "stm32h7xx_hal.h"
 #include "string.h"
+#include "sx1276/sx1276.h"
 #include "task.h"
 #include "timer.h"
 #include "timers.h"
@@ -35,6 +36,17 @@ static QueueHandle_t s_fp_queue;
 uint8_t user_armed[5] = {0, 0, 0, 0, 0};
 
 static BoardConfig *s_config_ptr = NULL;
+
+SpiDevice s_radio_device = {
+    .periph = P_SPI2,
+    .sck = PIN_PB13,
+    .miso = PIN_PC2,
+    .mosi = PIN_PC3,
+    .cs = PIN_PB12,
+    .clk = SPI_SPEED_10MHz,
+    .cpha = 0,
+    .cpol = 0,
+};
 
 uint16_t crc(uint16_t checksum, pspcommsg msg) {
     // Some code is taken from ChatGPT
@@ -62,6 +74,11 @@ uint16_t crc(uint16_t checksum, pspcommsg msg) {
 }
 
 Status pspcom_init() {
+    s_config_ptr = config_get_ptr();
+    if (s_config_ptr == NULL) {
+        return STATUS_ERROR;
+    }
+
     // Queues for synchronization, not buffering
     s_sensor_queue = xQueueCreate(1, sizeof(SensorFrame));
     s_gps_queue = xQueueCreate(1, sizeof(GPS_Fix_TypeDef));
@@ -70,6 +87,11 @@ Status pspcom_init() {
     configASSERT(s_sensor_queue);
     configASSERT(s_gps_queue);
     configASSERT(s_fp_queue);
+
+    if (sx1276_init(&s_radio_device, PIN_PC5, 434000000, 20, 125000, 10, 5, 8,
+                    false, true, true) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
 
     return STATUS_OK;
 }
@@ -83,7 +105,16 @@ void task_pspcom_rx() {
     }
 }
 
-void pspcom_send_msg(pspcommsg msg) {}
+void pspcom_send_msg(pspcommsg msg) {
+    // Prepare packet
+    uint8_t msg_buf[2 + msg.payload_len];
+    msg_buf[0] = msg.device_id;
+    msg_buf[1] = msg.msg_id;
+    memcpy(msg_buf + 2, msg.payload, msg.payload_len);
+
+    // Send message
+    sx1276_transmit(&s_radio_device, msg_buf, 2 + msg.payload_len);
+}
 
 void pspcom_send_sensor(SensorFrame *sensor_frame) {
     SensorFrame *sens = (SensorFrame *)sensor_frame;

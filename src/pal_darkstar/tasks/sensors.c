@@ -30,49 +30,49 @@
 /*********************/
 
 // MS5637 Barometer
-static I2cDevice s_baro_conf = {
-    .address = 0x76,
-    .clk = I2C_SPEED_FAST,
-    .periph = P_I2C1,
-    .scl = PIN_PB8,
-    .sda = PIN_PB7,
-};
+// static I2cDevice s_baro_conf = {
+//     .address = 0x76,
+//     .clk = I2C_SPEED_FAST,
+//     .periph = P_I2C1,
+//     .scl = PIN_PB8,
+//     .sda = PIN_PB7,
+// };
 
-// BMI088 Inertial Measurement Unit (Accelerometer)
-static I2cDevice s_imu_acc_conf = {
-    .address = 0x18,
-    .clk = I2C_SPEED_FAST,
-    .periph = P_I2C1,
-    .scl = PIN_PB8,
-    .sda = PIN_PB7,
-};
+// // BMI088 Inertial Measurement Unit (Accelerometer)
+// static I2cDevice s_imu_acc_conf = {
+//     .address = 0x18,
+//     .clk = I2C_SPEED_FAST,
+//     .periph = P_I2C1,
+//     .scl = PIN_PB8,
+//     .sda = PIN_PB7,
+// };
 
-// BMI088 Inertial Measurement Unit (Gyroscope)
-static I2cDevice s_imu_rot_conf = {
-    .address = 0x68,
-    .clk = I2C_SPEED_FAST,
-    .periph = P_I2C1,
-    .scl = PIN_PB8,
-    .sda = PIN_PB7,
-};
+// // BMI088 Inertial Measurement Unit (Gyroscope)
+// static I2cDevice s_imu_rot_conf = {
+//     .address = 0x68,
+//     .clk = I2C_SPEED_FAST,
+//     .periph = P_I2C1,
+//     .scl = PIN_PB8,
+//     .sda = PIN_PB7,
+// };
 
-// KX134 High-G Accelerometer
-static I2cDevice s_acc_conf = {
-    .address = 0x1F,
-    .clk = I2C_SPEED_FAST,
-    .periph = P_I2C1,
-    .scl = PIN_PB8,
-    .sda = PIN_PB7,
-};
+// // KX134 High-G Accelerometer
+// static I2cDevice s_acc_conf = {
+//     .address = 0x1F,
+//     .clk = I2C_SPEED_FAST,
+//     .periph = P_I2C1,
+//     .scl = PIN_PB8,
+//     .sda = PIN_PB7,
+// };
 
-// IIS2MDC Magnetometer
-static I2cDevice s_mag_conf = {
-    .address = 0x1E,
-    .clk = I2C_SPEED_FAST,
-    .periph = P_I2C1,
-    .scl = PIN_PB8,
-    .sda = PIN_PB7,
-};
+// // IIS2MDC Magnetometer
+// static I2cDevice s_mag_conf = {
+//     .address = 0x1E,
+//     .clk = I2C_SPEED_FAST,
+//     .periph = P_I2C1,
+//     .scl = PIN_PB8,
+//     .sda = PIN_PB7,
+// };
 
 /********************/
 /* STATIC VARIABLES */
@@ -88,15 +88,16 @@ static BoardConfig* s_config_ptr = NULL;
 /* API FUNCTIONS */
 /*****************/
 Status sensors_init() {
-    ASSERT_OK(ms5637_init(&s_baro_conf), "Barometer initialization failed\n");
-    ASSERT_OK(kx134_init(&s_acc_conf, KX134_OUT_RATE_200_HZ, KX134_RANGE_64_G),
-              "Accelerometer initialization failed\n");
-    ASSERT_OK(iis2mdc_init(&s_mag_conf, IIS2MDC_ODR_100_HZ),
-              "Magnetometer initialization failed\n");
-    ASSERT_OK(bmi088_init(&s_imu_acc_conf, &s_imu_rot_conf,
-                          BMI088_GYRO_RATE_200_HZ, BMI088_ACC_RATE_200_HZ,
-                          BMI088_GYRO_RANGE_2000_DPS, BMI088_ACC_RANGE_24_G),
-              "IMU initialization failed\n");
+    // ASSERT_OK(ms5637_init(&s_baro_conf), "Barometer initialization
+    // failed\n"); ASSERT_OK(kx134_init(&s_acc_conf, KX134_OUT_RATE_200_HZ,
+    // KX134_RANGE_64_G),
+    //           "Accelerometer initialization failed\n");
+    // ASSERT_OK(iis2mdc_init(&s_mag_conf, IIS2MDC_ODR_100_HZ),
+    //           "Magnetometer initialization failed\n");
+    // ASSERT_OK(bmi088_init(&s_imu_acc_conf, &s_imu_rot_conf,
+    //                       BMI088_GYRO_RATE_200_HZ, BMI088_ACC_RATE_200_HZ,
+    //                       BMI088_GYRO_RANGE_2000_DPS, BMI088_ACC_RANGE_24_G),
+    //           "IMU initialization failed\n");
 
     s_config_ptr = config_get_ptr();
     if (s_config_ptr == NULL) {
