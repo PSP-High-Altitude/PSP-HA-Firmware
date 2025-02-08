@@ -238,7 +238,7 @@ enum {
 char const *string_desc_arr[] = {
     (const char[]){0x09, 0x04},  // 0: is supported language is English (0x0409)
     "PSP High Altitude",         // 1: Manufacturer
-    "PAL 9000 Ver. 5",           // 2: Product
+    "PAL 9000 Darkstart",        // 2: Product
     NULL,                        // 3: Serials will use unique ID if possible
     "PAL 9000 CDC",              // 4: CDC Interface
     "PAL 9000 MSC",              // 5: MSC Interface

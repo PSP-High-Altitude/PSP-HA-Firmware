@@ -35,4 +35,6 @@ Status fatlog_dump_prf_stats(char stats[]);
 
 Status fatlog_space(uint64_t* total_bytes, uint64_t* free_bytes);
 
+Status fatlog_reformat();
+
 #endif  // FATLOG_H

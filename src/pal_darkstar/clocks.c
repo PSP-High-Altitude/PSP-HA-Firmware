@@ -103,9 +103,6 @@ void SystemClock_Config() {
     HAL_NVIC_SetPriority(DMA1_Stream1_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(DMA1_Stream1_IRQn);
 
-    // Initalize MDMA
-    __HAL_RCC_MDMA_CLK_ENABLE();
-
     // Enable RAM D2
     __HAL_RCC_D2SRAM1_CLK_ENABLE();
     __HAL_RCC_D2SRAM2_CLK_ENABLE();
@@ -137,6 +134,9 @@ HAL_StatusTypeDef HAL_InitTick(uint32_t TickPriority) {
 
     /* Enable TIM4 clock */
     __HAL_RCC_TIM4_CLK_ENABLE();
+
+    // Disable timer during debug
+    DBGMCU->APB1LFZ1 |= DBGMCU_APB1LFZ1_DBG_TIM4;
 
     /* Get clock configuration */
     HAL_RCC_GetClockConfig(&clkconfig, &pFLatency);

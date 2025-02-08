@@ -35,6 +35,7 @@ static uint8_t s_buf[MAX_BLOCK_SIZE];
 
 static uint32_t s_block_count;
 static uint16_t s_block_size;
+static bool s_ejected = false;
 
 static void get_disk_capacity() {
     DWORD count;
@@ -68,6 +69,11 @@ void tud_msc_inquiry_cb(uint8_t lun, uint8_t vendor_id[8],
 // Invoked when received Test Unit Ready command.
 // return true allowing host to read/write this LUN e.g SD card inserted
 bool tud_msc_test_unit_ready_cb(uint8_t lun) {
+    // If ejected, always not ready
+    if (s_ejected) {
+        return false;
+    }
+
     // Tell the storage task to stop for MSC
     storage_pause(STORAGE_PAUSE_MSC);
 
@@ -112,12 +118,9 @@ bool tud_msc_start_stop_cb(uint8_t lun, uint8_t power_condition, bool start,
     (void)lun;
     (void)power_condition;
 
-    if (load_eject) {
-        if (start) {
-            storage_start(STORAGE_PAUSE_MSC);
-        } else {
-            storage_pause(STORAGE_PAUSE_MSC);
-        }
+    if (load_eject && !start) {
+        storage_start(STORAGE_PAUSE_MSC);
+        s_ejected = true;
     }
 
     return true;
@@ -220,7 +223,7 @@ int32_t tud_msc_write10_cb(uint8_t lun, uint32_t lba, uint32_t offset,
         }
 
         // Copy the appropriate part of the block to the buffer
-        memcpy((BYTE*)buffer + bw, s_buf + offset, btc);
+        memcpy(s_buf + offset, (BYTE*)buffer + bw, btc);
 
         // Write a single block from the intermediate buffer
         res = disk_write(0, s_buf, lba, 1);

@@ -3,6 +3,7 @@
 
 #include "backup/backup.h"
 #include "board_config.h"
+#include "fatlog.h"
 #include "pspcom.h"
 #include "regex.h"
 #include "rtc/rtc.h"
@@ -22,7 +23,7 @@ void cmd_help(char *str) {
         "  print_config                          prints the config\n"
         "  invalidate_config                     invalidates the config\n"
         "  invalidate_backup                     invalidates the backup pointer\n"
-        "  erase_flash_chip                      full block-level flash erase\n"
+        "  reformat_storage                      reformat storage\n"
         "  set_frequency [frequency in Hz]       sets the frequency\n"
         "  set_config_value [key] [value]        sets a config value\n"
         "  get_firmware_spec                     prints the firmware spec\n");
@@ -71,9 +72,15 @@ void cmd_invalidate_backup(char *str) {
 }
 
 // Config erase chip
-char regex_erase_flash_chip[] = "^erase_flash_chip[\n]*$";
-void cmd_erase_flash_chip(char *str) {
-    PAL_LOGE("No raw flash device present in system\n");
+char regex_reformat_storage[] = "^reformat_storage[\n]*$";
+void cmd_reformat_storage(char *str) {
+    PAL_LOGI("Reformatting storage...\n");
+    if (fatlog_reformat() != STATUS_OK) {
+        PAL_LOGE("Failed to reformat storage!\n");
+    }
+    PAL_LOGI("Storage reformatted, restarting\n");
+    DELAY_MICROS(3000000);
+    NVIC_SystemReset();
 }
 
 // Config set frequency command

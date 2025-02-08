@@ -21,12 +21,15 @@
 #include "gpio/gpio.h"
 #include "rtc/rtc.h"
 #include "sdmmc/sdmmc.h"
+#include "string.h"
 #include "task.h"
 #include "timer.h"
 
 #ifndef FF_VOLUME_STRS
 const char *VolumeStr[FF_VOLUMES] = {"MMC"};
 #endif
+
+RAM_D2 static uint8_t rw_buf[512];  // DMA happy buffer
 
 /* MMC/SD command */
 #define CMD0 (0)           /* GO_IDLE_STATE */
@@ -194,9 +197,13 @@ DRESULT disk_read(
     DWORD sect = (DWORD)sector;
 
     if (drv == 0) {
-        if (sdmmc_read_blocks(&s_sd_sdmmc_device, (uint8_t *)buff, sect,
-                              count) != STATUS_OK) {
-            return RES_ERROR;
+        while (count--) {
+            if (sdmmc_read_blocks(&s_sd_sdmmc_device, (uint8_t *)rw_buf, sect++,
+                                  1) != STATUS_OK) {
+                return RES_ERROR;
+            }
+            memcpy(buff, rw_buf, 512);
+            buff += 512;
         }
         return RES_OK;
     }
@@ -217,9 +224,13 @@ DRESULT disk_write(BYTE drv,         /* Physical drive number (0) */
     DWORD sect = (DWORD)sector;
 
     if (drv == 0) {
-        if (sdmmc_write_blocks(&s_sd_sdmmc_device, (uint8_t *)buff, sect,
-                               count) != STATUS_OK) {
-            return RES_ERROR;
+        while (count--) {
+            memcpy(rw_buf, buff, 512);
+            buff += 512;
+            if (sdmmc_write_blocks(&s_sd_sdmmc_device, (uint8_t *)rw_buf,
+                                   sect++, 1) != STATUS_OK) {
+                return RES_ERROR;
+            }
         }
         return RES_OK;
     }

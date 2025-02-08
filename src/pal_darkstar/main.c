@@ -87,8 +87,7 @@ void task_init() {
     init_error |= (EXPECT_OK(gps_init(), "init GPS") != STATUS_OK) << 4;
     init_error |= (EXPECT_OK(control_init(), "init control") != STATUS_OK) << 5;
     init_error |= (EXPECT_OK(pyros_init(), "init pyros") != STATUS_OK) << 6;
-    // init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK) <<
-    // 7;
+    init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK) << 7;
 
     // Play init tune
     gpio_write(PIN_RED, GPIO_LOW);
@@ -120,7 +119,7 @@ void task_init() {
         TASK_CREATE(task_storage, +4, 5120);
         TASK_CREATE(task_pspcom_rx, +3, 2048);
         TASK_CREATE(task_buzzer, +2, 512);
-        // /TASK_CREATE(task_usb, +1, 4096);
+        TASK_CREATE(task_usb, +1, 4096);
     } else {
         PAL_LOGI("Started USB MSC mode\n");
         TASK_CREATE(task_buzzer, +2, 512);
@@ -191,7 +190,7 @@ int main(void) {
 
     // Launch FreeRTOS kernel and init task
 
-    TASK_CREATE(task_init, -1, 8192);
+    TASK_CREATE(task_init, -1, 10240);
 
     PAL_LOGI("Starting scheduler\n");
 

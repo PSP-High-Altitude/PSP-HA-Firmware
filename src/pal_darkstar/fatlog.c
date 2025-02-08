@@ -13,13 +13,13 @@
 #define HEADER_LEN 64
 #define MAXPATH_LEN 256
 
-RAM_D2 static FATFS s_fs;
+static FATFS s_fs;
 
 static void snfmtspace(char* str, size_t str_size, uint64_t bytes) {
     static const char* prefixes[] = {"", "K", "M", "G"};
     for (int i = sizeof(prefixes) / sizeof(prefixes[0]) - 1; i >= 0; i--) {
         if (bytes >= (1 << 10 * i) - 1) {
-            snprintf(str, str_size, "%*lu%sB", bytes >> 10 * i, prefixes[i]);
+            snprintf(str, str_size, "%lu%sB", bytes >> 10 * i, prefixes[i]);
             break;
         }
     }
@@ -276,4 +276,24 @@ Status fatlog_mkdir(const char* fname) {
         return STATUS_OK;
     }
     return STATUS_ERROR;
+}
+
+Status fatlog_reformat() {
+    BYTE work[FF_MAX_SS];
+    memset(work, 0, sizeof(work));
+    MKFS_PARM format_opts;
+    memset(&format_opts, 0, sizeof(format_opts));
+    format_opts.fmt = FM_FAT32;
+
+    FRESULT res = f_mkfs(MOUNT_POINT, &format_opts, work, FF_MAX_SS);
+    if (res != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    res = f_setlabel(MOUNT_POINT "/" VOLUME_LABEL);
+    if (res != FR_OK) {
+        return STATUS_HARDWARE_ERROR;
+    }
+
+    return STATUS_OK;
 }

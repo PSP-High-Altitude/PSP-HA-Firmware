@@ -121,6 +121,7 @@
                 "fs_common.h": "c",
                 "fs_core.h": "c",
                 "fs_config_ram_0.h": "c",
-                "rl_fs.h": "c"
+                "rl_fs.h": "c",
+                "tusb.h": "c"
         }
 }

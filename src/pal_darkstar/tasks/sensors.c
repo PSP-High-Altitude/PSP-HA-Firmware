@@ -125,12 +125,19 @@ void task_sensors(TaskHandle_t* handle_ptr) {
 
         // Read all the sensors, measuring the timestamp after the barometer
         // read since everything else is really fast
-        BaroData baro = ms5637_read(&s_baro_conf, OSR_256);
+        // BaroData baro = ms5637_read(&s_baro_conf, OSR_256);
+        // uint64_t timestamp = MICROS();
+        // Accel acch = kx134_read_accel(&s_acc_conf);
+        // Accel accel = bmi088_acc_read(&s_imu_acc_conf);
+        // Gyro gyro = bmi088_gyro_read(&s_imu_rot_conf);
+        // Mag mag = iis2mdc_read(&s_mag_conf);
+
+        BaroData baro = {0};
         uint64_t timestamp = MICROS();
-        Accel acch = kx134_read_accel(&s_acc_conf);
-        Accel accel = bmi088_acc_read(&s_imu_acc_conf);
-        Gyro gyro = bmi088_gyro_read(&s_imu_rot_conf);
-        Mag mag = iis2mdc_read(&s_mag_conf);
+        Accel acch = {0};
+        Accel accel = {0};
+        Gyro gyro = {0};
+        Mag mag = {0};
 
         // Copy data into a sensor frame
         SensorFrame sensor_frame;
