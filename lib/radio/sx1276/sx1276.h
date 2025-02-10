@@ -67,5 +67,9 @@ Status sx1276_init(SpiDevice *spi_device, int reset_pin, int freq_hz,
                    bool crc_on, bool low_data_rate);
 
 Status sx1276_transmit(SpiDevice *spi_device, uint8_t *data, int len);
+Status sx1276_set_rx_payload_length(SpiDevice *spi_device, int len);
+Status sx1276_start_receive(SpiDevice *spi_device);
+int sx1276_packet_available(SpiDevice *spi_device);
+Status sx1276_read_packet(SpiDevice *spi_device, uint8_t *data, int *len);
 
 #endif  // SX1276_H

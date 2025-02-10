@@ -25,15 +25,14 @@
 #define STD_TELEM_PERIOD_GROUND 5000
 #define STD_TELEM_PERIOD_FLIGHT 1000
 
-#define PYRO_RETRIES_MAN 3
-#define PYRO_RETRY_PERIOD_MAN 1000
-#define PYRO_FIRE_PERIOD_MAN 1000
+#define PYRO_TIMEOUT_PERIOD 10000
+
+static uint8_t pyro_armed[5] = {0, 0, 0, 0, 0};
+static uint64_t pyro_armed_start[5] = {0, 0, 0, 0, 0};
 
 static QueueHandle_t s_sensor_queue;
 static QueueHandle_t s_gps_queue;
 static QueueHandle_t s_fp_queue;
-
-uint8_t user_armed[5] = {0, 0, 0, 0, 0};
 
 static BoardConfig *s_config_ptr = NULL;
 
@@ -88,8 +87,14 @@ Status pspcom_init() {
     configASSERT(s_gps_queue);
     configASSERT(s_fp_queue);
 
+    // Initialize radio
     if (sx1276_init(&s_radio_device, PIN_PC5, 434000000, 20, 125000, 10, 5, 8,
                     false, true, false) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    // Start receiving
+    if (sx1276_start_receive(&s_radio_device) != STATUS_OK) {
         return STATUS_ERROR;
     }
 
@@ -100,6 +105,85 @@ void task_pspcom_rx() {
     TickType_t last_wake_time = xTaskGetTickCount();
 
     while (1) {
+        // Check for new messages
+        int ret = sx1276_packet_available(&s_radio_device);
+        if (ret == 1) {
+            PAL_LOGI("Packet received!\n", ret);
+            uint8_t rx_buf[256];
+            int len;
+            ret = sx1276_read_packet(&s_radio_device, rx_buf, &len);
+            if (ret == STATUS_OK) {
+                // Parse message
+                pspcommsg msg = {
+                    .device_id = rx_buf[0],
+                    .msg_id = rx_buf[1],
+                    .payload_len = len - 2,
+                };
+                memcpy(msg.payload, rx_buf + 2, msg.payload_len);
+                printf("Received message: %d %d %d\n", msg.device_id,
+                       msg.msg_id, msg.payload_len);
+
+                // Process message
+                switch (msg.msg_id) {
+                    case ARMMAIN:
+                        // Arm main pyro
+                        pyro_armed[0] = 1;
+                        pyro_armed_start[0] = MILLIS();
+                        PAL_LOGI("Main pyro armed!\n");
+                        break;
+                    case ARMDRG:
+                        // Arm drogue pyro
+                        pyro_armed[1] = 1;
+                        pyro_armed_start[1] = MILLIS();
+                        PAL_LOGI("Drogue pyro armed!\n");
+                        break;
+                    case ARMAUX:
+                        if (msg.payload_len == 1 && msg.payload[0] < 3) {
+                            // Arm specified aux pyro
+                            pyro_armed[msg.payload[0]] = 1;
+                            pyro_armed_start[msg.payload[0]] = MILLIS();
+                            PAL_LOGI("A%1d pyro armed!\n", msg.payload[0] + 1);
+                        } else {
+                            // Arm the first aux pyro
+                            pyro_armed[2] = 1;
+                            pyro_armed_start[2] = MILLIS();
+                            PAL_LOGI("A1 pyro armed!\n");
+                        }
+                        break;
+                    case FIREMAIN:
+                        // Fire main pyro (if not timed out)
+                        if (MILLIS() - pyro_armed_start[0] <
+                            PYRO_TIMEOUT_PERIOD) {
+                            pyros_fire(PYRO_MAIN);
+                        }
+                        break;
+                    case FIREDRG:
+                        // Fire drogue pyro (if not timed out)
+                        if (MILLIS() - pyro_armed_start[1] <
+                            PYRO_TIMEOUT_PERIOD) {
+                            pyros_fire(PYRO_DRG);
+                        }
+                        break;
+                    case FIREAUX:
+                        if (msg.payload_len == 1 && msg.payload[0] < 3) {
+                            // Fire specified aux pyro (if not timed out)
+                            if (MILLIS() - pyro_armed_start[msg.payload[0]] <
+                                PYRO_TIMEOUT_PERIOD) {
+                                pyros_fire(PYRO_A1 + msg.payload[0]);
+                            }
+                        } else {
+                            // Fire the first aux pyro (if not timed out)
+                            if (MILLIS() - pyro_armed_start[2] <
+                                PYRO_TIMEOUT_PERIOD) {
+                                pyros_fire(PYRO_A1);
+                            }
+                        }
+                        break;
+                }
+            }
+        } else if (ret < 0) {
+            PAL_LOGE("Error reading radio packet!");
+        }
         vTaskDelayUntil(&last_wake_time,
                         pdMS_TO_TICKS(s_config_ptr->pspcom_rx_loop_period_ms));
     }
@@ -114,6 +198,9 @@ void pspcom_send_msg(pspcommsg msg) {
 
     // Send message
     sx1276_transmit(&s_radio_device, msg_buf, 2 + msg.payload_len);
+
+    // When done, start receiving again
+    sx1276_start_receive(&s_radio_device);
 }
 
 void pspcom_send_sensor(SensorFrame *sensor_frame) {

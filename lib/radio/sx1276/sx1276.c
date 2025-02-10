@@ -246,6 +246,21 @@ Status sx1276_init(SpiDevice* spi_device, int reset_pin, int freq_hz,
     return STATUS_OK;
 }
 
+Status sx1276_set_rx_payload_length(SpiDevice* spi_device, int len) {
+    if (!s_sx1276_initialized) {
+        return STATUS_ERROR;
+    }
+
+    // Set expected payload length (for implicit header
+    uint8_t tx_buf = len;
+    if (sx1276_write(spi_device, SX1276_REG_PAYLOAD_LENGTH, &tx_buf, 1) !=
+        STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    return STATUS_OK;
+}
+
 Status sx1276_transmit(SpiDevice* spi_device, uint8_t* data, int len) {
     if (!s_sx1276_initialized) {
         return STATUS_ERROR;
@@ -292,9 +307,107 @@ Status sx1276_transmit(SpiDevice* spi_device, uint8_t* data, int len) {
 
         // Check if TX done
         if (irq_flags & 0x08) {
+            // Clear TX done flag
+            tx_buf = 0x08;
+            if (sx1276_write(spi_device, SX1276_REG_IRQ_FLAGS, &tx_buf, 1) !=
+                STATUS_OK) {
+                return STATUS_ERROR;
+            }
+
             return STATUS_OK;
         }
+
+        // Yielding Delay
+        DELAY(1);
     }
 
     return STATUS_ERROR;
+}
+
+Status sx1276_start_receive(SpiDevice* spi_device) {
+    if (!s_sx1276_initialized) {
+        return STATUS_ERROR;
+    }
+
+    // Read current mode
+    uint8_t rx_buf = 0xFF;
+
+    // Wait for standby/sleep
+    while ((rx_buf & 0x7) > 1) {
+        // Read mode
+        if (sx1276_read(spi_device, SX1276_REG_OP_MODE, &rx_buf, 1) !=
+            STATUS_OK) {
+            return STATUS_ERROR;
+        }
+
+        // Yielding Delay
+        DELAY(1);
+    }
+
+    // Set RX continuous mode
+    uint8_t tx_buf = 0x8D;
+    if (sx1276_write(spi_device, SX1276_REG_OP_MODE, &tx_buf, 1) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    return STATUS_OK;
+}
+
+int sx1276_packet_available(SpiDevice* spi_device) {
+    if (!s_sx1276_initialized) {
+        return -1;
+    }
+
+    // Read IRQ flags
+    uint8_t irq_flags;
+    if (sx1276_read(spi_device, SX1276_REG_IRQ_FLAGS, &irq_flags, 1) !=
+        STATUS_OK) {
+        return -1;
+    }
+
+    // Check if RX done
+    if (irq_flags & 0x40) {
+        return 1;
+    }
+
+    return 0;
+}
+
+Status sx1276_read_packet(SpiDevice* spi_device, uint8_t* data, int* len) {
+    if (!s_sx1276_initialized) {
+        return STATUS_ERROR;
+    }
+
+    // Read RX FIFO address
+    uint8_t rx_buf;
+    if (sx1276_read(spi_device, SX1276_REG_FIFO_RX_CURRENT_ADDR, &rx_buf, 1) !=
+        STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    // Set FIFO address pointer to RX FIFO base address
+    if (sx1276_write(spi_device, SX1276_REG_FIFO_ADDR_PTR, &rx_buf, 1) !=
+        STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    // Read packet length
+    if (sx1276_read(spi_device, SX1276_REG_RX_NB_BYTES, (uint8_t*)len, 1) !=
+        STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    // Read data
+    if (sx1276_read(spi_device, SX1276_REG_FIFO, data, *len) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    // Clear RX done flag
+    uint8_t tx_buf = 0x40;
+    if (sx1276_write(spi_device, SX1276_REG_IRQ_FLAGS, &tx_buf, 1) !=
+        STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    return STATUS_OK;
 }
