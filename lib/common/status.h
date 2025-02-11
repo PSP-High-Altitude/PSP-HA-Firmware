@@ -1,6 +1,8 @@
 #ifndef STATUS_H
 #define STATUS_H
 
+#include <stdint.h>
+
 typedef enum {
     STATUS_OK,
     STATUS_BUSY,
@@ -20,6 +22,8 @@ typedef enum {
     LOG_ERROR,
 } LogType;
 
+typedef uint32_t LogState;
+
 #define STORAGE_FILENO 3
 #define USB_FILENO 4
 
@@ -27,6 +31,10 @@ Status expect_ok(Status status, const char msg[], const char file[],
                  const int line);
 
 void pal_log(LogType type, const char* format, ...);
+
+// Log entering a state (use to avoid spamming logs)
+void pal_log_stateful(LogState* state, LogState new_state, LogType type,
+                      const char* format, ...);
 
 // If the provided status is not OK, print out the error (evals to status)
 #define EXPECT_OK(status, msg) (expect_ok((status), (msg), __FILE__, __LINE__))
@@ -52,5 +60,13 @@ void pal_log(LogType type, const char* format, ...);
 #define PAL_LOGI(...) pal_log(LOG_INFO, __VA_ARGS__)
 #define PAL_LOGW(...) pal_log(LOG_WARNING, __VA_ARGS__)
 #define PAL_LOGE(...) pal_log(LOG_ERROR, __VA_ARGS__)
+
+// Log entering a state (use to avoid spamming logs)
+#define PAL_STATE_LOGI(state, new_state, ...) \
+    pal_log_stateful(state, new_state, LOG_INFO, __VA_ARGS__)
+#define PAL_STATE_LOGW(state, new_state, ...) \
+    pal_log_stateful(state, new_state, LOG_WARNING, __VA_ARGS__)
+#define PAL_STATE_LOGE(state, new_state, ...) \
+    pal_log_stateful(state, new_state, LOG_ERROR, __VA_ARGS__)
 
 #endif  // STATUS_H

@@ -20,6 +20,7 @@
 #include "tasks/gps.h"
 #include "tasks/sensors.h"
 #include "tasks/storage.h"
+#include "tasks/voltage.h"
 #include "timer.h"
 #include "usb.h"
 
@@ -89,6 +90,8 @@ void task_init() {
     init_error |= (EXPECT_OK(control_init(), "init control") != STATUS_OK) << 5;
     init_error |= (EXPECT_OK(pyros_init(), "init pyros") != STATUS_OK) << 6;
     init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK) << 7;
+    // init_error |= (EXPECT_OK(voltage_init(), "init voltage") != STATUS_OK) <<
+    // 8;
 
     // Play init tune
     gpio_write(PIN_RED, GPIO_LOW);
@@ -112,12 +115,13 @@ void task_init() {
     if (!mtp_mode) {
         // Start tasks if we are in normal mode
         PAL_LOGI("Launching flight tasks\n");
-        TASK_CREATE(task_pyros, +9, 2048);
-        TASK_CREATE(task_control, +8, 2048);
-        TASK_CREATE(task_sensors, +7, 2048);
-        TASK_CREATE(task_pspcom_tx, +6, 2048);
-        TASK_CREATE(task_gps, +5, 2048);
-        TASK_CREATE(task_storage, +4, 5120);
+        TASK_CREATE(task_pyros, +10, 2048);
+        TASK_CREATE(task_control, +9, 2048);
+        TASK_CREATE(task_sensors, +8, 2048);
+        TASK_CREATE(task_pspcom_tx, +7, 2048);
+        TASK_CREATE(task_gps, +6, 2048);
+        TASK_CREATE(task_storage, +5, 5120);
+        // TASK_CREATE(task_voltage, +4, 512);
         TASK_CREATE(task_pspcom_rx, +3, 2048);
         TASK_CREATE(task_buzzer, +2, 512);
         TASK_CREATE(task_usb, +1, 4096);

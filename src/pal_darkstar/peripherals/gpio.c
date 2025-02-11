@@ -17,6 +17,8 @@ Status gpio_mode(uint8_t pin, GpioMode mode) {
         conf.Mode = GPIO_MODE_OUTPUT_OD;
     else if (GPIO_OUTPUT_OD)
         conf.Mode = GPIO_MODE_OUTPUT_OD;
+    else if (GPIO_ANALOG)
+        conf.Mode = GPIO_MODE_ANALOG;
     if (mode == GPIO_INPUT_PULLUP)
         conf.Pull = GPIO_PULLUP;
     else if (mode == GPIO_INPUT_PULLDOWN)

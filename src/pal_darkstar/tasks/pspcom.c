@@ -291,6 +291,11 @@ void pspcom_send_status() {
         uint8_t a1_cont = gpio_read(PIN_CONTA1);
         uint8_t a2_cont = gpio_read(PIN_CONTA2);
         uint8_t a3_cont = gpio_read(PIN_CONTA3);
+        // uint8_t main_cont = 0;
+        // uint8_t drg_cont = 0;
+        // uint8_t a1_cont = 0;
+        // uint8_t a2_cont = 0;
+        // uint8_t a3_cont = 0;
         // Show continuity and consider all armed
         tx_msg.payload[0] = (main_cont << 1) | (drg_cont << 3) |
                             (a1_cont << 5) | (a2_cont << 7) | 0x55;
@@ -353,6 +358,11 @@ void pspcom_send_standard() {
     uint8_t a1_cont = gpio_read(PIN_CONTA1);
     uint8_t a2_cont = gpio_read(PIN_CONTA2);
     uint8_t a3_cont = gpio_read(PIN_CONTA3);
+    // uint8_t main_cont = 0;
+    // uint8_t drg_cont = 0;
+    // uint8_t a1_cont = 0;
+    // uint8_t a2_cont = 0;
+    // uint8_t a3_cont = 0;
     // Show continuity and consider all armed
     tx_msg.payload[16] = (main_cont << 1) | (drg_cont << 3) | (a1_cont << 5) |
                          (a2_cont << 7) | 0x55;

@@ -399,6 +399,12 @@ void task_storage(TaskHandle_t* handle_ptr) {
 }
 
 Status storage_write_log(const char* log, size_t size) {
+    // If the storage is paused, queue and move on
+    if (s_pause_mode) {
+        fifo_enqueuen(&s_log_fifo, (uint8_t*)log, size);
+        return STATUS_ERROR;
+    }
+
     // Write the queued log to the NAND flash
     if (s_log_fifo.count > 0) {
         uint8_t* buf = malloc(s_log_fifo.count);

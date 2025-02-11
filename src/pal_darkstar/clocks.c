@@ -62,7 +62,7 @@ void SystemClock_Config() {
     PeriphClkInitStruct.PeriphClockSelection =
         RCC_PERIPHCLK_OSPI | RCC_PERIPHCLK_SPI123 | RCC_PERIPHCLK_SPI45 |
         RCC_PERIPHCLK_I2C1235 | RCC_PERIPHCLK_I2C4 | RCC_PERIPHCLK_USART234578 |
-        RCC_PERIPHCLK_SDMMC | RCC_PERIPHCLK_USB;
+        RCC_PERIPHCLK_SDMMC | RCC_PERIPHCLK_USB | RCC_PERIPHCLK_ADC;
     PeriphClkInitStruct.PLL2.PLL2M = 48;
     PeriphClkInitStruct.PLL2.PLL2N = 160;
     PeriphClkInitStruct.PLL2.PLL2P = 4;  // 40 Mhz

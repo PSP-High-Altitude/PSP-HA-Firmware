@@ -10,9 +10,9 @@
 static ADC_TypeDef* adc_base[3] = {ADC1, ADC2, ADC3};
 static int adc12_sample_times_x2[8] = {3, 5, 17, 33, 129, 112, 775, 1621};
 static int adc3_sample_times_x2[8] = {5, 13, 25, 49, 95, 185, 495, 1281};
-RAM_D2 static uint16_t adc1_sample_result[16];
-RAM_D2 static uint16_t adc2_sample_result[16];
-RAM_D2 static uint16_t adc3_sample_result[16];
+RAM_D2 static uint32_t adc1_sample_result[16];
+RAM_D2 static uint32_t adc2_sample_result[16];
+RAM_D2 static uint32_t adc3_sample_result[16];
 static int channel_count[3] = {0, 0, 0};
 
 Status adc_init(ADCDevice* dev) {
@@ -47,16 +47,10 @@ Status adc_init(ADCDevice* dev) {
     // Enable clocks
     if (dev->periph == P_ADC1) {
         __HAL_RCC_ADC12_CLK_ENABLE();
-        ADC12_COMMON->CCR &= ~ADC_CCR_PRESC_0;
-        ADC12_COMMON->CCR |= ADC_CCR_PRESC_3;  // div 32
     } else if (dev->periph == P_ADC2) {
         __HAL_RCC_ADC12_CLK_ENABLE();
-        ADC12_COMMON->CCR &= ~ADC_CCR_PRESC_0;
-        ADC12_COMMON->CCR |= ADC_CCR_PRESC_3;  // div 32
     } else if (dev->periph == P_ADC3) {
         __HAL_RCC_ADC3_CLK_ENABLE();
-        ADC3_COMMON->CCR &= ~ADC_CCR_PRESC_0;
-        ADC3_COMMON->CCR |= ADC_CCR_PRESC_3;  // div 32
     }
 
     // Disable peripheral
@@ -67,6 +61,18 @@ Status adc_init(ADCDevice* dev) {
                                200, result);
     if (result != STATUS_OK) {
         return result;
+    }
+
+    // Configure clocks
+    if (dev->periph == P_ADC1) {
+        ADC12_COMMON->CCR &= ~ADC_CCR_PRESC;
+        ADC12_COMMON->CCR |= ADC_CCR_PRESC_3;  // div 32
+    } else if (dev->periph == P_ADC2) {
+        ADC12_COMMON->CCR &= ~ADC_CCR_PRESC;
+        ADC12_COMMON->CCR |= ADC_CCR_PRESC_3;  // div 32
+    } else if (dev->periph == P_ADC3) {
+        ADC3_COMMON->CCR &= ~ADC_CCR_PRESC;
+        ADC3_COMMON->CCR |= ADC_CCR_PRESC_3;  // div 32
     }
 
     // Startup
@@ -276,8 +282,9 @@ Status adc_init(ADCDevice* dev) {
           DMA_SxCR_TCIE | DMA_SxCR_HTIE | DMA_SxCR_TEIE | DMA_SxCR_DMEIE |
           DMA_SxCR_EN);
     DMA1_Stream2->CR |= DMA_SxCR_MINC;     // Memory increment mode
-    DMA1_Stream2->CR |= DMA_SxCR_PSIZE_0;  // Peripheral data size: 16 bits
-    DMA1_Stream2->CR |= DMA_SxCR_MSIZE_0;  // Memory data size: 16 bits
+    DMA1_Stream2->CR &= ~DMA_SxCR_PSIZE;   // Clear peripheral data size
+    DMA1_Stream2->CR |= DMA_SxCR_PSIZE_1;  // Peripheral data size: 32 bits
+    DMA1_Stream2->CR |= DMA_SxCR_MSIZE_1;  // Memory data size: 32 bits
 
     NVIC_SetPriority(DMA1_Stream2_IRQn, 0);
     NVIC_EnableIRQ(DMA1_Stream2_IRQn);

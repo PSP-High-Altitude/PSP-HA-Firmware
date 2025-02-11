@@ -29,6 +29,12 @@ static Vector s_grav_vec = {.x = -G_MAG, .y = 0.0f, .z = 0.0f};
 
 static float s_ground_alt = 0.;
 
+enum LogState {
+    SE_LOG_OK = 0,
+    SE_LOG_NO_ACC = 1,
+};
+static LogState s_log_state = 0;
+
 static bool se_valid_acc(float acc_g) {
     // Higher cutoff values to accomodate future sensors
     return -100. < acc_g && acc_g < 100.;
@@ -187,6 +193,8 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     if (se_valid_acc(sensor_frame->acc_i_x) &&  ///
         se_valid_acc(sensor_frame->acc_i_y) &&  ///
         se_valid_acc(sensor_frame->acc_i_z)) {
+        s_log_state = SE_LOG_OK;
+
         // If the high-precision acceleration values are valid, prefer those
         orientation_function(sensor_frame->acc_i_x * G_MAG,  ///
                              sensor_frame->acc_i_y * G_MAG,  ///
@@ -221,6 +229,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     } else if (se_valid_acc(sensor_frame->acc_h_x) &&  ///
                se_valid_acc(sensor_frame->acc_h_y) &&  ///
                se_valid_acc(sensor_frame->acc_h_z)) {
+        s_log_state = SE_LOG_OK;
         // If the high-precision values are invalid but the high-range ones are
         // valid, not much to think about -- just go with the high-range ones
         orientation_function(sensor_frame->acc_h_x * G_MAG,  ///
@@ -230,7 +239,9 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     } else {
         // If neither were valid, then we reuse the acceleration values from
         // last time (which is a no-op since they're in s_current_state).
-        PAL_LOGW("Both accelerometers invalid; reusing old accelerations\n");
+        PAL_STATE_LOGW(
+            &s_log_state, SE_LOG_NO_ACC,
+            "Both accelerometers invalid; reusing old accelerations\n");
 
         // If we have a complete failure of both accelerometers, this will
         // repeat many, many times. If that happens, we want the stored

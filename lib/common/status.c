@@ -91,3 +91,12 @@ void pal_log(LogType type, const char* format, ...) {
     fnoprintf(USB_FILENO, "\033[0m");
     va_end(args);
 }
+
+void pal_log_stateful(LogState* state, LogState new_state, LogType type,
+                      const char* format, ...) {
+    if (*state == new_state) {
+        return;
+    }
+    pal_log(type, format);
+    *state = new_state;
+}
