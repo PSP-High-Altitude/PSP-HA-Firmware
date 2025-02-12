@@ -66,6 +66,8 @@ static SdmmcDevice s_sdmmc_device = {
 
 static char s_prf_buf[1024];  // 40 bytes per task
 
+static uint8_t s_log_lock = 0;
+
 /*****************/
 /* API FUNCTIONS */
 /*****************/
@@ -405,6 +407,15 @@ Status storage_write_log(const char* log, size_t size) {
         return STATUS_ERROR;
     }
 
+    // Add a lock to prevent multiple writes at the same time
+    if (s_log_lock) {
+        // If locked, for now just dump the log
+        return STATUS_ERROR;
+    }
+
+    // Lock the log
+    s_log_lock = 1;
+
     // Write the queued log to the NAND flash
     if (s_log_fifo.count > 0) {
         uint8_t* buf = malloc(s_log_fifo.count);
@@ -427,6 +438,9 @@ Status storage_write_log(const char* log, size_t size) {
         // If it fails, add the new data to the log
         fifo_enqueuen(&s_log_fifo, (uint8_t*)log, size);
     }
+
+    // Unlock the log
+    s_log_lock = 0;
 
     return status;
 }
