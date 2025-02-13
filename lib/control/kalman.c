@@ -35,7 +35,7 @@ static const mfloat Q_VARS_2[NUM_TOT_STATES] = {10., 1.,  1., 0.1,
                                                 0.1, 0.1, 0.1};
 static const mfloat R_DIAG_1[NUM_KIN_MEAS] = {5.e-01, 3.e-04, 3.e-04};
 static const mfloat R_DIAG_2[NUM_KIN_MEAS] = {0.5, 1., 1.};
-static kf_up kf_axis = Y_POS;  // using y for now from skyshot test
+static kf_up kf_axis = Y_POS;  // using y as default from skyshot test
 
 // TODO: Initial height?
 
@@ -141,7 +141,11 @@ int mat_findNans(const mfloat* pData, int size, bool* out) {
 }
 
 mfloat mat_val(const mat* mat, int i, int j) {
-    return mat->pData[i * mat->numCols + j];
+    if (i < mat->numRows && j < mat->numCols) {
+        return mat->pData[i * mat->numCols + j];
+    } else {
+        return NAN;
+    }
 }
 
 void mat_diag(mat* mptr, const mfloat* diag_vals, bool zeros) {
@@ -218,6 +222,9 @@ void kf_init_state(const mfloat* x0, const mfloat* P0_diag, kf_up upaxis) {
     kf_axis = upaxis;
     arm_copy_f32(x0, x.pData, mat_size(&x));
     mat_diag(&P, P0_diag, true);
+    w.pData[0] = 0;
+    w.pData[1] = 0;
+    w.pData[2] = 0;
     // TODO: set up axis here
     // TODO: Ititialize height based on current pressure
 }
@@ -234,45 +241,76 @@ kf_status kf_do_kf(void* state_ptr, FlightPhase phase,
 
     // get measurements from correct axis
     mfloat z[NUM_KIN_MEAS];
-    switch (kf_axis) {  // theres probably a shorter way to do this
+    mfloat w_meas[NUM_ROT_MEAS];
+    /*
+    Note on orientation:
+    x - roll
+    y - pitch
+    z - yaw
+    To make the quaternions and euler angles work, the up axis will become x ->
+    roll. Then the remaining to axes will become y and z in the order that makes
+    a right-hand csys. This xyz configuration may be different than the
+    acceleration frame and that's fine, since what we care about in the end is
+    euler angles and this should make that work
+    */
+    switch (kf_axis) {  // theres probably a shorter way to do this but whatever
         case X_POS:
             z[0] = sensor_frame->pressure;
             z[1] = sensor_frame->acc_h_x;
             z[2] = sensor_frame->acc_i_x;
+            w_meas[0] = sensor_frame->rot_i_x;
+            w_meas[1] = sensor_frame->rot_i_y;
+            w_meas[2] = sensor_frame->rot_i_z;
             break;
         case Y_POS:
             z[0] = sensor_frame->pressure;
             z[1] = sensor_frame->acc_h_y;
             z[2] = sensor_frame->acc_i_y;
+            w_meas[0] = sensor_frame->rot_i_y;
+            w_meas[1] = sensor_frame->rot_i_z;
+            w_meas[2] = sensor_frame->rot_i_x;
             break;
         case Z_POS:
             z[0] = sensor_frame->pressure;
             z[1] = sensor_frame->acc_h_z;
             z[2] = sensor_frame->acc_i_z;
+            w_meas[0] = sensor_frame->rot_i_z;
+            w_meas[1] = sensor_frame->rot_i_x;
+            w_meas[2] = sensor_frame->rot_i_y;
             break;
         case X_NEG:
             z[0] = sensor_frame->pressure;
             z[1] = -sensor_frame->acc_h_x;
             z[2] = -sensor_frame->acc_i_x;
+            w_meas[0] = -sensor_frame->rot_i_x;
+            w_meas[1] = -sensor_frame->rot_i_y;
+            w_meas[2] = -sensor_frame->rot_i_z;
+            // not sure how right this negative rotation stuff is -- needs
+            // testing
             break;
         case Y_NEG:
             z[0] = sensor_frame->pressure;
             z[1] = -sensor_frame->acc_h_y;
             z[2] = -sensor_frame->acc_i_y;
+            w_meas[0] = -sensor_frame->rot_i_y;
+            w_meas[1] = -sensor_frame->rot_i_z;
+            w_meas[2] = -sensor_frame->rot_i_x;
             break;
         case Z_NEG:
             z[0] = sensor_frame->pressure;
             z[1] = -sensor_frame->acc_h_z;
             z[2] = -sensor_frame->acc_i_z;
+            w_meas[0] = -sensor_frame->rot_i_z;
+            w_meas[1] = -sensor_frame->rot_i_x;
+            w_meas[2] = -sensor_frame->rot_i_y;
             break;
         default:
             return KF_ERROR;
     }
 
-    // TODO: How does up axis affect oreintation? Do they need reordered?
-    mfloat w_meas[NUM_ROT_MEAS] = {
-        sensor_frame->rot_i_x, sensor_frame->rot_i_y,
-        sensor_frame->rot_i_z};  // also check the order of these
+    // mfloat w_meas[NUM_ROT_MEAS] = {
+    //     sensor_frame->rot_i_x, sensor_frame->rot_i_y,
+    //     sensor_frame->rot_i_z};  // also check the order of these
 
     // Use static w so that old w is saved in case of a bad measurement
     // update w if there are no nans in measurement. Otherwise keep old value
@@ -296,6 +334,7 @@ kf_status kf_do_kf(void* state_ptr, FlightPhase phase,
 
 kf_status kf_predict(mfloat dt, const mfloat* w) {
     kf_F_matrix(dt);  // update F matrix with dt. Do this before f(x)!!!
+
     // self.x = self.f(self.x, dt, w=w) # use f(x) for EKF
     kf_fx(&x, dt, w);  // calculate (integrate) new state
 
@@ -361,18 +400,6 @@ kf_status kf_update(const mfloat* z, const mfloat* R_diag) {
 }
 
 kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
-    // if (!(x.pData[1] <
-    //       -6)) {  // TODO: This logic shouldn't happen here, for now it's
-    //       just
-    //               // for independednt testing and making variables not
-    //               unused.
-    //     arm_copy_f32(R_DIAG_1, R_diag, NUM_KIN_STATES);
-    //     arm_copy_f32(Q_VARS_1, Q_vars, NUM_TOT_STATES);
-    // } else {
-    //     arm_copy_f32(R_DIAG_2, R_diag, NUM_KIN_STATES);
-    //     arm_copy_f32(Q_VARS_2, Q_vars, NUM_TOT_STATES);
-    // }
-
     if (fabs(x.pData[KF_ACC_I]) >
         IMU_ACCEL_MAX) {    // remove saturated imu accel meas
         z[KF_ACC_I] = NAN;  // use x or z?
@@ -428,6 +455,7 @@ void kf_F_matrix(mfloat dt) {
     mat_edit(&F, 0, 2, .5 * dt * dt);
     mat_edit(&F, 1, 2, dt);
 }
+
 void kf_R_matrix(const mfloat* meas_vars, const mfloat* z) {
     bool nans[NUM_KIN_MEAS];
     mat_findNans(z, NUM_KIN_MEAS, nans);
@@ -522,7 +550,8 @@ void kf_hx(const mat* x, const mfloat* z, mat* out) {
     mat_edit(out, 0, 0, kf_altToPressure(mat_val(x, 0, 0)));
     mat_edit(out, 1, 0, mat_val(x, 2, 0) / G + 1);  // acc 1
     mat_edit(out, 2, 0, mat_val(x, 2, 0) / G + 1);  // acc 2
-    // TODO: Check up direction (positive or negative)
+    // No direction checks should be needed because accel meas sign gets
+    // converted
 }
 
 void kf_resid(const mat* x, const mfloat* z, mat* out) {
@@ -534,9 +563,7 @@ void kf_resid(const mat* x, const mfloat* z, mat* out) {
 
     mat hx_mat = {NUM_KIN_MEAS, 1, temp_space};
     // y = z - hx # use h(x) for EKF
-    kf_hx(x, z, &hx_mat);    // hx = h(x) (state to meas frame)
-    // mat_scale(&hx_mat, -1);  // -hx
-    // arm_add_f32(z, hx_mat.pData, out->pData, NUM_KIN_MEAS);  // y = z + -hx
+    kf_hx(x, z, &hx_mat);  // hx = h(x) (state to meas frame)
 
     // y = z + -hx  --but resized
     mat_setSize(out, NUM_KIN_MEAS - nanCount, 1);

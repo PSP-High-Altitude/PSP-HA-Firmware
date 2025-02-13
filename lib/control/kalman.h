@@ -40,6 +40,7 @@
 #define BARO_SPEED_MAX (200)          // m/s
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define SIGN(a) ((a) < (0.) ? (-1.) : (1.))
 
 //////////// NOTES ON MATRICES ////////////
 // The mat struct (arm_matrix_instance_f32) contains the number of rows,
@@ -71,7 +72,7 @@
 typedef arm_matrix_instance_f32 mat;
 typedef float32_t mfloat;
 
-typedef enum {  // TODO: Add more error types
+typedef enum {
     KF_SUCCESS = 0,
     KF_ERROR = 1,
     KF_NO_VALID_MEAS = 2,
@@ -102,7 +103,7 @@ typedef enum {
     KF_ACC_I = 2,
 } kf_z_idx;
 
-typedef struct {
+typedef struct {  // this might not be used
     mfloat time;
     mat* x;
     mat* P;

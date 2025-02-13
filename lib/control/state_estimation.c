@@ -126,11 +126,14 @@ Status se_init() {
                                  0, 0, 0};  // TODO: get these from config file
     mfloat P0_diag[NUM_TOT_STATES] = {1, 1, 1, 1,
                                       1, 1, 1};  // These are palceholder values
-    kf_init_state(
-        x0, P0_diag,
-        (int)DEFAULT_ORIENTATION + 1);  // + 1 converts between the state_est
-                                        // enum and kf enum for defining axes
-                                        // TODO: Actually fix this axis stuff
+
+    // kf direction enum defined differently than this one
+    int kf_up = DEFAULT_ORIENTATION + 1;
+    if (kf_up > 3) {
+        kf_up = -kf_up + 3;
+    }
+
+    kf_init_state(x0, P0_diag, kf_up);
 
     return STATUS_OK;
 }
