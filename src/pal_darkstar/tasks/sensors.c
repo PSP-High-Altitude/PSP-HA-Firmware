@@ -136,12 +136,12 @@ void task_sensors(TaskHandle_t* handle_ptr) {
         SensorFrame sensor_frame;
         sensor_frame.timestamp = timestamp;
 
-        // Reads +1g on y-axis; want +1g on z-axis
-        sensor_frame.acc_h_x = +acch.accelX;
-        sensor_frame.acc_h_y = -acch.accelZ;
-        sensor_frame.acc_h_z = +acch.accelY;
+        // Reads +1g on x-axis; want +1g on z-axis
+        sensor_frame.acc_h_x = -acch.accelZ;
+        sensor_frame.acc_h_y = +acch.accelY;
+        sensor_frame.acc_h_z = +acch.accelX;
 
-        // Reads -1g on y-axis; want +1g on z-axis
+        // TODO: FIX ORIENTATION ONCE WE HAVE THE SENSOR
         sensor_frame.acc_i_x = +accel.accelX;
         sensor_frame.acc_i_y = +accel.accelZ;
         sensor_frame.acc_i_z = -accel.accelY;

@@ -2,8 +2,10 @@
 
 #include <math.h>
 
+#include "board.h"
 #include "board_config.h"
 #include "flight_control.h"
+#include "gpio/gpio.h"
 #include "pspcom.h"
 #include "sensors.h"
 #include "state.pb.h"
@@ -100,6 +102,17 @@ void task_control(TaskHandle_t* handle_ptr) {
         state_frame.flight_phase = fp_get();
         state_frame.timestamp = MICROS();
         storage_queue_state(&state_frame);
+
+        // Yellow LED is solid when READY, strobing when in flight
+        if (state_frame.flight_phase == FP_READY) {
+            gpio_write(PIN_YELLOW, GPIO_HIGH);
+        } else if (state_frame.flight_phase > FP_READY &&
+                   state_frame.flight_phase < FP_LANDED) {
+            // 25% duty cycle, 400 ms period
+            gpio_write(PIN_YELLOW, (MILLIS() % 400) < 100);
+        } else {
+            gpio_write(PIN_YELLOW, GPIO_LOW);
+        }
 
         vTaskDelayUntil(&last_iteration_start_tick,
                         pdMS_TO_TICKS(s_config_ptr->control_loop_period_ms));

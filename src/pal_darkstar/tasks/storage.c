@@ -272,12 +272,10 @@ void task_storage(TaskHandle_t* handle_ptr) {
     // Outer loop does initialization and teardown
     while (1) {
         // Initialize LEDs
-        gpio_write(PIN_YELLOW, GPIO_LOW);
         gpio_write(PIN_GREEN, GPIO_LOW);
 
         s_storage_active = true;
         PAL_LOGI("Starting FS reinit\n");
-        gpio_write(PIN_YELLOW, GPIO_HIGH);
 
         // Make sure filesystem is mounted
         UPDATE_STATUS(status, EXPECT_OK(fatlog_reinit(), "FS reinit\n"));
@@ -355,7 +353,6 @@ void task_storage(TaskHandle_t* handle_ptr) {
                           EXPECT_OK(fatlog_flush(&s_logfile), "Log flush"));
 
             gpio_write(PIN_GREEN, status == STATUS_OK);
-            gpio_write(PIN_YELLOW, GPIO_LOW);
 
             // Check for and log any queue overflows
             if (s_sensor_overflows) {
@@ -384,7 +381,6 @@ void task_storage(TaskHandle_t* handle_ptr) {
         EXPECT_OK(storage_close_files(), "File close\n");
         EXPECT_OK(fatlog_deinit(), "FS unmount\n");
 
-        gpio_write(PIN_YELLOW, GPIO_LOW);
         PAL_LOGI("Finished FS deinit\n");
         s_storage_active = false;
 
