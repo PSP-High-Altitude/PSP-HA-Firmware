@@ -29,7 +29,13 @@ int fifo_dequeue(FIFO_t *fifo, uint8_t *item);
 // Remove items from the FIFO
 int fifo_dequeuen(FIFO_t *fifo, uint8_t *items, int n);
 
+// Delete items from the FIFO without deleting
+void fifo_discardn(FIFO_t *fifo, int n);
+
 // Peek at the first item in the FIFO
 int fifo_peek(FIFO_t *fifo, uint8_t *item);
+
+// Return the number of items readable contiguously in the FIFO
+int fifo_size_contig(FIFO_t *fifo);
 
 #endif  // FIFOS_H

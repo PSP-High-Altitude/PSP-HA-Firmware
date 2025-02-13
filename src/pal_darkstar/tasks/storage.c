@@ -66,8 +66,6 @@ static SdmmcDevice s_sdmmc_device = {
 
 static char s_prf_buf[1024];  // 40 bytes per task
 
-static uint8_t s_log_lock = 0;
-
 /*****************/
 /* API FUNCTIONS */
 /*****************/
@@ -229,11 +227,6 @@ Status storage_init() {
     ASSERT_OK(fatlog_mkdir(STATE_DIR), "failed to create state dir\n");
     ASSERT_OK(fatlog_mkdir(GPS_DIR), "failed to create gps dir\n");
 
-    // Open files
-    if (storage_open_files() != STATUS_OK) {
-        return STATUS_ERROR;
-    }
-
     // Set the pause button handler
     pause_event_callback = storage_save_event_handler;
 
@@ -340,6 +333,17 @@ void task_storage(TaskHandle_t* handle_ptr) {
                 stored_items += 1;
             }
 
+            // Write the log out to disk
+            int log_left = fifo_size_contig(&s_log_fifo);
+            while (log_left) {
+                // Write as many bytes as we can contiguously by looking
+                // directly into the buffer to avoid having to copy
+                fatlog_write_data(
+                    &s_logfile, &s_log_fifo.buffer[s_log_fifo.head], log_left);
+                fifo_discardn(&s_log_fifo, log_left);
+                log_left = fifo_size_contig(&s_log_fifo);
+            }
+
             // Flush everything to disk
             UPDATE_STATUS(status,
                           EXPECT_OK(fatlog_flush(&s_datfile), "Sensor flush"));
@@ -401,46 +405,11 @@ void task_storage(TaskHandle_t* handle_ptr) {
 }
 
 Status storage_write_log(const char* log, size_t size) {
-    // If the storage is paused, queue and move on
-    if (s_pause_mode) {
-        fifo_enqueuen(&s_log_fifo, (uint8_t*)log, size);
-        return STATUS_ERROR;
+    int written = fifo_enqueuen(&s_log_fifo, (uint8_t*)log, size);
+
+    if (written == size) {
+        return STATUS_OK;
+    } else {
+        return STATUS_MEMORY_ERROR;
     }
-
-    // Add a lock to prevent multiple writes at the same time
-    if (s_log_lock) {
-        // If locked, for now just dump the log
-        return STATUS_ERROR;
-    }
-
-    // Lock the log
-    s_log_lock = 1;
-
-    // Write the queued log to the NAND flash
-    if (s_log_fifo.count > 0) {
-        uint8_t* buf = malloc(s_log_fifo.count);
-
-        int n_read = fifo_dequeuen(&s_log_fifo, buf, s_log_fifo.count);
-        Status status = fatlog_write_data(&s_logfile, buf, n_read);
-
-        if (status != STATUS_OK) {
-            // If it fails, put the dequeued data back into the FIFO
-            fifo_enqueuen(&s_log_fifo, buf, n_read);
-        }
-
-        free(buf);
-    }
-
-    // Write the new log to the NAND flash
-    Status status = fatlog_write_data(&s_logfile, (uint8_t*)log, size);
-
-    if (status != STATUS_OK) {
-        // If it fails, add the new data to the log
-        fifo_enqueuen(&s_log_fifo, (uint8_t*)log, size);
-    }
-
-    // Unlock the log
-    s_log_lock = 0;
-
-    return status;
 }

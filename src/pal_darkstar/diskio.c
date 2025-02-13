@@ -123,12 +123,12 @@ Status diskio_init(SdmmcDevice *device) {
 DWORD get_fattime() {
     RTCDateTime datetime = rtc_get_datetime();
 
-    return (DWORD)(datetime.year - 80) << 25 |  // Year
-           (DWORD)(datetime.month + 1) << 21 |  // Month
-           (DWORD)datetime.day << 16 |          // Day
-           (DWORD)datetime.hour << 11 |         // Hour
-           (DWORD)datetime.minute << 5 |        // Minute
-           (DWORD)datetime.second >> 1;         // Second
+    return (DWORD)(datetime.year - 1980) << 25 |  // Year
+           (DWORD)(datetime.month) << 21 |        // Month
+           (DWORD)(datetime.day) << 16 |          // Day
+           (DWORD)(datetime.hour) << 11 |         // Hour
+           (DWORD)(datetime.minute) << 5 |        // Minute
+           (DWORD)(datetime.second) >> 1;         // Second
 }
 
 /*-----------------------------------------------------------------------*/

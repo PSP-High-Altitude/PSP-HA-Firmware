@@ -56,6 +56,13 @@ int fifo_dequeuen(FIFO_t *fifo, uint8_t *items, int n) {
     return n;
 }
 
+// Delete items from the FIFO without deleting
+void fifo_discardn(FIFO_t *fifo, int n) {
+    fifo->head = (fifo->head + n) % fifo->size;
+    fifo->count -= n;
+}
+
+// Peek at the first item in the FIFO
 int fifo_peek(FIFO_t *fifo, uint8_t *item) {
     if (fifo->count == 0) {
         return 0;
@@ -63,4 +70,15 @@ int fifo_peek(FIFO_t *fifo, uint8_t *item) {
 
     *item = fifo->buffer[fifo->head];
     return 1;
+}
+
+// Return the number of items readable contiguously in the FIFO
+int fifo_size_contig(FIFO_t *fifo) {
+    int items_till_buf_end = fifo->size - fifo->head;
+
+    if (items_till_buf_end > fifo->count) {
+        return fifo->count;
+    } else {
+        return items_till_buf_end;
+    }
 }
