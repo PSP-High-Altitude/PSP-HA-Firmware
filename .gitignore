@@ -222,3 +222,6 @@ cython_debug/
 
 # Ignore the analysis.py file so everyone can make their own
 analysis.py
+
+# Ignore asm files
+*.asm

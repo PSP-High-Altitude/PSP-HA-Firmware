@@ -47,6 +47,26 @@ void pal_log_stateful(LogState* state, LogState new_state, LogType type,
         if (retstatus != STATUS_OK) return retstatus; \
     } while (0)
 
+#define EXPECT_OK_RETRIES(function, msg, tries) \
+    ({                                          \
+        Status status = STATUS_OK;              \
+        for (int i = 0; i < tries; i++) {       \
+            status = (function);                \
+            if (status == STATUS_OK) break;     \
+        }                                       \
+        EXPECT_OK(status, msg);                 \
+    })
+
+#define ASSERT_OK_RETRIES(function, msg, tries) \
+    ({                                          \
+        Status status = STATUS_OK;              \
+        for (int i = 0; i < tries; i++) {       \
+            status = (function);                \
+            if (status == STATUS_OK) break;     \
+        }                                       \
+        ASSERT_OK(status, msg);                 \
+    })
+
 // Combine status codes
 #define COMBINE_STATUS(status1, status2) \
     ((status1) > (status2) ? (status1) : (status2))

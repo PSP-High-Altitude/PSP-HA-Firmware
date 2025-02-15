@@ -286,6 +286,8 @@ __attribute__((unused)) static uint32_t GPIO_PIN_TO_MODEPOS[] = {
 #define PAL_GPIO_MODER_POS(pin) GPIO_PIN_TO_MODEPOS[pin]
 
 // Pin aliases
+
+// Pyros
 #define PIN_FIREMAIN PIN_PE8
 #define PIN_FIREDRG PIN_PA6
 #define PIN_FIREA1 PIN_PA5
@@ -296,12 +298,35 @@ __attribute__((unused)) static uint32_t GPIO_PIN_TO_MODEPOS[] = {
 #define PIN_CONTA1 PIN_PA7
 #define PIN_CONTA2 PIN_PA4
 #define PIN_CONTA3 PIN_PC4
+
+// LEDs
 #define PIN_RED PIN_PC12
 #define PIN_YELLOW PIN_PD2
 #define PIN_GREEN PIN_PD3
 #define PIN_BLUE PIN_PD1
+
+// Buzzer
 #define PIN_BUZZER PIN_PE9
+
+// Buttons/switches
 #define PIN_PAUSE PIN_PB5
 #define PIN_MTP PIN_PB5
+
+// Buses/Interfaces
+#define PIN_USB_DM PIN_PA11
+#define PIN_USB_DP PIN_PA12
+
+#define PIN_GPS_RST PIN_PD6
+#define PIN_GPS_SDA PIN_PC10
+#define PIN_GPS_SCL PIN_PC11
+
+#define PIN_SENSOR_SDA PIN_PB7
+#define PIN_SENSOR_SCL PIN_PB8
+
+#define PIN_RADIO_RST PIN_PC5
+#define PIN_RADIO_CS PIN_PB12
+#define PIN_RADIO_SCK PIN_PB13
+#define PIN_RADIO_MISO PIN_PC2
+#define PIN_RADIO_MOSI PIN_PC3
 
 #endif  // BOARD_H

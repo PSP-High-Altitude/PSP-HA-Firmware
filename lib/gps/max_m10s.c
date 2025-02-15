@@ -68,6 +68,8 @@ static Status ubx_read_msg(I2cDevice* device, uint8_t header[4],
             }
             header_idx++;
             continue;
+        } else {
+            header_idx = 0;
         }
     }
 

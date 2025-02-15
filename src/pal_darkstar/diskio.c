@@ -159,18 +159,23 @@ static Status check_status(uint64_t timeout) {
 DSTATUS disk_initialize(BYTE drv /* Physical drive number (0) */
 ) {
     if (drv == 0) {
-        if (Stat[0] & STA_NODISK)
-            return Stat[0]; /* Is card existing in the soket? */
+        if (Stat[0] == STA_NOINIT) {
+            // Initialize the SDMMC device
+            if (Stat[0] & STA_NODISK)
+                return Stat[0]; /* Is card existing in the soket? */
 
-        if (sdmmc_setup(&s_sd_sdmmc_device) != STATUS_OK) {
-            Stat[0] = STA_NOINIT;
+            if (sdmmc_setup(&s_sd_sdmmc_device) != STATUS_OK) {
+                Stat[0] = STA_NOINIT;
+                return Stat[0];
+            }
+            Stat[0] &= ~STA_NOINIT; /* Clear STA_NOINIT flag */
             return Stat[0];
         }
-        Stat[0] &= ~STA_NOINIT; /* Clear STA_NOINIT flag */
-        return Stat[0];
+    } else {
+        return STA_NODISK;
     }
 
-    return STA_NOINIT;
+    return Stat[0];
 }
 
 /*-----------------------------------------------------------------------*/

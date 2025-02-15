@@ -177,6 +177,15 @@ int main(void) {
     rtc_init();
     button_event_init();
 
+    // Define GPIOs
+
+    // Resets
+    gpio_write(PIN_GPS_RST, GPIO_HIGH);
+    gpio_write(PIN_RADIO_RST, GPIO_HIGH);
+
+    // Radio SPI
+    gpio_write(PIN_RADIO_CS, GPIO_HIGH);
+
     // Analog switches
     adc_set_pc2_sw(true);
     adc_set_pc3_sw(true);

@@ -17,9 +17,10 @@ static FATFS s_fs;
 
 static void snfmtspace(char* str, size_t str_size, uint64_t bytes) {
     static const char* prefixes[] = {"", "K", "M", "G"};
-    for (int i = sizeof(prefixes) / sizeof(prefixes[0]) - 1; i >= 0; i--) {
+    for (int i = 3; i >= 0; i--) {
         if (bytes >= (1 << 10 * i) - 1) {
-            snprintf(str, str_size, "%lu%sB", bytes >> 10 * i, prefixes[i]);
+            snprintf(str, str_size, "%.*f %sB", (i == 0) ? 0 : 3,
+                     bytes / powf(1024.0F, (float)i), prefixes[i]);
             break;
         }
     }
@@ -112,7 +113,7 @@ Status fatlog_init() {
             memset(work, 0, sizeof(work));
             MKFS_PARM format_opts;
             memset(&format_opts, 0, sizeof(format_opts));
-            format_opts.fmt = FM_FAT32;
+            format_opts.fmt = FM_EXFAT;
 
             res = f_mkfs(MOUNT_POINT, &format_opts, work, FF_MAX_SS);
             if (res != FR_OK) {
@@ -137,7 +138,7 @@ Status fatlog_init() {
     char free_space_str[16];
     snfmtspace(total_space_str, 16, total_bytes);
     snfmtspace(free_space_str, 16, free_bytes);
-    PAL_LOGI("Remaining space: %s/%s\n", total_space_str, free_space_str);
+    PAL_LOGI("Remaining space: %s/%s\n", free_space_str, total_space_str);
 
     return STATUS_OK;
 }
@@ -261,8 +262,9 @@ Status fatlog_space(uint64_t* total_bytes, uint64_t* free_bytes) {
         return STATUS_HARDWARE_ERROR;
     }
 
-    *total_bytes = (fs->n_fatent - 2) * fs->csize * 512;
-    *free_bytes = fre_clust * fs->csize * 512;
+    *total_bytes =
+        ((uint64_t)fs->n_fatent - 2ULL) * (uint64_t)fs->csize * 512ULL;
+    *free_bytes = (uint64_t)fre_clust * (uint64_t)fs->csize * 512ULL;
 
     return STATUS_OK;
 }
@@ -283,7 +285,7 @@ Status fatlog_reformat() {
     memset(work, 0, sizeof(work));
     MKFS_PARM format_opts;
     memset(&format_opts, 0, sizeof(format_opts));
-    format_opts.fmt = FM_FAT32;
+    format_opts.fmt = FM_EXFAT;
 
     FRESULT res = f_mkfs(MOUNT_POINT, &format_opts, work, FF_MAX_SS);
     if (res != FR_OK) {

@@ -89,7 +89,7 @@ GpsFrame gps_fix_to_pb_frame(uint64_t timestamp,
 /* API FUNCTIONS */
 /*****************/
 Status gps_init() {
-    ASSERT_OK(max_m10s_init(&s_gps_conf), "failed to init GPS\n");
+    ASSERT_OK_RETRIES(max_m10s_init(&s_gps_conf), "failed to init GPS\n", 3);
 
     s_config_ptr = config_get_ptr();
     if (s_config_ptr == NULL) {

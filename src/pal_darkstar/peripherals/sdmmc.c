@@ -55,11 +55,12 @@ Status sdmmc_setup(SdmmcDevice* dev) {
         SDMMC_CLOCK_POWER_SAVE_DISABLE;
     mmc_handles[dev->periph]->Init.HardwareFlowControl =
         SDMMC_HARDWARE_FLOW_CONTROL_DISABLE;
-    mmc_handles[dev->periph]->Init.ClockDiv = 1;
+    mmc_handles[dev->periph]->Init.ClockDiv = 1;  // 80Mhz -> 40Mhz
 
     if (HAL_MMC_Init(mmc_handles[dev->periph]) != HAL_OK) {
         return STATUS_ERROR;
     }
+
     return STATUS_OK;
 }
 
@@ -83,7 +84,7 @@ Status sdmmc_write_blocks(SdmmcDevice* dev, uint8_t* tx_buf,
         if (MILLIS() - start > 500) {
             return STATUS_ERROR;
         }
-        DELAY(1);
+        DELAY(0);
     }
     return STATUS_OK;
 }
@@ -101,7 +102,7 @@ Status sdmmc_read_blocks(SdmmcDevice* dev, uint8_t* rx_buf,
         if (MILLIS() - start > 500) {
             return STATUS_ERROR;
         }
-        DELAY(1);
+        DELAY(0);
     }
     return STATUS_OK;
 }
