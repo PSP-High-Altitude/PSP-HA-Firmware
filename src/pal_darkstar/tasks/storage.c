@@ -190,6 +190,18 @@ static Status storage_open_files() {
     return STATUS_OK;
 }
 
+static void storage_dump_log() {
+    int log_left = fifo_size_contig(&s_log_fifo);
+    while (log_left) {
+        // Write as many bytes as we can contiguously by looking
+        // directly into the buffer to avoid having to copy
+        fatlog_write_data(&s_logfile, &s_log_fifo.buffer[s_log_fifo.head],
+                          log_left);
+        fifo_discardn(&s_log_fifo, log_left);
+        log_left = fifo_size_contig(&s_log_fifo);
+    }
+}
+
 Status storage_init() {
     // Initialize FATFS
     ASSERT_OK(diskio_init(&s_sdmmc_device), "diskio init");
@@ -332,15 +344,7 @@ void task_storage(TaskHandle_t* handle_ptr) {
             }
 
             // Write the log out to disk
-            int log_left = fifo_size_contig(&s_log_fifo);
-            while (log_left) {
-                // Write as many bytes as we can contiguously by looking
-                // directly into the buffer to avoid having to copy
-                fatlog_write_data(
-                    &s_logfile, &s_log_fifo.buffer[s_log_fifo.head], log_left);
-                fifo_discardn(&s_log_fifo, log_left);
-                log_left = fifo_size_contig(&s_log_fifo);
-            }
+            storage_dump_log();
 
             // Flush everything to disk
             UPDATE_STATUS(status,
@@ -376,6 +380,9 @@ void task_storage(TaskHandle_t* handle_ptr) {
             vTaskGetRunTimeStats(s_prf_buf);
             PAL_LOGI("Profiling stats:\n%s\n", s_prf_buf);
         }
+
+        // Final log dump before closing filesystem
+        storage_dump_log();
 
         // Unmount filesystem
         EXPECT_OK(storage_close_files(), "File close\n");

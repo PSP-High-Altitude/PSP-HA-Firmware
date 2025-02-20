@@ -114,6 +114,11 @@ void task_control(TaskHandle_t* handle_ptr) {
             gpio_write(PIN_YELLOW, GPIO_LOW);
         }
 
+        if (state_frame.flight_phase == FP_ERROR) {
+            // 25% duty cycle, 400 ms period
+            gpio_write(PIN_RED, (MILLIS() % 400) < 100);
+        }
+
         vTaskDelayUntil(&last_iteration_start_tick,
                         pdMS_TO_TICKS(s_config_ptr->control_loop_period_ms));
     }

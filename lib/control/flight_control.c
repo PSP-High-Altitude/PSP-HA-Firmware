@@ -20,6 +20,7 @@ FlightPhase fp_update_coast(const SensorFrame* sensor_frame);
 FlightPhase fp_update_drogue(const SensorFrame* sensor_frame);
 FlightPhase fp_update_main(const SensorFrame* sensor_frame);
 FlightPhase fp_update_landed(const SensorFrame* sensor_frame);
+FlightPhase fp_update_error(const SensorFrame* sensor_frame);
 
 FlightStageStatus fp_stage_check_drogue(const StateEst* state);
 FlightStageStatus fp_stage_check_sep_lockout(const StateEst* state);
@@ -157,6 +158,10 @@ Status fp_update(const SensorFrame* sensor_frame) {
             *s_flight_phase_ptr = fp_update_landed(sensor_frame);
             break;
 
+        case FP_ERROR:
+            *s_flight_phase_ptr = fp_update_error(sensor_frame);
+            break;
+
         default:
             // Unknown state; go back to init because there's not really
             // much else that we can realistically do at this point
@@ -169,18 +174,72 @@ Status fp_update(const SensorFrame* sensor_frame) {
 
 FlightPhase fp_update_init(const SensorFrame* sensor_frame) {
     // During init, we want to record a reliable pressure value we can use to
-    // determine the ground altitude later on
+    // determine the ground altitude later on, and check that the accelerometers
+    // are outputting values near 1g to prevent launch detection mishaps.
     static float s_pressure_sum = 0;
     static size_t s_pressure_num_pts = 0;
+
+    static float s_acc_h_sum = 0;
+    static size_t s_acc_h_num_pts = 0;
+
+    static float s_acc_i_sum = 0;
+    static size_t s_acc_i_num_pts = 0;
+
+    float acc_h_mag = sqrtf(sensor_frame->acc_h_x * sensor_frame->acc_h_x +
+                            sensor_frame->acc_h_y * sensor_frame->acc_h_y +
+                            sensor_frame->acc_h_z * sensor_frame->acc_h_z);
+
+    float acc_i_mag = sqrtf(sensor_frame->acc_i_x * sensor_frame->acc_i_x +
+                            sensor_frame->acc_i_y * sensor_frame->acc_i_y +
+                            sensor_frame->acc_i_z * sensor_frame->acc_i_z);
 
     if (!isnan(sensor_frame->pressure)) {
         s_pressure_sum += sensor_frame->pressure;
         s_pressure_num_pts += 1;
     }
 
+    if (!isnan(acc_h_mag)) {
+        s_acc_h_sum += acc_h_mag;
+        s_acc_h_num_pts += 1;
+    }
+
+    if (!isnan(acc_i_mag)) {
+        s_acc_i_sum += acc_i_mag;
+        s_acc_i_num_pts += 1;
+    }
+
     if (cond_timer_update(&s_init_timer, true)) {
         // Once the init time is up, record the average ground pressure
         se_set_ground_pressure(s_pressure_sum / s_pressure_num_pts);
+
+        float acc_h_avg_mag = s_acc_h_sum / s_acc_h_num_pts;
+        float acc_i_avg_mag = s_acc_i_sum / s_acc_i_num_pts;
+
+        // If both accelerometers are invalid at this point, abort
+        if (isnan(acc_h_mag) && isnan(acc_i_mag)) {
+            PAL_LOGE("Both accelerometers invalid; aborting\n");
+            PAL_LOGI("FP_INIT -> FP_ERROR");
+            return FP_ERROR;
+        }
+
+        // Check that high-g accelerometer was within range
+        if (fabsf(acc_h_avg_mag - 1) * G_MAG >
+            s_config_ptr->max_ready_acc_bias_mps2) {
+            PAL_LOGE(
+                "High-g accelerometer avg %.3f is unacceptable; aborting\n",
+                acc_h_avg_mag);
+            PAL_LOGI("FP_INIT -> FP_ERROR");
+            return FP_ERROR;
+        }
+
+        // Check that low-g accelerometer was within range
+        if (fabsf(acc_i_avg_mag - 1) * G_MAG >
+            s_config_ptr->max_ready_acc_bias_mps2) {
+            PAL_LOGE("Low-g accelerometer avg %.3f is unacceptable; aborting\n",
+                     acc_i_avg_mag);
+            PAL_LOGI("FP_INIT -> FP_ERROR");
+            return FP_ERROR;
+        }
 
         PAL_LOGI("FP_INIT -> FP_WAIT\n");
         return FP_WAIT;
@@ -386,6 +445,11 @@ FlightPhase fp_update_main(const SensorFrame* sensor_frame) {
 FlightPhase fp_update_landed(const SensorFrame* sensor_frame) {
     // Nothing more to be done
     return FP_LANDED;
+}
+
+FlightPhase fp_update_error(const SensorFrame* sensor_frame) {
+    // Nothing more to be done
+    return FP_ERROR;
 }
 
 FlightStageStatus fp_stage_check_drogue(const StateEst* state) {

@@ -6,7 +6,8 @@
 #include "math.h"
 #include "timer.h"
 
-Kx134Range curr_range = 0;
+static Kx134Range s_curr_range = 0;
+static bool s_initialized = false;
 
 /**
  * @brief Function for SPI read of a KX134 register
@@ -64,8 +65,6 @@ static Status kx134_write(I2cDevice* device, uint8_t address, uint8_t* tx_buf,
     if (i2c_write(device, tx_buf_new, len + 1) != STATUS_OK) {
         return STATUS_ERROR;
     }
-
-    // DELAY_MICROS(100);
 
     return STATUS_OK;
 }
@@ -128,11 +127,13 @@ Status kx134_init(I2cDevice* device, Kx134OutputDataRate rate,
     }
 
     // enable sensor and set range
-    curr_range = range;
+    s_curr_range = range;
     tx_buf = 0xC0 | range;
     if (kx134_write(device, KX134_CNTL1, &tx_buf, 1) != STATUS_OK) {
         return STATUS_ERROR;
     }
+
+    s_initialized = true;
 
     return STATUS_OK;
 }
@@ -144,14 +145,15 @@ Status kx134_init(I2cDevice* device, Kx134OutputDataRate rate,
  * @return Accel struct
  */
 Accel kx134_read_accel(I2cDevice* device) {
-    Accel result;
+    Accel result = {NAN, NAN, NAN};
+
+    if (!s_initialized) {
+        return result;
+    }
 
     // Read all 6 registers at once
     uint8_t rx_buf[6];
     if (kx134_read(device, KX134_DATA, rx_buf, 6) != STATUS_OK) {
-        result.accelX = NAN;
-        result.accelY = NAN;
-        result.accelZ = NAN;
         return result;
     }
 
@@ -161,7 +163,7 @@ Accel kx134_read_accel(I2cDevice* device) {
     int16_t acc_z_raw = (int16_t)(((uint16_t)rx_buf[5] << 8) | rx_buf[4]);
 
     float conversion_factor;
-    switch (curr_range) {
+    switch (s_curr_range) {
         case KX134_RANGE_8_G:
             conversion_factor = 1.0 / 4096;
             break;

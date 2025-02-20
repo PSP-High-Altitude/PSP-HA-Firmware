@@ -13,6 +13,7 @@ typedef enum {
     FP_DROGUE,  // under drogue
     FP_MAIN,    // under main
     FP_LANDED,
+    FP_ERROR,
 } FlightPhase;
 
 typedef enum { FP_STG_GO, FP_STG_NOGO, FP_STG_WAIT } FlightStageStatus;

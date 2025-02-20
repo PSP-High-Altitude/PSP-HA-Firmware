@@ -211,6 +211,36 @@ static Status i2c_setup(I2cDevice *dev) {
     return STATUS_OK;
 }
 
+Status i2c_write_verify(I2cDevice *device, uint8_t *tx_buf, size_t len) {
+    uint8_t buf[8];
+
+    // Max 7 byte write
+    if (len > 7) {
+        return STATUS_PARAMETER_ERROR;
+    }
+
+    // Initial write
+    if (i2c_write(device, tx_buf, len) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    // Read back
+    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+    if (i2c_read(device, buf, len) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    for (int i = 1; i < len; i++) {
+        if (tx_buf[i] != buf[i - 1]) {
+            return STATUS_ERROR;
+        }
+    }
+
+    return STATUS_OK;
+}
+
 Status i2c_write(I2cDevice *device, uint8_t *tx_buf, size_t len) {
     if (i2c_setup(device) != STATUS_OK) {
         return STATUS_PARAMETER_ERROR;
