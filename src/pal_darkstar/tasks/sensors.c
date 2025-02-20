@@ -157,15 +157,15 @@ void task_sensors(TaskHandle_t* handle_ptr) {
         sensor_frame.acc_h_y = +acch.accelY;
         sensor_frame.acc_h_z = +acch.accelX;
 
-        // TODO: FIX ORIENTATION ONCE WE HAVE THE SENSOR
-        sensor_frame.acc_i_x = +accel.accelX;
-        sensor_frame.acc_i_y = +accel.accelZ;
-        sensor_frame.acc_i_z = -accel.accelY;
+        // Reads +1g on y-axis; want +1g on z-axis
+        sensor_frame.acc_i_x = -accel.accelZ;
+        sensor_frame.acc_i_y = -accel.accelX;
+        sensor_frame.acc_i_z = +accel.accelY;
 
         // Apply same transformation to gyro
-        sensor_frame.rot_i_x = +gyro.gyroX;
-        sensor_frame.rot_i_y = +gyro.gyroY;
-        sensor_frame.rot_i_z = -gyro.gyroZ;
+        sensor_frame.rot_i_x = -gyro.gyroZ;
+        sensor_frame.rot_i_y = -gyro.gyroX;
+        sensor_frame.rot_i_z = +gyro.gyroY;
 
         sensor_frame.mag_i_x = mag.magX;
         sensor_frame.mag_i_y = mag.magY;
