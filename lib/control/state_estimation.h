@@ -75,8 +75,6 @@ typedef enum {
     IMU_Z_DOWN
 } SensorDirection;
 
-#define DEFAULT_ORIENTATION (IMU_Z_UP)
-
 Status se_init();
 
 Status se_reset();

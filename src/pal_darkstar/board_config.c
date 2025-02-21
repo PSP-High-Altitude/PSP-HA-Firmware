@@ -29,6 +29,7 @@ const static BoardConfig s_default_config = {
     .max_grounded_alt_m = 100,      // m
     .min_grounded_time_ms = 10000,  // ms
     .max_ready_acc_bias_mps2 = 2,   // m/s^2
+    .orient_antenna_up = false,     // antenna down
 
     // Stage separation settings
     .stage_is_separator_bool = 1,
@@ -193,6 +194,8 @@ void config_print() {
     printf("Max grounded alt: %.2f m\n", config->max_grounded_alt_m);
     printf("Min grounded time: %.2f ms\n", config->min_grounded_time_ms);
     printf("Max ready acc bias: %.2f m/s^2\n", config->max_ready_acc_bias_mps2);
+    printf("Antenna orientation: %s\n",
+           config->orient_antenna_up ? "Up" : "Down");
 
     printf("\n----- STAGE SEPARATION -----\n");
     printf("Stage is separator: %s\n",

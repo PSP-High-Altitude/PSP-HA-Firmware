@@ -24,7 +24,7 @@ static MedianFilter s_baro_alt_median;
 static SmaFilter s_baro_alt_sma;
 static SmaFilter s_baro_vel_sma;
 
-static OrientFunc orientation_function = NULL;
+static OrientFunc s_orientation_function = NULL;
 
 static Vector s_grav_vec = {.x = -G_MAG, .y = 0.0f, .z = 0.0f};
 
@@ -108,9 +108,6 @@ static float se_baro_alt_m(float p_mbar) {
 }
 
 Status se_init() {
-    orientation_function = get_orientation_function(DEFAULT_ORIENTATION);
-    // TODO: make up a config thing
-
     ASSERT_OK(median_filter_init(&s_baro_alt_median, BARO_ALT_MEDIAN_WINDOW),
               "failed to init baro alt median filter\n");
     ASSERT_OK(sma_filter_init(&s_baro_alt_sma, BARO_ALT_SMA_WINDOW),
@@ -120,15 +117,20 @@ Status se_init() {
 
     s_state_ptr = &(backup_get_ptr()->state_estimate);
 
+    SensorDirection sensor_dir =
+        config_get_ptr()->orient_antenna_up ? IMU_Z_DOWN : IMU_Z_UP;
+
+    s_orientation_function = get_orientation_function(sensor_dir);
+
     // kf init
     ASSERT_OK(kf_init_mats(), "failed to allocate memory for kf matrices");
     mfloat x0[NUM_TOT_STATES] = {0, 0, 0, 1,
                                  0, 0, 0};  // TODO: get these from config file
     mfloat P0_diag[NUM_TOT_STATES] = {1, 1, 1, 1,
-                                      1, 1, 1};  // These are palceholder values
+                                      1, 1, 1};  // These are placeholder values
 
     // kf direction enum defined differently than this one
-    int kf_up = DEFAULT_ORIENTATION + 1;
+    int kf_up = sensor_dir + 1;
     if (kf_up > 3) {
         kf_up = -kf_up + 3;
     }
@@ -233,10 +235,10 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
         s_log_state = SE_LOG_OK;
 
         // If the high-precision acceleration values are valid, prefer those
-        orientation_function(sensor_frame->acc_i_x * G_MAG,  ///
-                             sensor_frame->acc_i_y * G_MAG,  ///
-                             sensor_frame->acc_i_z * G_MAG,  ///
-                             &s_current_acc);
+        s_orientation_function(sensor_frame->acc_i_x * G_MAG,  ///
+                               sensor_frame->acc_i_y * G_MAG,  ///
+                               sensor_frame->acc_i_z * G_MAG,  ///
+                               &s_current_acc);
 
         // Check if we're exceeding the high-precision limit on any axis
         if (fabsf(sensor_frame->acc_i_x) > LOW_G_MAX_ACC ||  ///
@@ -247,10 +249,10 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
                 se_valid_acc(sensor_frame->acc_h_y) &&
                 se_valid_acc(sensor_frame->acc_h_z)) {
                 // If we do, then, just use those straight up
-                orientation_function(sensor_frame->acc_h_x * G_MAG,  ///
-                                     sensor_frame->acc_h_y * G_MAG,  ///
-                                     sensor_frame->acc_h_z * G_MAG,  ///
-                                     &s_current_acc);
+                s_orientation_function(sensor_frame->acc_h_x * G_MAG,  ///
+                                       sensor_frame->acc_h_y * G_MAG,  ///
+                                       sensor_frame->acc_h_z * G_MAG,  ///
+                                       &s_current_acc);
             } else {
                 // If we don't, then we have to make the decision between
                 // sticking with the old values or going with the new ones
@@ -269,10 +271,10 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
         s_log_state = SE_LOG_OK;
         // If the high-precision values are invalid but the high-range ones are
         // valid, not much to think about -- just go with the high-range ones
-        orientation_function(sensor_frame->acc_h_x * G_MAG,  ///
-                             sensor_frame->acc_h_y * G_MAG,  ///
-                             sensor_frame->acc_h_z * G_MAG,  ///
-                             &s_current_acc);
+        s_orientation_function(sensor_frame->acc_h_x * G_MAG,  ///
+                               sensor_frame->acc_h_y * G_MAG,  ///
+                               sensor_frame->acc_h_z * G_MAG,  ///
+                               &s_current_acc);
     } else {
         // If neither were valid, then we reuse the acceleration values from
         // last time (which is a no-op since they're in s_current_state).
@@ -293,10 +295,10 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     if (!isnan(sensor_frame->rot_i_x) &&  ///
         !isnan(sensor_frame->rot_i_y) &&  ///
         !isnan(sensor_frame->rot_i_z)) {
-        orientation_function(DEG_TO_RAD(sensor_frame->rot_i_x),  ///
-                             DEG_TO_RAD(sensor_frame->rot_i_y),  ///
-                             DEG_TO_RAD(sensor_frame->rot_i_z),  ///
-                             &(s_state_ptr->angVelBody));
+        s_orientation_function(DEG_TO_RAD(sensor_frame->rot_i_x),  ///
+                               DEG_TO_RAD(sensor_frame->rot_i_y),  ///
+                               DEG_TO_RAD(sensor_frame->rot_i_z),  ///
+                               &(s_state_ptr->angVelBody));
     }
 
     /*******************/
