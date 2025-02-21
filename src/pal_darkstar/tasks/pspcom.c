@@ -11,6 +11,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "stm32h7xx_hal.h"
+#include "storage.h"
 #include "string.h"
 #include "sx1276/sx1276.h"
 #include "task.h"
@@ -119,6 +120,13 @@ void task_pspcom_rx() {
                     .msg_id = rx_buf[1],
                     .payload_len = len - 2,
                 };
+
+                // If the message id is greater than 0x80, the message is
+                // telemetry from another board, and we should ignore it
+                if (msg.msg_id >= 0x80) {
+                    continue;
+                }
+
                 memcpy(msg.payload, rx_buf + 2, msg.payload_len);
                 printf("Received message: %d %d %d\n", msg.device_id,
                        msg.msg_id, msg.payload_len);
@@ -177,6 +185,19 @@ void task_pspcom_rx() {
                                 PYRO_TIMEOUT_PERIOD) {
                                 pyros_fire(PYRO_A1);
                             }
+                        }
+                        break;
+                    case RESETDEVICE:
+                        // Reset board if magic byte received
+                        if (msg.payload_len == 1 && msg.payload[0] == 0x42) {
+                            // Pause storage
+                            storage_pause(STORAGE_PAUSE_RESET);
+                            while (storage_is_active()) {
+                                DELAY_MICROS(1000);
+                            }
+
+                            // Reset
+                            NVIC_SystemReset();
                         }
                         break;
                 }

@@ -24,6 +24,7 @@ enum {
     FIREMAIN = 0x18,
     FIREDRG = 0x19,
     FIREAUX = 0x1A,
+    RESETDEVICE = 0x20,
     MAINSTAT = 0x81,
     DRGSTAT = 0x82,
     AUXSTAT = 0x83,

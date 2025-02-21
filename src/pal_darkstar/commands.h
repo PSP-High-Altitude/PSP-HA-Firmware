@@ -9,6 +9,7 @@
 #include "rtc/rtc.h"
 #include "status.h"
 #include "stm32h7xx_hal.h"
+#include "tasks/storage.h"
 #include "timer.h"
 
 // Help command
@@ -67,13 +68,24 @@ char regex_invalidate_backup[] = "^invalidate_backup[\n]*$";
 void cmd_invalidate_backup(char *str) {
     memset(backup_get_ptr(), 0, sizeof(Backup));
     PAL_LOGW("Board backup pointer invalidated!\n");
-    DELAY_MICROS(1000);
+
+    // Pause storage
+    storage_pause(STORAGE_PAUSE_RESET);
+    while (storage_is_active()) {
+        DELAY_MICROS(1000);
+    }
     NVIC_SystemReset();
 }
 
 // Config erase chip
 char regex_reformat_storage[] = "^reformat_storage[\n]*$";
 void cmd_reformat_storage(char *str) {
+    // Pause storage
+    storage_pause(STORAGE_PAUSE_RESET);
+    while (storage_is_active()) {
+        DELAY_MICROS(1000);
+    }
+
     PAL_LOGI("Reformatting storage...\n");
     if (fatlog_reformat() != STATUS_OK) {
         PAL_LOGE("Failed to reformat storage!\n");
