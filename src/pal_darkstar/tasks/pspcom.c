@@ -55,6 +55,8 @@ static UartDevice s_camera_device = {
     .rx = 0,
 };
 
+static bool s_camera_status = false;
+
 uint16_t crc16(uint16_t checksum, pspcommsg msg) {
     // Some code is taken from ChatGPT
     uint8_t *msg_content = (uint8_t *)malloc(5 + msg.payload_len);
@@ -222,6 +224,7 @@ void task_pspcom_rx() {
                                 0xE7,  // CRC-8/DVB-S2
                             };
                             uart_tx(&s_camera_device, cmd, sizeof(cmd));
+                            s_camera_status = !s_camera_status;
                         }
                         break;
                 }
@@ -414,7 +417,9 @@ void pspcom_send_standard() {
     tx_msg.payload[17] = (a3_cont << 1) | 0x1;
 
     // SYS_STAT
-    tx_msg.payload[18] = s_gps_fix.fix_valid & 0x1 & !s_gps_fix.invalid_llh;
+    tx_msg.payload[18] = (s_gps_fix.fix_valid && !s_gps_fix.invalid_llh) & 0x1;
+    tx_msg.payload[18] |= ((uint8_t)storage_status() & 0x1) << 1;
+    tx_msg.payload[18] |= ((uint8_t)s_camera_status & 0x1) << 2;
     tx_msg.payload[18] |= ((uint8_t)s_flight_phase & 0xF) << 3;
 
     pspcom_send_msg(tx_msg);

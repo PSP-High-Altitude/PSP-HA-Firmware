@@ -66,6 +66,8 @@ static SdmmcDevice s_sdmmc_device = {
 
 static char s_prf_buf[1024];  // 40 bytes per task
 
+static Status s_status = STATUS_OK;
+
 /*****************/
 /* API FUNCTIONS */
 /*****************/
@@ -247,6 +249,8 @@ Status storage_init() {
 
 bool storage_is_active() { return s_storage_active; }
 
+bool storage_status() { return s_status == STATUS_OK; }
+
 void storage_pause(StoragePauseMode mode) { s_pause_mode |= mode; }
 
 void storage_start(StoragePauseMode mode) { s_pause_mode &= ~mode; }
@@ -279,8 +283,6 @@ Status storage_queue_gps(const GpsFrame* gps_frame) {
 }
 
 void task_storage(TaskHandle_t* handle_ptr) {
-    Status status = STATUS_OK;
-
     // Outer loop does initialization and teardown
     while (1) {
         // Initialize LEDs
@@ -290,14 +292,14 @@ void task_storage(TaskHandle_t* handle_ptr) {
         PAL_LOGI("Starting FS reinit\n");
 
         // Make sure filesystem is mounted
-        UPDATE_STATUS(status, EXPECT_OK(fatlog_reinit(), "FS reinit\n"));
+        UPDATE_STATUS(s_status, EXPECT_OK(fatlog_reinit(), "FS reinit\n"));
 
         // Open files
-        UPDATE_STATUS(status, EXPECT_OK(storage_open_files(), "File open\n"));
+        UPDATE_STATUS(s_status, EXPECT_OK(storage_open_files(), "File open\n"));
 
         PAL_LOGI("Entering main storage loop\n");
 
-        while (status == STATUS_OK && !s_pause_mode) {
+        while (s_status == STATUS_OK && !s_pause_mode) {
             uint64_t iteration_start_ms = MILLIS();
             uint32_t stored_items = 0;
 
@@ -347,16 +349,16 @@ void task_storage(TaskHandle_t* handle_ptr) {
             storage_dump_log();
 
             // Flush everything to disk
-            UPDATE_STATUS(status,
+            UPDATE_STATUS(s_status,
                           EXPECT_OK(fatlog_flush(&s_datfile), "Sensor flush"));
-            UPDATE_STATUS(status,
+            UPDATE_STATUS(s_status,
                           EXPECT_OK(fatlog_flush(&s_fslfile), "State flush"));
-            UPDATE_STATUS(status,
+            UPDATE_STATUS(s_status,
                           EXPECT_OK(fatlog_flush(&s_gpsfile), "GPS flush"));
-            UPDATE_STATUS(status,
+            UPDATE_STATUS(s_status,
                           EXPECT_OK(fatlog_flush(&s_logfile), "Log flush"));
 
-            gpio_write(PIN_GREEN, status == STATUS_OK);
+            gpio_write(PIN_GREEN, s_status == STATUS_OK);
 
             // Check for and log any queue overflows
             if (s_sensor_overflows) {
@@ -393,7 +395,7 @@ void task_storage(TaskHandle_t* handle_ptr) {
 
         // Blink the green LED while waiting
         while (s_pause_mode) {
-            gpio_write(PIN_GREEN, status == STATUS_OK);
+            gpio_write(PIN_GREEN, s_status == STATUS_OK);
             DELAY(250);
             gpio_write(PIN_GREEN, GPIO_LOW);
             DELAY(250);
@@ -403,7 +405,7 @@ void task_storage(TaskHandle_t* handle_ptr) {
         DELAY(500);
 
         // Reset status since restarting
-        status = STATUS_OK;
+        s_status = STATUS_OK;
     }
 }
 

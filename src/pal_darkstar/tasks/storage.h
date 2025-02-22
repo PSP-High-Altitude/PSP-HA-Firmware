@@ -39,6 +39,7 @@ typedef enum {
 Status storage_init();
 
 bool storage_is_active();
+bool storage_status();
 
 void storage_pause(StoragePauseMode mode);
 void storage_start(StoragePauseMode mode);
