@@ -44,7 +44,7 @@ typedef struct {
     float min_grounded_time_ms;
     // maximum acceleration that may be measured by state estimation in ready
     float max_ready_acc_bias_mps2;
-    // whether to the board is mounted upside down, i.e. antenna up
+    // whether the board is mounted upside down, i.e. antenna up
     uint32_t orient_antenna_up;
 
     /* STAGE SEPARATION SETTINGS */

@@ -25,6 +25,7 @@ enum {
     FIREDRG = 0x19,
     FIREAUX = 0x1A,
     RESETDEVICE = 0x20,
+    TRIGGERCAM = 0x21,
     MAINSTAT = 0x81,
     DRGSTAT = 0x82,
     AUXSTAT = 0x83,
@@ -65,7 +66,7 @@ typedef struct {
     GPS_Fix_TypeDef *gps_fix;
 } PAL_Data_Typedef;
 
-uint16_t crc(uint16_t checksum, pspcommsg msg);
+uint16_t crc16(uint16_t checksum, pspcommsg msg);
 
 Status pspcom_init();
 

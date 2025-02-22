@@ -22,13 +22,12 @@
 #include "tasks/storage.h"
 #include "tasks/voltage.h"
 #include "timer.h"
+#include "uart/uart.h"
 #include "usb.h"
 
 // FreeRTOS
 #include "FreeRTOS.h"
 #include "task.h"
-
-uint8_t mtp_mode = 0;
 
 /*****************/
 /* HELPER MACROS */
@@ -76,8 +75,6 @@ void task_init() {
 
     uint32_t init_error = 0;  // Set if error occurs during initialization
     // uint32_t num_inits = 8;   // Number of inits the error code refers to
-
-    mtp_mode = backup_get_ptr()->flag_mtp_pressed;
 
     PAL_LOGI("Starting initialization...\n");
 
@@ -140,28 +137,15 @@ void task_init() {
     // }
 
     while (1) {
-        if (mtp_mode) {
-            gpio_write(PIN_RED, GPIO_HIGH);
-            gpio_write(PIN_YELLOW, GPIO_HIGH);
-            gpio_write(PIN_GREEN, GPIO_HIGH);
-            gpio_write(PIN_BLUE, GPIO_HIGH);
-            DELAY(1000);
-            gpio_write(PIN_RED, GPIO_LOW);
-            gpio_write(PIN_YELLOW, GPIO_LOW);
-            gpio_write(PIN_GREEN, GPIO_LOW);
-            gpio_write(PIN_BLUE, GPIO_LOW);
-            DELAY(1000);
-        } else {
 #ifdef HWIL_TEST
-            gpio_write(PIN_RED, GPIO_HIGH);
-            DELAY(100);
-            gpio_write(PIN_RED, GPIO_LOW);
-            DELAY(100);
+        gpio_write(PIN_RED, GPIO_HIGH);
+        DELAY(100);
+        gpio_write(PIN_RED, GPIO_LOW);
+        DELAY(100);
 #else
-            DELAY(1000 * 60);
-            PAL_LOGI("<3\n");
+        DELAY(1000 * 60);
+        PAL_LOGI("<3\n");
 #endif  // HWIL_TEST
-        }
     }
 }
 

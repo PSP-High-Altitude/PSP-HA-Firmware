@@ -17,6 +17,7 @@
 #include "task.h"
 #include "timer.h"
 #include "timers.h"
+#include "uart/uart.h"
 
 #define PSPCOM_DEVICE_ID 0x10  // PAL darkstar
 
@@ -37,7 +38,7 @@ static QueueHandle_t s_fp_queue;
 
 static BoardConfig *s_config_ptr = NULL;
 
-SpiDevice s_radio_device = {
+static SpiDevice s_radio_device = {
     .periph = P_SPI2,
     .sck = PIN_PB13,
     .miso = PIN_PC2,
@@ -48,7 +49,13 @@ SpiDevice s_radio_device = {
     .cpol = 0,
 };
 
-uint16_t crc(uint16_t checksum, pspcommsg msg) {
+static UartDevice s_camera_device = {
+    .baudrate = 115200,
+    .tx = PIN_PC8,
+    .rx = 0,
+};
+
+uint16_t crc16(uint16_t checksum, pspcommsg msg) {
     // Some code is taken from ChatGPT
     uint8_t *msg_content = (uint8_t *)malloc(5 + msg.payload_len);
     msg_content[0] = '!';
@@ -98,6 +105,9 @@ Status pspcom_init() {
     if (sx1276_start_receive(&s_radio_device) != STATUS_OK) {
         return STATUS_ERROR;
     }
+
+    // Initialize camera
+    uart_init(&s_camera_device);
 
     return STATUS_OK;
 }
@@ -198,6 +208,20 @@ void task_pspcom_rx() {
 
                             // Reset
                             NVIC_SystemReset();
+                        }
+                        break;
+                    case TRIGGERCAM:
+                        // Send the camera start recording command
+                        if (msg.payload_len == 1 && msg.payload[0] == 42) {
+                            // https://note.youdao.com/coshare/index.html?token=9AD3F89F0B92488E8241F58CAEDF7939&gid=29699666&_time=1740185861540
+                            // https://crccalc.com/?crc=cc0101&method=dvb-s2&datatype=hex&outtype=hex
+                            uint8_t cmd[] = {
+                                0xCC,  // Header (magic value)
+                                0x01,  // Command (camera control)
+                                0x01,  // Action ID (power button)
+                                0xE7,  // CRC-8/DVB-S2
+                            };
+                            uart_tx(&s_camera_device, cmd, sizeof(cmd));
                         }
                         break;
                 }
