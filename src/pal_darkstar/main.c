@@ -74,7 +74,7 @@ void task_init() {
     vTaskSuspendAll();
 
     uint32_t init_error = 0;  // Set if error occurs during initialization
-    // uint32_t num_inits = 8;   // Number of inits the error code refers to
+    uint32_t num_inits = 8;   // Number of inits the error code refers to
 
     PAL_LOGI("Starting initialization...\n");
 
@@ -95,17 +95,17 @@ void task_init() {
     gpio_write(PIN_YELLOW, GPIO_LOW);
     gpio_write(PIN_GREEN, GPIO_LOW);
     gpio_write(PIN_BLUE, GPIO_LOW);
-    // buzzer_play(BUZZER_SOUND_INIT);
-    // // buzzer_play(BUZZER_SOUND_SONG);
+    buzzer_play(BUZZER_SOUND_INIT);
+    // buzzer_play(BUZZER_SOUND_SONG);
 
-    // // Beep out the failure code (if any)
-    // for (int i = 0; i < num_inits; i++) {
-    //     if ((init_error >> i) & 1) {
-    //         buzzer_play(BUZZER_SOUND_LONG_DESCENDING_BEEP);
-    //     } else {
-    //         buzzer_play(BUZZER_SOUND_LONG_BEEP);
-    //     }
-    // }
+    // Beep out the failure code (if any)
+    for (int i = 0; i < num_inits; i++) {
+        if ((init_error >> i) & 1) {
+            buzzer_play(BUZZER_SOUND_LONG_DESCENDING_BEEP);
+        } else {
+            buzzer_play(BUZZER_SOUND_LONG_BEEP);
+        }
+    }
 
     PAL_LOGI("Initialization complete\n");
 

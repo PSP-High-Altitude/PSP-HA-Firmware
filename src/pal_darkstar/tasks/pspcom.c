@@ -98,7 +98,8 @@ Status pspcom_init() {
     configASSERT(s_fp_queue);
 
     // Initialize radio
-    if (sx1276_init(&s_radio_device, PIN_PC5, 434000000, 20, 125000, 10, 5, 8,
+    if (sx1276_init(&s_radio_device, PIN_PC5,
+                    s_config_ptr->telemetry_frequency_hz, 20, 125000, 10, 5, 8,
                     false, true, false) != STATUS_OK) {
         return STATUS_ERROR;
     }

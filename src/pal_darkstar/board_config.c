@@ -29,10 +29,10 @@ const static BoardConfig s_default_config = {
     .max_grounded_alt_m = 100,      // m
     .min_grounded_time_ms = 10000,  // ms
     .max_ready_acc_bias_mps2 = 2,   // m/s^2
-    .orient_antenna_up = false,     // antenna down
+    .orient_antenna_up = true,      // antenna down
 
     // Stage separation settings
-    .stage_is_separator_bool = 1,
+    .stage_is_separator_bool = 0,
     .stage_sep_lockout_ms = 4500,
     .stage_sep_delay_ms = 800,
     .stage_min_sep_velocity_mps = -1e9f,
@@ -55,12 +55,12 @@ const static BoardConfig s_default_config = {
     .stage_ignite_pyro_channel = PYRO_A1,
 
     // Recovery settings
-    .main_height_m = 300.0,      // m
-    .drogue_delay_ms = 0,        // ms
-    .deploy_lockout_ms = 10000,  // ms
+    .main_height_m = 300.0,     // m
+    .drogue_delay_ms = 0,       // ms
+    .deploy_lockout_ms = 5000,  // ms
 
     // Telemetry settings
-    .telemetry_frequency_hz = 433750000,  // Hz
+    .telemetry_frequency_hz = 433350000,  // Hz
 };
 
 // Simple summing checksum with non-zero initialization
