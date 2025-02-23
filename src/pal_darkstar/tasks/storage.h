@@ -34,6 +34,7 @@ typedef enum {
     STORAGE_PAUSE_RESET = 1,
     STORAGE_PAUSE_SAFE = 2,
     STORAGE_PAUSE_MSC = 4,
+    STORAGE_PAUSE_BRK = 8,
 } StoragePauseMode;
 
 Status storage_init();

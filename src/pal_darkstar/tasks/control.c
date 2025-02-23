@@ -114,9 +114,27 @@ void task_control(TaskHandle_t* handle_ptr) {
             gpio_write(PIN_YELLOW, GPIO_LOW);
         }
 
+        // Blink red LED in error state
         if (state_frame.flight_phase == FP_ERROR) {
             // 25% duty cycle, 400 ms period
             gpio_write(PIN_RED, (MILLIS() % 400) < 100);
+        }
+
+        // Periodically pause storage to segment files when grounded
+        static uint64_t s_last_autosave_ms = 0;
+        if (state_frame.flight_phase == FP_WAIT ||
+            state_frame.flight_phase == FP_LANDED) {
+            if (MILLIS() - s_last_autosave_ms > 5 * 60 * 1000) {
+                // Pause every 5 minutes; note that this will stall state
+                // estimation while the save is in progress, so we don't want to
+                // do this either in flight or in launch detect mode
+                s_last_autosave_ms = MILLIS();
+                storage_pause(STORAGE_PAUSE_BRK);
+                while (storage_is_active()) {
+                    DELAY(1);
+                }
+                storage_start(STORAGE_PAUSE_BRK);
+            }
         }
 
         vTaskDelayUntil(&last_iteration_start_tick,
