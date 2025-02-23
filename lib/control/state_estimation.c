@@ -26,9 +26,9 @@ static SmaFilter s_baro_vel_sma;
 
 static OrientFunc s_orientation_function = NULL;
 
-static Vector s_grav_vec = {.x = -G_MAG, .y = 0.0f, .z = 0.0f};
+static Vector s_grav_vec = {.x = -G_MAG, .y = 0.f, .z = 0.f};
 
-static float s_ground_alt = 0.;
+static float s_ground_alt = 0.f;
 
 enum LogState {
     SE_LOG_OK = 0,
@@ -38,12 +38,12 @@ static LogState s_log_state = 0;
 
 static bool se_valid_acc(float acc_g) {
     // Higher cutoff values to accomodate future sensors
-    return -100. < acc_g && acc_g < 100.;
+    return -100.f < acc_g && acc_g < 100.f;
 }
 
 static bool se_valid_pressure(float pressure_mbar) {
     // Allow extended low range for descent tracking
-    return 0. < pressure_mbar && pressure_mbar < 1200.;
+    return 0.f < pressure_mbar && pressure_mbar < 1200.f;
 }
 
 static float se_baro_weight(float alt_m, float vel_mps) {
@@ -74,14 +74,14 @@ static float se_baro_weight(float alt_m, float vel_mps) {
      *
      */
 
-    const static float s_baro_max_vel_mps = 150.;  // m/s
-    const static float s_baro_max_alt_m = 9000.;   // m
+    const static float s_baro_max_vel_mps = 90.f;  // m/s
+    const static float s_baro_max_alt_m = 9000.f;  // m
 
-    float alt_weight = 1. - expf(10. * (alt_m / s_baro_max_alt_m - 1.));
+    float alt_weight = 1.f - expf(10. * (alt_m / s_baro_max_alt_m - 1.f));
 
-    float vel_weight_clamp = 1. - expf((vel_mps - s_baro_max_vel_mps) / 30.);
+    float vel_weight_clamp = 1.f - expf((vel_mps - s_baro_max_vel_mps) / 9.f);
     float vel_weight_logistic =
-        1. / (1. + expf((vel_mps - s_baro_max_vel_mps / 2.) / 30.));
+        1. / (1. + expf((vel_mps - s_baro_max_vel_mps / 2.) / 9.));
     float vel_weight = vel_weight_clamp * vel_weight_logistic;
 
     // Also weight by the health of the baro filters
@@ -95,15 +95,15 @@ static float se_baro_weight(float alt_m, float vel_mps) {
     float filter_weight = alt_filter_weight * vel_filter_weight;
 
     float total_weight = alt_weight * vel_weight * filter_weight;
-    return total_weight < 0. ? 0. : total_weight > 1. ? 1. : total_weight;
+    return total_weight < 0.f ? 0.f : total_weight > 1.f ? 1.f : total_weight;
 }
 
 static float se_trap_int_step(float old, float new, float dt) {
-    return dt * (old + new) / 2.;
+    return dt * (old + new) / 2.f;
 }
 
 static float se_baro_alt_m(float p_mbar) {
-    float alt_m = 44330 * (1 - powf(((p_mbar) / 1013.25), 1 / 5.255f));
+    float alt_m = 44330.f * (1.f - powf(((p_mbar) / 1013.25f), 1.f / 5.255f));
     return se_valid_pressure(p_mbar) ? alt_m : NAN;
 }
 
@@ -218,7 +218,7 @@ StateFrame se_as_frame() {
 
 Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     // Sensor timestamp is in us, so convert to seconds (float)
-    float t = sensor_frame->timestamp / 1e6;
+    float t = sensor_frame->timestamp / 1e6f;
     float dt = t - s_state_ptr->time;
     s_state_ptr->time = t;
 
@@ -343,31 +343,35 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     s_state_ptr->posImu +=
         se_trap_int_step(s_state_ptr->velImu, last_imu_vel, dt);
 
-    // Combined state updates
-    if (phase >= FP_DROGUE) {
-        // After drogue deployment, use baro alt exclusively
-        s_state_ptr->posVert = s_state_ptr->posBaro;
-        s_state_ptr->velVert = s_state_ptr->velBaro;
-        s_state_ptr->accVert = vec_mag(&s_current_acc);
-    } else if (phase == FP_COAST && baro_valid) {
-        // During coast, use weighted combination of integration and baro
-        static float baro_weight = 0;
-        float new_baro_weight =
-            se_baro_weight(s_state_ptr->posVert, s_state_ptr->velVert);
-        baro_weight = (baro_weight + new_baro_weight) / 2;
-        // baro_weight = 0.;
-        float imu_weight = 1. - baro_weight;
+    // Always update acceleration
+    s_state_ptr->accVert = s_state_ptr->accImu;
 
-        s_state_ptr->posVert = imu_weight * s_state_ptr->posImu +
-                               baro_weight * s_state_ptr->posBaro;
-        s_state_ptr->velVert = imu_weight * s_state_ptr->velImu +
-                               baro_weight * s_state_ptr->velBaro;
-        s_state_ptr->accVert = s_state_ptr->accImu;
+    // Combined state updates
+    if (FP_BOOST <= phase && phase <= FP_MAIN) {
+        if (phase == FP_DROGUE || phase == FP_MAIN) {
+            // During descent, use baro alt exclusively
+            s_state_ptr->posVert = s_state_ptr->posBaro;
+            s_state_ptr->velVert = s_state_ptr->velBaro;
+        } else if (phase == FP_COAST && baro_valid) {
+            // During coast, use weighted combination of integration and baro
+            static float s_baro_weight = 0.f;
+            float new_baro_weight =
+                se_baro_weight(s_state_ptr->posVert, s_state_ptr->velVert);
+            s_baro_weight = (s_baro_weight + new_baro_weight) / 2.f;
+            float imu_weight = 1.f - s_baro_weight;
+
+            s_state_ptr->posVert = imu_weight * s_state_ptr->posImu +
+                                   s_baro_weight * s_state_ptr->posBaro;
+            s_state_ptr->velVert = imu_weight * s_state_ptr->velImu +
+                                   s_baro_weight * s_state_ptr->velBaro;
+        } else {
+            // In all other cases, use integration exclusively
+            s_state_ptr->posVert = s_state_ptr->posImu;
+            s_state_ptr->velVert = s_state_ptr->velImu;
+        }
     } else {
-        // Otherwise, use integration exclusively
-        s_state_ptr->posVert = s_state_ptr->posImu;
-        s_state_ptr->velVert = s_state_ptr->velImu;
-        s_state_ptr->accVert = s_state_ptr->accImu;
+        // If we're on the ground, skip all state updates
+        return STATUS_OK;
     }
 
     /*************************/

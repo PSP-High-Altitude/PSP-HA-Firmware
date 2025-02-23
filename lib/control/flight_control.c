@@ -318,7 +318,7 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
                         s_config_ptr->control_loop_period_ms / 1e3);
 
             for (int i = 0; i < s_ld_buffer_entries; i++) {
-                EXPECT_OK(se_update(*s_flight_phase_ptr, &s_ld_buffer_data[i]),
+                EXPECT_OK(se_update(FP_BOOST, &s_ld_buffer_data[i]),
                           "state est update failed during launch replay\n");
             }
         }
