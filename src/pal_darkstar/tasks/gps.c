@@ -115,7 +115,7 @@ void task_gps(TaskHandle_t* handle_ptr) {
             }
 #endif  // HWIL_TEST
 
-            GpsFrame gps_frame = gps_fix_to_pb_frame(MILLIS(), &fix);
+            GpsFrame gps_frame = gps_fix_to_pb_frame(MICROS(), &fix);
 
             // Set LED to indicate GPS fix
             gpio_write(PIN_BLUE, (fix.fix_valid && !fix.invalid_llh)
