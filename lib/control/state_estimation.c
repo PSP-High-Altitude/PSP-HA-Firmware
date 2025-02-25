@@ -358,7 +358,6 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
             float new_baro_weight =
                 se_baro_weight(s_state_ptr->posVert, s_state_ptr->velVert);
             s_baro_weight = (s_baro_weight + new_baro_weight) / 2.f;
-            s_baro_weight = 0;
             float imu_weight = 1.f - s_baro_weight;
 
             s_state_ptr->posVert = imu_weight * s_state_ptr->posImu +

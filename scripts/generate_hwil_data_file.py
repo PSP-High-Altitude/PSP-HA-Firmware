@@ -8,7 +8,7 @@ def load_as_initializer_list(file_path: Path) -> str:
             '    {' + line.rstrip(',\n') + '},'
             for line in f.readlines()
         ]
-    
+
 def generate_hwil_data_defs(file_path: Path, data_type: str, name: str) -> str:
     initializer_list = load_as_initializer_list(file_path)
     return f"""
@@ -23,7 +23,7 @@ def generate_hwil_data_file():
 
     sensor_file_path = next(Path(hwil_data_dir_path).glob("*dat.csv"))
     gps_file_path = next(Path(hwil_data_dir_path).glob("*gps.csv"))
-    
+
     print(f"Generating sensor HWIL data from {sensor_file_path}")
     sensor_data_defs = generate_hwil_data_defs(sensor_file_path, "SensorFrame", "SENSOR")
 
@@ -32,6 +32,7 @@ def generate_hwil_data_file():
 
     return f"""
 #include <stdint.h>
+#include <math.h>
 
 #include "sensor.pb.h"
 #include "gps.pb.h"
@@ -56,7 +57,7 @@ def write_hwil_data_file():
     print(f"Writing generated HWIL data file to {output_file_path}")
     with open(output_file_path, 'w') as f:
         f.write(output_file_str)
-    
+
     env.BuildSources(str(hwil_build_dir), str(hwil_src_dir))
 
 write_hwil_data_file()
