@@ -358,6 +358,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
             float new_baro_weight =
                 se_baro_weight(s_state_ptr->posVert, s_state_ptr->velVert);
             s_baro_weight = (s_baro_weight + new_baro_weight) / 2.f;
+            s_baro_weight = 0;
             float imu_weight = 1.f - s_baro_weight;
 
             s_state_ptr->posVert = imu_weight * s_state_ptr->posImu +
@@ -403,8 +404,8 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     /********************/
     /* EKF MODEL UPDATE */
     /********************/
-    kf_do_kf(s_state_ptr, phase, sensor_frame);  // TODO: status output here
-    kf_wrtie_state(s_state_ptr);                 // write new state to StateEst
+    kf_do_kf(phase, sensor_frame, dt);  // TODO: status output here
+    kf_write_state(s_state_ptr);        // write new state to StateEst
 
     return STATUS_OK;
 }

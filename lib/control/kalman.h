@@ -103,13 +103,6 @@ typedef enum {
     KF_ACC_I = 2,
 } kf_z_idx;
 
-typedef struct {  // this might not be used
-    mfloat time;
-    mat* x;
-    mat* P;
-    int dim;
-} KfState;
-
 // MATRIX FUNCTIONS
 arm_status mat_copy(const mat* from, mat* to);
 arm_status mat_edit(mat* mat_ptr, uint16_t i, uint16_t j, mfloat value);
@@ -168,10 +161,8 @@ Status kf_init_mats();
 void kf_free_mats();
 void kf_init_state(const mfloat* x0, const mfloat* P0_diag, kf_up upaxis);
 
-kf_status kf_do_kf(
-    void* state_ptr, FlightPhase phase,
-    const SensorFrame* sensor_frame);  // 1st input should be StateEst but I
-                                       // don't want to include that rn
+kf_status kf_do_kf(FlightPhase phase, const SensorFrame* sensor_frame,
+                   mfloat dt);
 
 /**
  * @brief
@@ -226,8 +217,6 @@ void kf_resid(
 
 mfloat kf_altToPressure(mfloat alt);
 
-KfState kf_getState();
-
-void kf_wrtie_state(StateEst* s_statest);
+void kf_write_state(StateEst* state_ptr);
 
 #endif  // KALMAN_H

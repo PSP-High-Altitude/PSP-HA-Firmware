@@ -7,7 +7,6 @@
 #include "stdlib.h"
 
 // MATRICES (STATIC)
-static KfState state;  // might not need this
 static mat x;          // state
 static mat P;          // state covar mat
 static mat F;          // state update mat
@@ -24,8 +23,6 @@ static mat w;  // angular velocity measurements
 
 static mfloat Q_vars[NUM_TOT_STATES];  // get set in preprocess
 static mfloat R_diag[NUM_KIN_MEAS];    // get set in preprocess
-
-static mfloat time = -1;  // in seconds
 
 // TODO: Better place for all this config stuff
 // These copied from the values I used during python testing
@@ -196,9 +193,6 @@ Status kf_init_mats() {
     malloc_errors += mat_alloc(&S, NUM_KIN_MEAS, NUM_KIN_MEAS);
     malloc_errors += mat_alloc(&K, NUM_TOT_STATES, NUM_KIN_MEAS);
 
-    state.x = &x;
-    state.P = &P;
-
     if (malloc_errors == 0) {
         return STATUS_OK;
     } else {
@@ -229,16 +223,8 @@ void kf_init_state(const mfloat* x0, const mfloat* P0_diag, kf_up upaxis) {
     // TODO: Ititialize height based on current pressure
 }
 
-kf_status kf_do_kf(void* state_ptr, FlightPhase phase,
-                   const SensorFrame* sensor_frame) {
-    mfloat dt;
-    if (time > 0) {
-        dt = sensor_frame->timestamp / TIME_CONVERSION - time;
-    } else {
-        dt = 0;
-    }
-    time = sensor_frame->timestamp / TIME_CONVERSION;
-
+kf_status kf_do_kf(FlightPhase phase, const SensorFrame* sensor_frame,
+                   mfloat dt) {
     // get measurements from correct axis
     mfloat z[NUM_KIN_MEAS];
     mfloat w_meas[NUM_ROT_MEAS];
@@ -382,7 +368,7 @@ kf_status kf_update(const mfloat* z, const mfloat* R_diag) {
     math_status = arm_mat_trans_f32(&H, &Ht);     // H'
     math_status = mat_doubleMultiply(&P, &Ht, &S, &K);  // K = P*H'*inv(S)
 
-    // x += K @ self.y # update state 
+    // x += K @ self.y # update state
     mat Ky = {NUM_TOT_STATES, 1, temp_space};
     math_status = arm_mat_mult_f32(&K, &y, &Ky);  // Ky = K*y'
     math_status = mat_addTo(&x, &Ky);             // x += Ky
@@ -590,27 +576,22 @@ mfloat kf_altToPressure(mfloat alt) {
     // TODO: Checks for negative alt make NaN pressure
 }
 
-KfState kf_getState() {
-    KfState state = {time, &x, &P, NUM_TOT_STATES};
-    return state;
-}
+void kf_write_state(StateEst* state_ptr) {
+    state_ptr->posEkf = x.pData[KF_POS];
+    state_ptr->velEkf = x.pData[KF_VEL];
+    state_ptr->accEkf = x.pData[KF_ACC];
 
-void kf_wrtie_state(StateEst* s_statest) {
-    s_statest->posEkf = x.pData[KF_POS];
-    s_statest->velEkf = x.pData[KF_VEL];
-    s_statest->accEkf = x.pData[KF_ACC];
+    state_ptr->posVarEkf = mat_val(&P, KF_POS, KF_POS);
+    state_ptr->velVarEkf = mat_val(&P, KF_VEL, KF_VEL);
+    state_ptr->accVarEkf = mat_val(&P, KF_ACC, KF_ACC);
 
-    s_statest->posVarEkf = mat_val(&P, KF_POS, KF_POS);
-    s_statest->velVarEkf = mat_val(&P, KF_VEL, KF_VEL);
-    s_statest->accVarEkf = mat_val(&P, KF_ACC, KF_ACC);
+    state_ptr->orientEkf1 = x.pData[KF_Q0 + 0];
+    state_ptr->orientEkf2 = x.pData[KF_Q0 + 1];
+    state_ptr->orientEkf3 = x.pData[KF_Q0 + 2];
+    state_ptr->orientEkf4 = x.pData[KF_Q0 + 3];
 
-    s_statest->orientEkf1 = x.pData[KF_Q0 + 0];
-    s_statest->orientEkf2 = x.pData[KF_Q0 + 1];
-    s_statest->orientEkf3 = x.pData[KF_Q0 + 2];
-    s_statest->orientEkf4 = x.pData[KF_Q0 + 3];
-
-    s_statest->orientVarEkf1 = mat_val(&P, KF_Q0 + 0, KF_Q0 + 0);
-    s_statest->orientVarEkf2 = mat_val(&P, KF_Q0 + 1, KF_Q0 + 1);
-    s_statest->orientVarEkf3 = mat_val(&P, KF_Q0 + 2, KF_Q0 + 2);
-    s_statest->orientVarEkf4 = mat_val(&P, KF_Q0 + 3, KF_Q0 + 3);
+    state_ptr->orientVarEkf1 = mat_val(&P, KF_Q0 + 0, KF_Q0 + 0);
+    state_ptr->orientVarEkf2 = mat_val(&P, KF_Q0 + 1, KF_Q0 + 1);
+    state_ptr->orientVarEkf3 = mat_val(&P, KF_Q0 + 2, KF_Q0 + 2);
+    state_ptr->orientVarEkf4 = mat_val(&P, KF_Q0 + 3, KF_Q0 + 3);
 }
