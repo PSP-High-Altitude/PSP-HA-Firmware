@@ -32,7 +32,6 @@ static const mfloat Q_VARS_2[NUM_TOT_STATES] = {10., 1.,  1., 0.1,
                                                 0.1, 0.1, 0.1};
 static const mfloat R_DIAG_1[NUM_KIN_MEAS] = {5.e-01, 3.e-04, 3.e-04};
 static const mfloat R_DIAG_2[NUM_KIN_MEAS] = {0.5, 1., 1.};
-static kf_up kf_axis = Y_POS;  // using y as default from skyshot test
 
 // TODO: Initial height?
 static mfloat s_initial_height;
@@ -213,91 +212,24 @@ void kf_free_mats() {
     free(K.pData);
 }
 
-void kf_init_state(const mfloat* x0, const mfloat* P0_diag, kf_up upaxis) {
-    kf_axis = upaxis;
+void kf_init_state(const mfloat* x0, const mfloat* P0_diag) {
     arm_copy_f32(x0, x.pData, mat_size(&x));
     mat_diag(&P, P0_diag, true);
     w.pData[0] = 0;
     w.pData[1] = 0;
     w.pData[2] = 0;
-    // TODO: set up axis here
-    // TODO: Ititialize height based on current pressure
 }
 
-kf_status kf_do_kf(FlightPhase phase, const SensorFrame* sensor_frame,
-                   mfloat dt) {
-    // get measurements from correct axis
+kf_status kf_do_kf(FlightPhase phase, KfInputVector input, mfloat dt) {
     mfloat z[NUM_KIN_MEAS];
     mfloat w_meas[NUM_ROT_MEAS];
-    /*
-    Note on orientation:
-    x - roll
-    y - pitch
-    z - yaw
-    To make the quaternions and euler angles work, the up axis will become x ->
-    roll. Then the remaining to axes will become y and z in the order that makes
-    a right-hand csys. This xyz configuration may be different than the
-    acceleration frame and that's fine, since what we care about in the end is
-    euler angles and this should make that work
-    */
-    switch (kf_axis) {  // theres probably a shorter way to do this but whatever
-        case X_POS:
-            z[0] = sensor_frame->pressure;
-            z[1] = sensor_frame->acc_h_x;
-            z[2] = sensor_frame->acc_i_x;
-            w_meas[0] = sensor_frame->rot_i_x;
-            w_meas[1] = sensor_frame->rot_i_y;
-            w_meas[2] = sensor_frame->rot_i_z;
-            break;
-        case Y_POS:
-            z[0] = sensor_frame->pressure;
-            z[1] = sensor_frame->acc_h_y;
-            z[2] = sensor_frame->acc_i_y;
-            w_meas[0] = sensor_frame->rot_i_y;
-            w_meas[1] = sensor_frame->rot_i_z;
-            w_meas[2] = sensor_frame->rot_i_x;
-            break;
-        case Z_POS:
-            z[0] = sensor_frame->pressure;
-            z[1] = sensor_frame->acc_h_z;
-            z[2] = sensor_frame->acc_i_z;
-            w_meas[0] = sensor_frame->rot_i_z;
-            w_meas[1] = sensor_frame->rot_i_x;
-            w_meas[2] = sensor_frame->rot_i_y;
-            break;
-        case X_NEG:
-            z[0] = sensor_frame->pressure;
-            z[1] = -sensor_frame->acc_h_x;
-            z[2] = -sensor_frame->acc_i_x;
-            w_meas[0] = -sensor_frame->rot_i_x;
-            w_meas[1] = -sensor_frame->rot_i_y;
-            w_meas[2] = -sensor_frame->rot_i_z;
-            // not sure how right this negative rotation stuff is -- needs
-            // testing
-            break;
-        case Y_NEG:
-            z[0] = sensor_frame->pressure;
-            z[1] = -sensor_frame->acc_h_y;
-            z[2] = -sensor_frame->acc_i_y;
-            w_meas[0] = -sensor_frame->rot_i_y;
-            w_meas[1] = -sensor_frame->rot_i_z;
-            w_meas[2] = -sensor_frame->rot_i_x;
-            break;
-        case Z_NEG:
-            z[0] = sensor_frame->pressure;
-            z[1] = -sensor_frame->acc_h_z;
-            z[2] = -sensor_frame->acc_i_z;
-            w_meas[0] = -sensor_frame->rot_i_z;
-            w_meas[1] = -sensor_frame->rot_i_x;
-            w_meas[2] = -sensor_frame->rot_i_y;
-            break;
-        default:
-            return KF_ERROR;
-    }
 
-    // mfloat w_meas[NUM_ROT_MEAS] = {
-    //     sensor_frame->rot_i_x, sensor_frame->rot_i_y,
-    //     sensor_frame->rot_i_z};  // also check the order of these
+    z[0] = input.pressure;
+    z[1] = input.acc_h;
+    z[2] = input.acc_i;
+    w_meas[0] = input.rot_x;
+    w_meas[1] = input.rot_y;
+    w_meas[2] = input.rot_z;
 
     // Use static w so that old w is saved in case of a bad measurement
     // update w if there are no nans in measurement. Otherwise keep old value

@@ -80,15 +80,6 @@ typedef enum {
     KF_PASS = 4,  // Don't do anything
 } kf_status;
 
-typedef enum {
-    X_POS = 1,
-    Y_POS = 2,
-    Z_POS = 3,
-    X_NEG = -1,
-    Y_NEG = -2,
-    Z_NEG = -3,
-} kf_up;
-
 // Use these enums for indexing x and z for readability and changeability
 typedef enum {
     KF_POS = 0,  // position index in state vector
@@ -102,6 +93,15 @@ typedef enum {
     KF_ACC_H = 1,
     KF_ACC_I = 2,
 } kf_z_idx;
+
+typedef struct {
+    mfloat pressure;
+    mfloat acc_h;
+    mfloat acc_i;
+    mfloat rot_x;
+    mfloat rot_y;
+    mfloat rot_z;
+} KfInputVector;
 
 // MATRIX FUNCTIONS
 arm_status mat_copy(const mat* from, mat* to);
@@ -159,10 +159,9 @@ int mat_boolSum(bool* vec, int size);
 // KF FUNCTIONS
 Status kf_init_mats();
 void kf_free_mats();
-void kf_init_state(const mfloat* x0, const mfloat* P0_diag, kf_up upaxis);
+void kf_init_state(const mfloat* x0, const mfloat* P0_diag);
 
-kf_status kf_do_kf(FlightPhase phase, const SensorFrame* sensor_frame,
-                   mfloat dt);
+kf_status kf_do_kf(FlightPhase phase, KfInputVector input, mfloat dt);
 
 /**
  * @brief

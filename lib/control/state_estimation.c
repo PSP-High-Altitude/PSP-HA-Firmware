@@ -28,7 +28,7 @@ static SmaFilter s_baro_vel_sma;
 static SampleWindow s_baro_alt_window;
 static SampleWindow s_baro_time_window;
 
-static OrientFunc s_orientation_function = NULL;
+static OrientFunc orientation_function = NULL;
 
 static Vector s_grav_vec = {.x = -G_MAG, .y = 0.f, .z = 0.f};
 
@@ -128,7 +128,7 @@ Status se_init() {
     SensorDirection sensor_dir =
         config_get_ptr()->orient_antenna_up ? IMU_Z_DOWN : IMU_Z_UP;
 
-    s_orientation_function = get_orientation_function(sensor_dir);
+    orientation_function = get_orientation_function(sensor_dir);
 
     // kf init
     ASSERT_OK(kf_init_mats(), "failed to allocate memory for kf matrices");
@@ -143,7 +143,7 @@ Status se_init() {
         kf_up = -kf_up + 3;
     }
 
-    kf_init_state(x0, P0_diag, kf_up);
+    kf_init_state(x0, P0_diag);
 
     return STATUS_OK;
 }
@@ -240,31 +240,37 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     static Vector s_current_acc = {};
     Vector last_acc = s_current_acc;
 
+    Vector acc_h;
+    Vector acc_i;
+
+    orientation_function(sensor_frame->acc_h_x,  ///
+                         sensor_frame->acc_h_y,  ///
+                         sensor_frame->acc_h_z,  ///
+                         &acc_h);
+    orientation_function(sensor_frame->acc_i_x,  ///
+                         sensor_frame->acc_i_y,  ///
+                         sensor_frame->acc_i_z,  ///
+                         &acc_i);
+
     // Decide which acceleration value to use
-    if (se_valid_acc(sensor_frame->acc_i_x) &&  ///
-        se_valid_acc(sensor_frame->acc_i_y) &&  ///
-        se_valid_acc(sensor_frame->acc_i_z)) {
+    if (se_valid_acc(acc_i.x) &&  ///
+        se_valid_acc(acc_i.y) &&  ///
+        se_valid_acc(acc_i.z)) {
         s_log_state = SE_LOG_OK;
 
         // If the high-precision acceleration values are valid, prefer those
-        s_orientation_function(sensor_frame->acc_i_x * G_MAG,  ///
-                               sensor_frame->acc_i_y * G_MAG,  ///
-                               sensor_frame->acc_i_z * G_MAG,  ///
-                               &s_current_acc);
+        s_current_acc = acc_i;
 
         // Check if we're exceeding the high-precision limit on any axis
-        if (fabsf(sensor_frame->acc_i_x) > LOW_G_MAX_ACC ||  ///
-            fabsf(sensor_frame->acc_i_y) > LOW_G_MAX_ACC ||  ///
-            fabsf(sensor_frame->acc_i_z) > LOW_G_MAX_ACC) {
+        if (fabsf(acc_i.x) > LOW_G_MAX_ACC ||  ///
+            fabsf(acc_i.y) > LOW_G_MAX_ACC ||  ///
+            fabsf(acc_i.z) > LOW_G_MAX_ACC) {
             // If we are, check if we have valid high-range values
-            if (se_valid_acc(sensor_frame->acc_h_x) &&
-                se_valid_acc(sensor_frame->acc_h_y) &&
-                se_valid_acc(sensor_frame->acc_h_z)) {
+            if (se_valid_acc(acc_h.x) &&  ///
+                se_valid_acc(acc_h.y) &&  ///
+                se_valid_acc(acc_h.z)) {
                 // If we do, then, just use those straight up
-                s_orientation_function(sensor_frame->acc_h_x * G_MAG,  ///
-                                       sensor_frame->acc_h_y * G_MAG,  ///
-                                       sensor_frame->acc_h_z * G_MAG,  ///
-                                       &s_current_acc);
+                s_current_acc = acc_h;
             } else {
                 // If we don't, then we have to make the decision between
                 // sticking with the old values or going with the new ones
@@ -277,16 +283,13 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
                 }
             }
         }
-    } else if (se_valid_acc(sensor_frame->acc_h_x) &&  ///
-               se_valid_acc(sensor_frame->acc_h_y) &&  ///
-               se_valid_acc(sensor_frame->acc_h_z)) {
+    } else if (se_valid_acc(acc_h.x) &&  ///
+               se_valid_acc(acc_h.y) &&  ///
+               se_valid_acc(acc_h.z)) {
         s_log_state = SE_LOG_OK;
         // If the high-precision values are invalid but the high-range ones are
         // valid, not much to think about -- just go with the high-range ones
-        s_orientation_function(sensor_frame->acc_h_x * G_MAG,  ///
-                               sensor_frame->acc_h_y * G_MAG,  ///
-                               sensor_frame->acc_h_z * G_MAG,  ///
-                               &s_current_acc);
+        s_current_acc = acc_h;
     } else {
         // If neither were valid, then we reuse the acceleration values from
         // last time (which is a no-op since they're in s_current_state).
@@ -301,22 +304,29 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
         vec_iscale(&s_current_acc, 0.9);  // half-life of 7 iterations
     }
 
+    vec_iscale(&s_current_acc, G_MAG);
+
     /******************/
     /* ANG VEL UPDATE */
     /******************/
-    if (!isnan(sensor_frame->rot_i_x) &&  ///
-        !isnan(sensor_frame->rot_i_y) &&  ///
-        !isnan(sensor_frame->rot_i_z)) {
-        s_orientation_function(DEG_TO_RAD(sensor_frame->rot_i_x),  ///
-                               DEG_TO_RAD(sensor_frame->rot_i_y),  ///
-                               DEG_TO_RAD(sensor_frame->rot_i_z),  ///
-                               &(s_state_ptr->angVelBody));
+    Vector rot;
+
+    orientation_function(DEG_TO_RAD(sensor_frame->rot_i_x),  ///
+                         DEG_TO_RAD(sensor_frame->rot_i_y),  ///
+                         DEG_TO_RAD(sensor_frame->rot_i_z),  ///
+                         &rot);
+
+    if (!isnan(rot.x) &&  ///
+        !isnan(rot.y) &&  ///
+        !isnan(rot.z)) {
+        s_state_ptr->angVelBody = rot;
     }
 
     /*******************/
     /* BARO ALT UPDATE */
     /*******************/
-    float baro_alt = se_baro_alt_m(sensor_frame->pressure) - s_ground_alt;
+    float pressure = sensor_frame->pressure;
+    float baro_alt = se_baro_alt_m(pressure) - s_ground_alt;
 
     /***********************/
     /* LINEAR MODEL UPDATE */
@@ -418,7 +428,16 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     /********************/
     /* EKF MODEL UPDATE */
     /********************/
-    kf_do_kf(phase, sensor_frame, dt);  // TODO: status output here
+    KfInputVector kf_input = {
+        .pressure = se_valid_pressure(pressure) ? pressure : NAN,
+        .acc_h = se_valid_acc(acc_h.x) ? acc_h.x : NAN,
+        .acc_i = se_valid_acc(acc_i.x) ? acc_i.x : NAN,
+        .rot_x = rot.x,
+        .rot_y = rot.y,
+        .rot_z = rot.z,
+    };
+
+    kf_do_kf(phase, kf_input, dt);      // TODO: status output here
     kf_write_state(s_state_ptr);        // write new state to StateEst
 
     return STATUS_OK;
