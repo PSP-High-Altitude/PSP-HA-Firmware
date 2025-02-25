@@ -8,6 +8,7 @@
 #include "filter/sma_filter.h"
 #include "kalman.h"
 #include "quat.h"
+#include "sample_window.h"
 #include "vector.h"
 
 #define DEG_TO_RAD(x) (x * M_PI / 180)
@@ -23,6 +24,9 @@ static StateEst* s_state_ptr = NULL;
 static MedianFilter s_baro_alt_median;
 static SmaFilter s_baro_alt_sma;
 static SmaFilter s_baro_vel_sma;
+
+static SampleWindow s_baro_alt_window;
+static SampleWindow s_baro_time_window;
 
 static OrientFunc s_orientation_function = NULL;
 
@@ -43,7 +47,7 @@ static bool se_valid_acc(float acc_g) {
 
 static bool se_valid_pressure(float pressure_mbar) {
     // Allow extended low range for descent tracking
-    return 0.f < pressure_mbar && pressure_mbar < 1200.f;
+    return 0.f < pressure_mbar && pressure_mbar < 1100.f;
 }
 
 static float se_baro_weight(float alt_m, float vel_mps) {
@@ -114,6 +118,10 @@ Status se_init() {
               "failed to init baro alt sma filter\n");
     ASSERT_OK(sma_filter_init(&s_baro_vel_sma, BARO_VEL_SMA_WINDOW),
               "failed to init baro vel sma filter\n");
+    ASSERT_OK(sample_window_init(&s_baro_alt_window, BARO_DIFF_WINDOW),
+              "failed to init baro diff alt window\n");
+    ASSERT_OK(sample_window_init(&s_baro_time_window, BARO_DIFF_WINDOW),
+              "failed to init baro diff time window\n");
 
     s_state_ptr = &(backup_get_ptr()->state_estimate);
 
@@ -141,8 +149,11 @@ Status se_init() {
 }
 
 Status se_reset() {
+    median_filter_reset(&s_baro_alt_median);
     sma_filter_reset(&s_baro_alt_sma);
     sma_filter_reset(&s_baro_vel_sma);
+    sample_window_reset(&s_baro_alt_window);
+    sample_window_reset(&s_baro_time_window);
     memset(s_state_ptr, 0, sizeof(StateEst));
     s_state_ptr->orientation.w = 1;
     return STATUS_OK;
@@ -156,6 +167,7 @@ Status se_set_time(float t_s) {
 
 Status se_set_ground_pressure(float p_mbar) {
     s_ground_alt = se_baro_alt_m(p_mbar);
+    kf_set_initial_alt(s_ground_alt);
     PAL_LOGI("Ground baro alt set to %.1f m\n", s_ground_alt);
     return STATUS_OK;
 }
@@ -309,9 +321,6 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     /***********************/
     /* LINEAR MODEL UPDATE */
     /***********************/
-    // Baro updates
-    float last_baro_alt = s_state_ptr->posBaro;
-
     // Median filter on the first stage for outlier rejection
     median_filter_insert(&s_baro_alt_median, baro_alt);
     float median_baro_alt = median_filter_get_median(&s_baro_alt_median);
@@ -320,8 +329,14 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     sma_filter_insert(&s_baro_alt_sma, median_baro_alt);
     s_state_ptr->posBaro = sma_filter_get_mean(&s_baro_alt_sma);
 
-    // Calculate baro velocity using last and current average baro altitude
-    float baro_vel = (s_state_ptr->posBaro - last_baro_alt) / dt;
+    // Calculate baro velocity using the differentiaton window
+    sample_window_insert(&s_baro_alt_window, s_state_ptr->posBaro);
+    sample_window_insert(&s_baro_time_window, s_state_ptr->time);
+    float old_baro_alt = sample_window_get(&s_baro_alt_window, 0);
+    float old_baro_time = sample_window_get(&s_baro_time_window, 0);
+    float baro_alt_diff = s_state_ptr->posBaro - old_baro_alt;
+    float baro_time_diff = s_state_ptr->time - old_baro_time;
+    float baro_vel = baro_alt_diff / baro_time_diff;
 
     // SMA filter on the velocity calculated above
     sma_filter_insert(&s_baro_vel_sma, baro_vel);

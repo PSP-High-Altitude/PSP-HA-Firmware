@@ -217,6 +217,8 @@ void kf_resid(
 
 mfloat kf_altToPressure(mfloat alt);
 
+void kf_set_initial_alt(mfloat alt);
+
 void kf_write_state(StateEst* state_ptr);
 
 #endif  // KALMAN_H

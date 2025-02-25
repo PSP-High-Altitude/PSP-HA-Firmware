@@ -35,6 +35,7 @@ static const mfloat R_DIAG_2[NUM_KIN_MEAS] = {0.5, 1., 1.};
 static kf_up kf_axis = Y_POS;  // using y as default from skyshot test
 
 // TODO: Initial height?
+static mfloat s_initial_height;
 
 // Just for debugging
 static arm_status math_status;   // Watch this for math debugging
@@ -576,8 +577,13 @@ mfloat kf_altToPressure(mfloat alt) {
     // TODO: Checks for negative alt make NaN pressure
 }
 
+void kf_set_initial_alt(mfloat alt) {
+    s_initial_height = alt;
+    x.pData[KF_POS] = alt;
+}
+
 void kf_write_state(StateEst* state_ptr) {
-    state_ptr->posEkf = x.pData[KF_POS];
+    state_ptr->posEkf = x.pData[KF_POS] - s_initial_height;
     state_ptr->velEkf = x.pData[KF_VEL];
     state_ptr->accEkf = x.pData[KF_ACC];
 

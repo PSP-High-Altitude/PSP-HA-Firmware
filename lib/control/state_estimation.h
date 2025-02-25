@@ -21,6 +21,7 @@
 #define BARO_ALT_MEDIAN_WINDOW 25
 #define BARO_ALT_SMA_WINDOW 50
 #define BARO_VEL_SMA_WINDOW 25
+#define BARO_DIFF_WINDOW 5
 
 typedef struct {
     float time;  // seconds
