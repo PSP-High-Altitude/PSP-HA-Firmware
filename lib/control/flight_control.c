@@ -431,10 +431,10 @@ FlightPhase fp_update_drogue(const SensorFrame* sensor_frame) {
 FlightPhase fp_update_main(const SensorFrame* sensor_frame) {
     const StateEst* state = se_predict();
 
-    bool alt_below_threshold =
-        state->posVert < s_config_ptr->max_grounded_alt_m;
+    bool vel_below_threshold =
+        state->velEkf > -s_config_ptr->max_grounded_vel_mps;
 
-    if (cond_timer_update(&s_landing_det_timer, alt_below_threshold)) {
+    if (cond_timer_update(&s_landing_det_timer, vel_below_threshold)) {
         PAL_LOGI("FP_MAIN -> FP_LANDED\n");
         return FP_LANDED;
     }

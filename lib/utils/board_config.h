@@ -38,8 +38,8 @@ typedef struct {
     float min_boost_acc_mps2;
     // maximum acceleration below which we are considered to be in coast
     float max_coast_acc_mps2;
-    // maximum altitude under which we are considered to be grounded
-    float max_grounded_alt_m;
+    // maximum velocity under which we are considered to be grounded
+    float max_grounded_vel_mps;
     // minimum time for which we have to be below the grounded alt to transition
     float min_grounded_time_ms;
     // maximum acceleration that may be measured by state estimation in ready
