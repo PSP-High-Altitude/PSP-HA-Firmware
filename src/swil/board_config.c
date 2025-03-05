@@ -22,7 +22,7 @@ static BoardConfig s_config = {
     .min_fast_vel_mps = 300,        // m/s
     .min_boost_acc_mps2 = 25,       // m/s^2
     .max_coast_acc_mps2 = 0,        // m/s^2
-    .max_grounded_alt_m = 100,      // m
+    .max_grounded_vel_mps = 2,      // m/s
     .min_grounded_time_ms = 10000,  // ms
     .max_ready_acc_bias_mps2 = 2,   // m/s^2
     .orient_antenna_up = true,      // antenna up
@@ -102,7 +102,7 @@ void config_print() {
     printf("Min fast vel: %.2f m/s\n", config->min_fast_vel_mps);
     printf("Min boost acc: %.2f m/s^2\n", config->min_boost_acc_mps2);
     printf("Max coast acc: %.2f m/s^2\n", config->max_coast_acc_mps2);
-    printf("Max grounded alt: %.2f m\n", config->max_grounded_alt_m);
+    printf("Max grounded vel: %.2f m\n", config->max_grounded_vel_mps);
     printf("Min grounded time: %.2f ms\n", config->min_grounded_time_ms);
     printf("Antenna orientation: %s\n",
            config->orient_antenna_up ? "Up" : "Down");

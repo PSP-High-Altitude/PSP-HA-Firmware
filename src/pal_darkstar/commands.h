@@ -159,7 +159,7 @@ const char *boardConfigDescription =
     "min_fast_vel_mps: Minimum velocity considered 'fast' (m/s)\n"
     "min_boost_acc_mps2: Minimum acceleration for boost detection (m/s²)\n"
     "max_coast_acc_mps2: Maximum acceleration for coast detection (m/s²)\n"
-    "max_grounded_alt_m: Maximum altitude to be considered grounded (m)\n"
+    "max_grounded_vel_mps: Maximum velocity to be considered grounded (m/s)\n"
     "min_grounded_time_ms: Minimum grounded time for transition (ms)\n"
     "max_ready_acc_bias_mps2: Maximum ready state acceleration bias (m/s²)\n"
     "\n"
