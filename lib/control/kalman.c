@@ -40,6 +40,7 @@ static mfloat s_initial_height;
 static arm_status math_status;   // Watch this for math debugging
 static kf_status filter_status;  // Watch this for kf debugging
 int iteration = 0;
+int pressure_gate_count = 0;
 
 // MATRIX DEFINITIONS
 
@@ -244,6 +245,7 @@ kf_status kf_do_kf(FlightPhase phase, KfInputVector input, mfloat dt) {
                                           // on current phase and state
     if (filter_status == KF_SUCCESS) {
         filter_status = kf_predict(dt, w.pData);  // No NaNs can go in here!
+        kf_pressure_gate(z, 60);                  // gate pressure meas
         filter_status = kf_update(z, R_diag);     // z can contain NaNs
     }
 
@@ -356,6 +358,23 @@ kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
     }
 }
 
+void kf_pressure_gate(mfloat* z, mfloat stdevs) {
+    // discard pressure meas if it is far from current state
+    // mfloat stdevs = 5;
+    if (!isnan(z[KF_BARO])) {
+        mfloat meas_alt = kf_pressureToAlt(z[KF_BARO]);
+        mfloat diff = fabs(meas_alt - x.pData[KF_POS]);
+        mfloat cutoff = (sqrtf(mat_val(&P, KF_POS, KF_POS)) * stdevs);
+        if ((diff > 15) && (diff > cutoff) && (pressure_gate_count < 10)) {
+            // if ((diff > 100) && (diff > cutoff)) {
+            pressure_gate_count++;
+            z[KF_BARO] = NAN;  // reject meas
+        } else {
+            pressure_gate_count = 0;
+        }
+    }
+}
+
 void kf_Q_matrix(mfloat dt) {
     // Q = np.diag(self.Q_var*dt)
     mat_diag(&Q, Q_vars, true);  // Make Q from Q_vars
@@ -388,7 +407,7 @@ void kf_R_matrix(const mfloat* meas_vars, const mfloat* z) {
             j++;
         }
     }
-    mat_setSize(&R, NUM_KIN_MEAS-nanCount, NUM_KIN_MEAS-nanCount);
+    mat_setSize(&R, NUM_KIN_MEAS - nanCount, NUM_KIN_MEAS - nanCount);
     mat_diag(&R, new_R, true);  // Make R matrix
 }
 
@@ -461,8 +480,9 @@ void kf_fx(mat* x, mfloat dt, const mfloat* w) {  // state update function
     mat q_out = {4, 1, &(x->pData[KF_Q0])};  // points to the memory in x
     arm_mat_mult_f32(&w_mat, &quat, &q_out);
     // make quat mag = 1
-    mfloat q_mag = sqrt(pow(q_out.pData[0], 2) + pow(q_out.pData[1], 2) + pow(q_out.pData[2], 2) + pow(q_out.pData[3], 2));
-    mat_scale(&q_out, 1./q_mag);
+    mfloat q_mag = sqrtf(pow(q_out.pData[0], 2) + pow(q_out.pData[1], 2) +
+                         pow(q_out.pData[2], 2) + pow(q_out.pData[3], 2));
+    mat_scale(&q_out, 1. / q_mag);
 }
 
 void kf_hx(const mat* x, const mfloat* z, mat* out) {
@@ -507,6 +527,13 @@ mfloat kf_altToPressure(mfloat alt) {
     mfloat p = (pow((1 - alt / 44330), 5.25588)) * SEA_LEVEL_PRESSURE;
     return p;
     // TODO: Checks for negative alt make NaN pressure
+}
+
+mfloat kf_pressureToAlt(mfloat p_mbar) {  // only used for gating
+    mfloat alt_m =
+        44330.f * (1.f - powf(((p_mbar) / SEA_LEVEL_PRESSURE), 1.f / 5.25588f));
+    // TODO: check for invalid pressure
+    return alt_m;
 }
 
 void kf_set_initial_alt(mfloat alt) {

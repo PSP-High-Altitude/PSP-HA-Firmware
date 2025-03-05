@@ -186,6 +186,8 @@ kf_status kf_update(const mfloat* z, const mfloat* R_diag);
 
 kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase);
 
+void kf_pressure_gate(mfloat* z, mfloat stdevs);
+
 void kf_Q_matrix(mfloat dt);  // process noise matrix
 void kf_F_matrix(mfloat dt);  // state update matrix (linearized)
 void kf_R_matrix(const mfloat* meas_vars,
@@ -208,13 +210,16 @@ void kf_fx(mat* x, mfloat dt, const mfloat* w);  // state update function
  * @param z Measurements vec (not rotation)
  * @param out Output, State in measurement frame (excluding rotation)
  */
-void kf_hx(const mat* x, const mfloat* z, mat* out);  // measurement function
+void kf_hx(const mat* x, const mfloat* z,
+           mat* out);  // measurement function
 
 void kf_resid(
     const mat* x, const mfloat* z,
     mat* out);  // Computes residual y = z - h(x), size adjusted for NaNs
 
 mfloat kf_altToPressure(mfloat alt);
+
+mfloat kf_pressureToAlt(mfloat p_mbar);  // only used for gating
 
 void kf_set_initial_alt(mfloat alt);
 
