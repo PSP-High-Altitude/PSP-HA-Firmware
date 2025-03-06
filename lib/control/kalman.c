@@ -327,6 +327,7 @@ kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
         case FP_INIT:
             return KF_PASS;
         case FP_WAIT:
+        case FP_READY:
             // TODO: low pass/ rolling average to initialize altitude. With
             // temperature?
             return KF_PASS;
@@ -356,12 +357,15 @@ kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
         IMU_ACCEL_MAX) {    // remove saturated imu accel meas
         z[KF_ACC_I] = NAN;  // use x or z?
     }
-    if (x.pData[KF_VEL] > BARO_SPEED_MAX - 75) {
-        mfloat fastVarScale =
-            4;  // increase varaince when going fast but not supersonic yet
-        R_diag[KF_BARO] *= fastVarScale;
-        if (x.pData[KF_VEL] > BARO_SPEED_MAX) {
-            z[KF_BARO] = NAN;
+    if (x.pData[KF_VEL] >= BARO_SPEED_MAX || phase == FP_BOOST) {
+        z[KF_BARO] = NAN;
+    } else if (x.pData[KF_VEL] > 0) {
+        // increase varaince when going fast but not supersonic yet
+        mfloat vel = x.pData[KF_VEL];
+        mfloat varScaleClamp = vel - BARO_SPEED_FULL;
+        mfloat fastVarScale = 50.f / (1. + BARO_SPEED_MAX - vel);
+        if (isnormal(fastVarScale) && fastVarScale > 1) {
+            R_diag[KF_BARO] *= 1.f + varScaleClamp * fastVarScale;
         }
     }
 
