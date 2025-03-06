@@ -27,11 +27,11 @@ static mfloat R_diag[NUM_KIN_MEAS];    // get set in preprocess
 // TODO: Better place for all this config stuff
 // These copied from the values I used during python testing
 static const mfloat Q_VARS_1[NUM_TOT_STATES] = {
-    5.0e-01, 1.6e-03, 4.0e+00, 1.0e-01, 1.0e-01, 1.0e-01, 1.0e-01};
+    1.2, 1.0e-03, 4.0e+00, 1.0e-01, 1.0e-01, 1.0e-01, 1.0e-01};
 static const mfloat Q_VARS_2[NUM_TOT_STATES] = {10., 1.,  1., 0.1,
                                                 0.1, 0.1, 0.1};
-static const mfloat R_DIAG_1[NUM_KIN_MEAS] = {5.e-01, 3.e-04, 3.e-04};
-static const mfloat R_DIAG_2[NUM_KIN_MEAS] = {0.5, 1., 1.};
+static const mfloat R_DIAG_1[NUM_KIN_MEAS] = {20.0e-01, 3.e-04, 3.e-04};
+static const mfloat R_DIAG_2[NUM_KIN_MEAS] = {1, 1., 1.};
 
 // TODO: Initial height?
 static mfloat s_initial_height;
@@ -321,14 +321,6 @@ kf_status kf_update(const mfloat* z, const mfloat* R_diag) {
 }
 
 kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
-    if (fabs(x.pData[KF_ACC_I]) >
-        IMU_ACCEL_MAX) {    // remove saturated imu accel meas
-        z[KF_ACC_I] = NAN;  // use x or z?
-    }
-    if (x.pData[KF_VEL] > BARO_SPEED_MAX) {
-        z[KF_BARO] = NAN;
-    }
-
     // TODO: Copying is a bad and inefficient way to do this but I don't want to
     // deal with pointers rn
     switch (phase) {
@@ -342,7 +334,8 @@ kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
         case FP_COAST:
             arm_copy_f32(R_DIAG_1, R_diag, NUM_KIN_STATES);
             arm_copy_f32(Q_VARS_1, Q_vars, NUM_TOT_STATES);
-            return KF_SUCCESS;
+            filter_status = KF_SUCCESS;
+            break;
         case FP_DROGUE:
         case FP_MAIN:
             arm_copy_f32(R_DIAG_2, R_diag, NUM_KIN_STATES);
@@ -350,12 +343,29 @@ kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
             z[KF_ACC_H] =
                 NAN;  // remove accel measuremnts bc they aren't helpful anymore
             z[KF_ACC_I] = NAN;
-            return KF_SUCCESS;
+            filter_status = KF_SUCCESS;
+            break;
         case FP_LANDED:
             return KF_PASS;
         default:
             return KF_ERROR;
     }
+
+    // data preproccssing
+    if (fabs(x.pData[KF_ACC_I]) >
+        IMU_ACCEL_MAX) {    // remove saturated imu accel meas
+        z[KF_ACC_I] = NAN;  // use x or z?
+    }
+    if (x.pData[KF_VEL] > BARO_SPEED_MAX - 75) {
+        mfloat fastVarScale =
+            4;  // increase varaince when going fast but not supersonic yet
+        R_diag[KF_BARO] *= fastVarScale;
+        if (x.pData[KF_VEL] > BARO_SPEED_MAX) {
+            z[KF_BARO] = NAN;
+        }
+    }
+
+    return filter_status;
 }
 
 void kf_pressure_gate(mfloat* z, mfloat stdevs) {
@@ -365,8 +375,8 @@ void kf_pressure_gate(mfloat* z, mfloat stdevs) {
         mfloat meas_alt = kf_pressureToAlt(z[KF_BARO]);
         mfloat diff = fabs(meas_alt - x.pData[KF_POS]);
         mfloat cutoff = (sqrtf(mat_val(&P, KF_POS, KF_POS)) * stdevs);
-        if ((diff > 15) && (diff > cutoff) && (pressure_gate_count < 10)) {
-            // if ((diff > 100) && (diff > cutoff)) {
+        // if ((diff > 15) && (diff > cutoff) && (pressure_gate_count < 10)) {
+        if ((diff > 100) && (diff > cutoff)) {
             pressure_gate_count++;
             z[KF_BARO] = NAN;  // reject meas
         } else {
