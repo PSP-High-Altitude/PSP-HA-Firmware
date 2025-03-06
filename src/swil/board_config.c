@@ -17,7 +17,7 @@ static BoardConfig s_config = {
 
     // State estimation settings
     .state_init_time_ms = 10000,    // ms
-    .boost_detect_period_ms = 500,  // ms
+    .boost_detect_period_ms = 400,  // ms
     .launch_detect_replay = true,   // will replay
     .min_fast_vel_mps = 300,        // m/s
     .min_boost_acc_mps2 = 25,       // m/s^2
@@ -25,7 +25,7 @@ static BoardConfig s_config = {
     .max_grounded_vel_mps = 2,      // m/s
     .min_grounded_time_ms = 10000,  // ms
     .max_ready_acc_bias_mps2 = 2,   // m/s^2
-    .orient_antenna_up = true,      // antenna up
+    .orient_antenna_up = false,     // antenna up
 
     // Stage separation settings
     .stage_is_separator_bool = 0,

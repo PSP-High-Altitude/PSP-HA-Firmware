@@ -37,7 +37,7 @@
 #define G (9.81f)
 #define SEA_LEVEL_PRESSURE (1013.25f) /** milibars */
 #define IMU_ACCEL_MAX (16. * 1)       // accel limit, g
-#define BARO_SPEED_MAX (250)          // m/s
+#define BARO_SPEED_MAX (150)          // m/s
 #define BARO_SPEED_FULL (50)          // m/s
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
