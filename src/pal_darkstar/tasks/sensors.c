@@ -93,23 +93,23 @@ Status sensors_init() {
     // Allow each intialization to occur
     UPDATE_STATUS(status,
                   EXPECT_OK_RETRIES(ms5637_init(&s_baro_conf),
-                                    "Barometer initialization failed\n", 3));
+                                    "Barometer initialization failed\n", 5));
 
     UPDATE_STATUS(
         status, EXPECT_OK_RETRIES(kx134_init(&s_acc_conf, KX134_OUT_RATE_200_HZ,
                                              KX134_RANGE_64_G),
-                                  "Accelerometer initialization failed\n", 3));
+                                  "Accelerometer initialization failed\n", 5));
 
     UPDATE_STATUS(
         status, EXPECT_OK_RETRIES(iis2mdc_init(&s_mag_conf, IIS2MDC_ODR_100_HZ),
-                                  "Magnetometer initialization failed\n", 3));
+                                  "Magnetometer initialization failed\n", 5));
     UPDATE_STATUS(
         status,
         EXPECT_OK_RETRIES(
             bmi088_init(&s_imu_acc_conf, &s_imu_rot_conf,
                         BMI088_GYRO_RATE_200_HZ, BMI088_ACC_RATE_200_HZ,
                         BMI088_GYRO_RANGE_2000_DPS, BMI088_ACC_RANGE_24_G),
-            "IMU initialization failed\n", 3));
+            "IMU initialization failed\n", 5));
 
     s_config_ptr = config_get_ptr();
     if (s_config_ptr == NULL) {
