@@ -80,11 +80,6 @@ static I2cDevice s_mag_conf = {
 static TaskHandle_t* s_handle_ptr = NULL;
 static BoardConfig* s_config_ptr = NULL;
 
-static Status s_baro_status = STATUS_OK;
-static Status s_acc_status = STATUS_OK;
-static Status s_mag_status = STATUS_OK;
-static Status s_imu_status = STATUS_OK;
-
 /********************/
 /* HELPER FUNCTIONS */
 /********************/
@@ -93,23 +88,23 @@ static Status s_imu_status = STATUS_OK;
 /* API FUNCTIONS */
 /*****************/
 Status sensors_init() {
+    Status status = STATUS_OK;
+
     // Allow each intialization to occur
-    UPDATE_STATUS(s_baro_status,
+    UPDATE_STATUS(status,
                   EXPECT_OK_RETRIES(ms5637_init(&s_baro_conf),
                                     "Barometer initialization failed\n", 5));
 
     UPDATE_STATUS(
-        s_acc_status,
-        EXPECT_OK_RETRIES(
-            kx134_init(&s_acc_conf, KX134_OUT_RATE_200_HZ, KX134_RANGE_64_G),
-            "Accelerometer initialization failed\n", 5));
+        status, EXPECT_OK_RETRIES(kx134_init(&s_acc_conf, KX134_OUT_RATE_200_HZ,
+                                             KX134_RANGE_64_G),
+                                  "Accelerometer initialization failed\n", 5));
 
     UPDATE_STATUS(
-        s_mag_status,
-        EXPECT_OK_RETRIES(iis2mdc_init(&s_mag_conf, IIS2MDC_ODR_100_HZ),
-                          "Magnetometer initialization failed\n", 5));
+        status, EXPECT_OK_RETRIES(iis2mdc_init(&s_mag_conf, IIS2MDC_ODR_100_HZ),
+                                  "Magnetometer initialization failed\n", 5));
     UPDATE_STATUS(
-        s_imu_status,
+        status,
         EXPECT_OK_RETRIES(
             bmi088_init(&s_imu_acc_conf, &s_imu_rot_conf,
                         BMI088_GYRO_RATE_200_HZ, BMI088_ACC_RATE_200_HZ,
@@ -120,14 +115,6 @@ Status sensors_init() {
     if (s_config_ptr == NULL) {
         ASSERT_OK(STATUS_STATE_ERROR, "unable to get ptr to config\n");
     }
-
-    Status status = STATUS_OK;
-
-    // Combine all statuses
-    UPDATE_STATUS(status, s_baro_status);
-    UPDATE_STATUS(status, s_acc_status);
-    UPDATE_STATUS(status, s_mag_status);
-    UPDATE_STATUS(status, s_imu_status);
 
     // Fail if any sensor initialization failed
     ASSERT_OK(status, "sensor initialization failed\n");
@@ -154,63 +141,12 @@ void task_sensors(TaskHandle_t* handle_ptr) {
 
         // Read all the sensors, measuring the timestamp after the barometer
         // read since everything else is really fast
-
-        // Barometer read
-        BaroData baro;
-        if (s_baro_status != STATUS_OK) {
-            // Known bad value if failed
-            baro.temperature = NAN;
-            baro.pressure = NAN;
-        } else {
-            baro = ms5637_read(&s_baro_conf, OSR_256);
-        }
-
+        BaroData baro = ms5637_read(&s_baro_conf, OSR_256);
         uint64_t timestamp = MICROS();
-
-        // High-g accelerometer read
-        Accel acch;
-        if (s_acc_status != STATUS_OK) {
-            // Known bad value if failed
-            acch.accelX = NAN;
-            acch.accelY = NAN;
-            acch.accelZ = NAN;
-        } else {
-            acch = kx134_read_accel(&s_acc_conf);
-        }
-
-        // IMU accelerometer read
-        Accel accel;
-        if (s_imu_status != STATUS_OK) {
-            // Known bad values if failed
-            accel.accelX = NAN;
-            accel.accelY = NAN;
-            accel.accelZ = NAN;
-
-        } else {
-            accel = bmi088_acc_read(&s_imu_acc_conf);
-        }
-
-        // IMU gyroscope read
-        Gyro gyro;
-        if (s_imu_status != STATUS_OK) {
-            // Known bad values if failed
-            gyro.gyroX = NAN;
-            gyro.gyroY = NAN;
-            gyro.gyroZ = NAN;
-        } else {
-            gyro = bmi088_gyro_read(&s_imu_rot_conf);
-        }
-
-        // Magnetometer read
-        Mag mag;
-        if (s_mag_status != STATUS_OK) {
-            // Known bad values if failed
-            mag.magX = NAN;
-            mag.magY = NAN;
-            mag.magZ = NAN;
-        } else {
-            mag = iis2mdc_read(&s_mag_conf);
-        }
+        Accel acch = kx134_read_accel(&s_acc_conf);
+        Accel accel = bmi088_acc_read(&s_imu_acc_conf);
+        Gyro gyro = bmi088_gyro_read(&s_imu_rot_conf);
+        Mag mag = iis2mdc_read(&s_mag_conf);
 
         // Copy data into a sensor frame
         SensorFrame sensor_frame;
