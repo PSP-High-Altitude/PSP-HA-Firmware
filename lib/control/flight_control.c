@@ -336,7 +336,8 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
 FlightPhase fp_update_boost(const SensorFrame* sensor_frame) {
     const StateEst* state = se_predict();
 
-    if (state->accVert < s_config_ptr->max_coast_acc_mps2) {
+    // if (state->accVert < s_config_ptr->max_coast_acc_mps2) {
+    if (state->accEkf < s_config_ptr->max_coast_acc_mps2) {
         // If we're above the coast deceleration threshold, transition.
         cond_timer_update(&s_boost_det_timer, false);
         s_boost_time_ms = MILLIS();
@@ -344,13 +345,13 @@ FlightPhase fp_update_boost(const SensorFrame* sensor_frame) {
         return FP_COAST;
     }
 
-    bool acc_below_threshold =
-        state->accVert < s_config_ptr->min_boost_acc_mps2;
+    bool acc_below_threshold = state->accEkf < s_config_ptr->min_boost_acc_mps2;
 
     if (cond_timer_update(&s_boost_det_timer, acc_below_threshold)) {
-        // If we were below the boost threshold for the boost detection period,
-        // also transition to coast. This is needed to make sure that we go to
-        // coast in low deceleration scenarios or sensor malfunctions.
+        // If we were below the boost threshold for the boost detection
+        // period, also transition to coast. This is needed to make sure
+        // that we go to coast in low deceleration scenarios or sensor
+        // malfunctions.
         cond_timer_update(&s_boost_det_timer, false);
         s_boost_time_ms = MILLIS();
         PAL_LOGI("FP_BOOST -> FP_COAST\n");
@@ -402,8 +403,7 @@ FlightPhase fp_update_coast(const SensorFrame* sensor_frame) {
     }
 
     // Check if we should go to boost
-    bool acc_above_threshold =
-        state->accVert > s_config_ptr->min_boost_acc_mps2;
+    bool acc_above_threshold = state->accEkf > s_config_ptr->min_boost_acc_mps2;
 
     if (cond_timer_update(&s_boost_det_timer, acc_above_threshold)) {
         // We were above the boost threshold for the detection period
@@ -418,7 +418,7 @@ FlightPhase fp_update_coast(const SensorFrame* sensor_frame) {
 FlightPhase fp_update_drogue(const SensorFrame* sensor_frame) {
     const StateEst* state = se_predict();
 
-    if (state->posVert < s_config_ptr->main_height_m) {
+    if (state->posEkf < s_config_ptr->main_height_m) {
         EXPECT_OK(pyros_fire(PYRO_MAIN), "failed to fire main pyro\n");
 
         PAL_LOGI("FP_DROGUE -> FP_MAIN\n");
@@ -460,7 +460,7 @@ FlightStageStatus fp_stage_check_drogue(const StateEst* state) {
 
     // Use a threshold slightly above zero for deployment to account for cases
     // where sensor malfunction causes  velocity to get stuck at/near zero.
-    if (state->velVert < 1) {
+    if (state->velEkf < 1) {
         // Record the apogee time
         if (!s_apogee_time_ms) {
             s_apogee_time_ms = MILLIS();
@@ -494,8 +494,8 @@ FlightStageStatus fp_stage_check_sep_lockout(const StateEst* state) {
 
     s_stage_sep_locked = 1;
 
-    float velocity = state->velVert;
-    float altitude = state->posVert;
+    float velocity = state->velEkf;
+    float altitude = state->posEkf;
     float angle_deg =
         quat_angle_from_vertical(&(state->orientation)) * M_PI / 180.0f;
 
@@ -533,8 +533,8 @@ FlightStageStatus fp_stage_check_ignite_lockout(const StateEst* state) {
 
     s_stage_ignite_locked = 1;
 
-    float velocity = state->velVert;
-    float altitude = state->posVert;
+    float velocity = state->velEkf;
+    float altitude = state->posEkf;
     float angle_deg =
         quat_angle_from_vertical(&(state->orientation)) * M_PI / 180.0f;
 
