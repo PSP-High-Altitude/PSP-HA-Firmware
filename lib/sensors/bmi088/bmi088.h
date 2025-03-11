@@ -23,6 +23,7 @@
 #define BMI088_ACC_OUT BMI088_ACC_X_LSB
 #define BMI088_ACC_PWR_CONF 0x7C
 #define BMI088_ACC_PWR_CTRL 0x7D
+#define BMI088_ACC_SOFTRESET 0x7E
 
 // Gyroscope defs
 #define BMI088_GYRO_CHIP_ID 0x00
@@ -35,6 +36,7 @@
 #define BMI088_GYRO_RANGE 0x0F
 #define BMI088_GYRO_BANDWIDTH 0x10
 #define BMI088_GYRO_OUT BMI088_GYRO_X_LSB
+#define BMI088_GYRO_SOFTRESET 0x14
 
 // Settings
 typedef enum {

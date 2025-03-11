@@ -236,8 +236,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     /***********************/
     /* ACCELERATION UPDATE */
     /***********************/
-    static Vector s_current_acc = {};
-    Vector last_acc = s_current_acc;
+    static Vector s_current_acc;
 
     Vector acc_h;
     Vector acc_i;
@@ -258,7 +257,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
         s_log_state = SE_LOG_OK;
 
         // If the high-precision acceleration values are valid, prefer those
-        s_current_acc = acc_i;
+        vec_scale(&acc_i, G_MAG, &s_current_acc);
 
         // Check if we're exceeding the high-precision limit on any axis
         if (fabsf(acc_i.x) > LOW_G_MAX_ACC ||  ///
@@ -269,17 +268,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
                 se_valid_acc(acc_h.y) &&  ///
                 se_valid_acc(acc_h.z)) {
                 // If we do, then, just use those straight up
-                s_current_acc = acc_h;
-            } else {
-                // If we don't, then we have to make the decision between
-                // sticking with the old values or going with the new ones
-                if (last_acc.x > s_current_acc.x ||  ///
-                    last_acc.y > s_current_acc.y ||  ///
-                    last_acc.z > s_current_acc.z) {
-                    // If the old values are higher on any axis than the new
-                    // values, use those since they're probably more accurate
-                    s_current_acc = last_acc;
-                }
+                vec_scale(&acc_h, G_MAG, &s_current_acc);
             }
         }
     } else if (se_valid_acc(acc_h.x) &&  ///
@@ -288,7 +277,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
         s_log_state = SE_LOG_OK;
         // If the high-precision values are invalid but the high-range ones are
         // valid, not much to think about -- just go with the high-range ones
-        s_current_acc = acc_h;
+        vec_scale(&acc_h, G_MAG, &s_current_acc);
     } else {
         // If neither were valid, then we reuse the acceleration values from
         // last time (which is a no-op since they're in s_current_state).
@@ -302,8 +291,6 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
         // confidence or so that we eventually deploy from the gravity offset.
         vec_iscale(&s_current_acc, 0.9);  // half-life of 7 iterations
     }
-
-    vec_iscale(&s_current_acc, G_MAG);
 
     /******************/
     /* ANG VEL UPDATE */

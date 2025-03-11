@@ -15,71 +15,161 @@ static float s_gyro_conversion[] = {1.0 / 16.384, 1.0 / 32.768, 1.0 / 65.536,
 
 static bool s_initialized = false;
 
+// Write a register on the BMI088
+static Status bmi088_write(I2cDevice* device, uint8_t address, uint8_t* tx_buf,
+                           uint8_t len) {
+    if (address > 0x7F) {
+        return STATUS_PARAMETER_ERROR;
+    }
+
+    // Create tx buffer for address
+    uint8_t tx_buf_new[len + 1];
+    tx_buf_new[0] = address;  // Add address to tx buffer
+    memcpy(tx_buf_new + 1, tx_buf, len);
+
+    // Write address and read len bytes
+    if (i2c_write(device, tx_buf_new, len + 1) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    // Delay between writes (tIDLE_wacc_nm) = 2 us
+    DELAY_MICROS(3);
+
+    return STATUS_OK;
+}
+
+// Read a register on the BMI088
+static Status bmi088_read(I2cDevice* device, uint8_t address, uint8_t* rx_buf,
+                          uint8_t len) {
+    if (address > 0x7F) {
+        return STATUS_PARAMETER_ERROR;
+    }
+
+    // Create tx buffer for address
+    uint8_t tx_buf[1];
+    tx_buf[0] = address;  // Add address to tx buffer
+
+    // Write address and read len bytes
+    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+    if (i2c_read(device, rx_buf, len) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    // Delay between transmissions (tBUF) = 1.3 us
+    DELAY_MICROS(2);
+
+    return STATUS_OK;
+}
+
+// Write a register on the BMI088 and verify the data
+static Status bmi088_write_verify(I2cDevice* device, uint8_t address,
+                                  uint8_t* tx_buf, uint8_t len) {
+    if (address > 0x7F) {
+        return STATUS_PARAMETER_ERROR;
+    }
+
+    // Write the data
+    if (bmi088_write(device, address, tx_buf, len) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    // Read back the data
+    uint8_t rx_buf[len];
+    if (bmi088_read(device, address, rx_buf, len) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    // Verify the data
+    if (memcmp(tx_buf, rx_buf, len) != 0) {
+        return STATUS_ERROR;
+    }
+
+    return STATUS_OK;
+}
+
 Status bmi088_init(I2cDevice* acc_device, I2cDevice* gyro_device,
                    Bmi088GyroRate gyro_rate, Bmi088AccRate acc_rate,
                    Bmi088GyroRange gyro_range, Bmi088AccRange acc_range) {
     s_current_acc_range = acc_range;
     s_current_gyro_range = gyro_range;
-    uint8_t buf[2];
+    uint8_t buf;
 
     // Read BMI_ACC & BMI_Gyro register to confirm we're connected
-    buf[0] = BMI088_ACC_CHIP_ID;
-    if (i2c_write(acc_device, buf, 1) != STATUS_OK) {
+    if (bmi088_read(acc_device, BMI088_ACC_CHIP_ID, &buf, 1) != STATUS_OK) {
         return STATUS_ERROR;
     }
-    if (i2c_read(acc_device, buf, 1) != STATUS_OK) {
-        return STATUS_ERROR;
-    }
-    if (buf[0] != 0x1e) {
+    if (buf != 0x1e) {
         return STATUS_ERROR;
     }
 
-    buf[0] = BMI088_GYRO_CHIP_ID;
-    if (i2c_write(gyro_device, buf, 1) != STATUS_OK) {
+    if (bmi088_read(gyro_device, BMI088_GYRO_CHIP_ID, &buf, 1) != STATUS_OK) {
         return STATUS_ERROR;
     }
-    if (i2c_read(gyro_device, buf, 1) != STATUS_OK) {
-        return STATUS_ERROR;
-    }
-    if (buf[0] != 0x0f) {
+    if (buf != 0x0f) {
         return STATUS_ERROR;
     }
 
-    // Perform configurations for ACC and activate
-    buf[0] = BMI088_ACC_CONF;
-    buf[1] = 0xA0 | acc_rate;
-    if (i2c_write_verify(acc_device, buf, 2) != STATUS_OK) {
+    // Perform soft-reset to ensure we are in the POR state
+    buf = 0xB6;
+    if (bmi088_write(gyro_device, BMI088_ACC_SOFTRESET, &buf, 1) != STATUS_OK) {
         return STATUS_ERROR;
     }
 
-    buf[0] = BMI088_ACC_RANGE;
-    buf[1] = acc_range;
-    if (i2c_write_verify(acc_device, buf, 2) != STATUS_OK) {
+    // Delay at least 1 ms
+    DELAY(2);
+
+    buf = 0xB6;
+    if (bmi088_write(gyro_device, BMI088_GYRO_SOFTRESET, &buf, 1) !=
+        STATUS_OK) {
         return STATUS_ERROR;
     }
 
-    buf[0] = BMI088_ACC_PWR_CONF;
-    buf[1] = 0x00;
-    if (i2c_write_verify(acc_device, buf, 2) != STATUS_OK) {
+    // Delay at least 30 ms
+    DELAY(31);
+
+    // Exit accelerometer from PS mode
+    buf = 0x04;
+    if (bmi088_write_verify(acc_device, BMI088_ACC_PWR_CTRL, &buf, 1) !=
+        STATUS_OK) {
         return STATUS_ERROR;
     }
 
-    buf[0] = BMI088_ACC_PWR_CTRL;
-    buf[1] = 0x04;
-    if (i2c_write_verify(acc_device, buf, 2) != STATUS_OK) {
+    // Delay 450 us at least
+    DELAY_MICROS(500);
+
+    // Configure accerometer rate
+    buf = 0xA0 | acc_rate;
+    if (bmi088_write_verify(acc_device, BMI088_ACC_CONF, &buf, 1) !=
+        STATUS_OK) {
         return STATUS_ERROR;
     }
 
-    // Perform configurations for Gyro
-    buf[0] = BMI088_GYRO_RANGE;
-    buf[1] = gyro_range;
-    if (i2c_write_verify(gyro_device, buf, 2) != STATUS_OK) {
+    // Configure accelerometer range
+    buf = acc_range;
+    if (bmi088_write_verify(acc_device, BMI088_ACC_RANGE, &buf, 1) !=
+        STATUS_OK) {
         return STATUS_ERROR;
     }
 
-    buf[0] = BMI088_GYRO_BANDWIDTH;
-    buf[1] = 0x80 | gyro_rate;
-    if (i2c_write_verify(gyro_device, buf, 2) != STATUS_OK) {
+    // Accelometer to active mode
+    buf = 0x00;
+    if (bmi088_write_verify(acc_device, BMI088_ACC_PWR_CONF, &buf, 1) !=
+        STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    // Configure gyroscope range
+    buf = gyro_range;
+    if (bmi088_write_verify(gyro_device, BMI088_GYRO_RANGE, &buf, 1) !=
+        STATUS_OK) {
+        return STATUS_ERROR;
+    }
+
+    buf = 0x80 | gyro_rate;
+    if (bmi088_write_verify(gyro_device, BMI088_GYRO_BANDWIDTH, &buf, 1) !=
+        STATUS_OK) {
         return STATUS_ERROR;
     }
 
@@ -97,14 +187,7 @@ Accel bmi088_acc_read(I2cDevice* device) {
         return accel;
     }
 
-    buf[0] = BMI088_ACC_OUT;
-
-    if (i2c_write(device, buf, 1) != STATUS_OK) {
-        return accel;
-    }
-    if (i2c_read(device, buf, 6) != STATUS_OK) {
-        return accel;
-    }
+    bmi088_read(device, BMI088_ACC_OUT, buf, 6);
 
     float cf = s_acc_conversion[s_current_acc_range];
     accel.accelX = (int16_t)(((uint16_t)buf[1] << 8) | (uint16_t)buf[0]) * cf;
@@ -123,14 +206,8 @@ Gyro bmi088_gyro_read(I2cDevice* device) {
         return gyro;
     }
 
-    buf[0] = BMI088_GYRO_OUT;
+    bmi088_read(device, BMI088_GYRO_OUT, buf, 6);
 
-    if (i2c_write(device, buf, 1) != STATUS_OK) {
-        return gyro;
-    }
-    if (i2c_read(device, buf, 6) != STATUS_OK) {
-        return gyro;
-    }
     double cf = s_gyro_conversion[s_current_gyro_range];
     gyro.gyroX = (int16_t)(((uint16_t)buf[1] << 8) | (uint16_t)buf[0]) * cf;
     gyro.gyroY = (int16_t)(((uint16_t)buf[3] << 8) | (uint16_t)buf[2]) * cf;
