@@ -564,13 +564,13 @@ void kf_write_state(StateEst* state_ptr) {
     state_ptr->velVarEkf = mat_val(&P, KF_VEL, KF_VEL);
     state_ptr->accVarEkf = mat_val(&P, KF_ACC, KF_ACC);
 
-    state_ptr->orientEkf1 = x.pData[KF_Q0 + 0];
-    state_ptr->orientEkf2 = x.pData[KF_Q0 + 1];
-    state_ptr->orientEkf3 = x.pData[KF_Q0 + 2];
-    state_ptr->orientEkf4 = x.pData[KF_Q0 + 3];
+    state_ptr->orientEkfw = x.pData[KF_Q0 + 0];
+    state_ptr->orientEkfx = x.pData[KF_Q0 + 1];
+    state_ptr->orientEkfy = x.pData[KF_Q0 + 2];
+    state_ptr->orientEkfz = x.pData[KF_Q0 + 3];
 
-    state_ptr->orientVarEkf1 = mat_val(&P, KF_Q0 + 0, KF_Q0 + 0);
-    state_ptr->orientVarEkf2 = mat_val(&P, KF_Q0 + 1, KF_Q0 + 1);
-    state_ptr->orientVarEkf3 = mat_val(&P, KF_Q0 + 2, KF_Q0 + 2);
-    state_ptr->orientVarEkf4 = mat_val(&P, KF_Q0 + 3, KF_Q0 + 3);
+    state_ptr->orientVarEkfw = mat_val(&P, KF_Q0 + 0, KF_Q0 + 0);
+    state_ptr->orientVarEkfx = mat_val(&P, KF_Q0 + 1, KF_Q0 + 1);
+    state_ptr->orientVarEkfy = mat_val(&P, KF_Q0 + 2, KF_Q0 + 2);
+    state_ptr->orientVarEkfz = mat_val(&P, KF_Q0 + 3, KF_Q0 + 3);
 }

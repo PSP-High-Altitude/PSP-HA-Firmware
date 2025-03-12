@@ -38,6 +38,9 @@ static uint64_t s_init_start_ms;
 // Launch detect sensor data buffer
 static SensorFrame* s_ld_buffer_data;
 static size_t s_ld_buffer_size = 0;
+static size_t s_ld_buffer_ridx = 0;
+static size_t s_ld_buffer_widx = 0;
+static size_t s_ld_buffer_entries = 0;
 
 // Condition timers
 static CondTimer s_init_timer;
@@ -122,51 +125,86 @@ Status fp_init() {
 FlightPhase fp_get() { return *s_flight_phase_ptr; }
 
 Status fp_update(const SensorFrame* sensor_frame) {
-    EXPECT_OK(se_update(*s_flight_phase_ptr, sensor_frame),
-              "state estimation update failed\n");
+    FlightPhase flight_phase = *s_flight_phase_ptr;
+    const SensorFrame* latest_sensor_frame = NULL;
 
-    switch (*s_flight_phase_ptr) {
+    // If we're in flight and the launch replay buffer isn't empty,
+    // consume some stored frames and add the current one to the back
+    if (flight_phase > FP_READY && s_ld_buffer_entries) {
+        for (size_t i = 0; i < LD_REPLAY_FRAMES_PER_ITER; i++) {
+            if (!s_ld_buffer_entries) {
+                // If we ran out of stored frames, abort
+                break;
+            }
+
+            // Perform the update with the frame stored at this index
+            latest_sensor_frame = &s_ld_buffer_data[s_ld_buffer_ridx++];
+            se_update(flight_phase, latest_sensor_frame);
+            s_ld_buffer_ridx %= s_ld_buffer_size;
+            s_ld_buffer_entries--;
+        }
+    }
+
+    if (!latest_sensor_frame) {
+        // No stored frames were processed, so update using latest
+        se_update(flight_phase, sensor_frame);
+        latest_sensor_frame = sensor_frame;
+    } else if (s_ld_buffer_entries) {
+        // If we haven't emptied the launch detect buffer, add the newly
+        // received frame to the end of the buffer for future use
+        s_ld_buffer_data[s_ld_buffer_widx++] = *sensor_frame;
+        s_ld_buffer_widx %= s_ld_buffer_size;
+        s_ld_buffer_entries++;
+    }
+
+    switch (flight_phase) {
         case FP_INIT:
-            *s_flight_phase_ptr = fp_update_init(sensor_frame);
+            *s_flight_phase_ptr = fp_update_init(latest_sensor_frame);
             break;
 
         case FP_WAIT:
-            *s_flight_phase_ptr = fp_update_wait(sensor_frame);
+            *s_flight_phase_ptr = fp_update_wait(latest_sensor_frame);
             break;
 
         case FP_READY:
-            *s_flight_phase_ptr = fp_update_ready(sensor_frame);
+            *s_flight_phase_ptr = fp_update_ready(latest_sensor_frame);
             break;
 
         case FP_BOOST:
-            *s_flight_phase_ptr = fp_update_boost(sensor_frame);
+            *s_flight_phase_ptr = fp_update_boost(latest_sensor_frame);
             break;
 
         case FP_COAST:
-            *s_flight_phase_ptr = fp_update_coast(sensor_frame);
+            *s_flight_phase_ptr = fp_update_coast(latest_sensor_frame);
             break;
 
         case FP_DROGUE:
-            *s_flight_phase_ptr = fp_update_drogue(sensor_frame);
+            *s_flight_phase_ptr = fp_update_drogue(latest_sensor_frame);
             break;
 
         case FP_MAIN:
-            *s_flight_phase_ptr = fp_update_main(sensor_frame);
+            *s_flight_phase_ptr = fp_update_main(latest_sensor_frame);
             break;
 
         case FP_LANDED:
-            *s_flight_phase_ptr = fp_update_landed(sensor_frame);
+            *s_flight_phase_ptr = fp_update_landed(latest_sensor_frame);
             break;
 
         case FP_ERROR:
-            *s_flight_phase_ptr = fp_update_error(sensor_frame);
+            *s_flight_phase_ptr = fp_update_error(latest_sensor_frame);
             break;
 
         default:
             // Unknown state; go back to init because there's not really
             // much else that we can realistically do at this point
-            *s_flight_phase_ptr = fp_update_init(sensor_frame);
+            *s_flight_phase_ptr = fp_update_init(latest_sensor_frame);
             break;
+    }
+
+    // If we are doing launch detection and the replay buffer has entries in it,
+    // tell the control loop to not store the state since it could be replayed
+    if (flight_phase == FP_READY && s_ld_buffer_entries) {
+        return STATUS_BUSY;
     }
 
     return STATUS_OK;
@@ -273,8 +311,6 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
     // In ready, we're tracking the acceleration for launch
     // detection and buffering data so that we can replay
     // it through the state estimation when launch is detected
-    static size_t s_ld_buffer_entries = 0;
-
     const StateEst* state = se_predict();
 
     if (state->accVert < -s_config_ptr->max_ready_acc_bias_mps2) {
@@ -317,10 +353,9 @@ FlightPhase fp_update_ready(const SensorFrame* sensor_frame) {
             se_set_time(s_ld_buffer_data[0].timestamp / 1e6 -
                         s_config_ptr->control_loop_period_ms / 1e3);
 
-            for (int i = 0; i < s_ld_buffer_entries; i++) {
-                EXPECT_OK(se_update(FP_BOOST, &s_ld_buffer_data[i]),
-                          "state est update failed during launch replay\n");
-            }
+            // We're going to start consuming the replay buffer, so update the
+            // size to the number of entries we have stored
+            s_ld_buffer_size = s_ld_buffer_entries;
         }
 
         // Reset the boost detection timer for use in boost

@@ -43,19 +43,19 @@ typedef struct {
     float velEkf;
     float accEkf;
 
-    float orientEkf1;
-    float orientEkf2;
-    float orientEkf3;
-    float orientEkf4;
+    float orientEkfw;
+    float orientEkfx;
+    float orientEkfy;
+    float orientEkfz;
 
     float posVarEkf;
     float velVarEkf;
     float accVarEkf;
 
-    float orientVarEkf1;
-    float orientVarEkf2;
-    float orientVarEkf3;
-    float orientVarEkf4;
+    float orientVarEkfw;
+    float orientVarEkfx;
+    float orientVarEkfy;
+    float orientVarEkfz;
 
     // Intermediate variables (NOT LOGGED)
     float posImu;  // m

@@ -41,19 +41,20 @@ int main() {
         store_sensor_frame(&hwil_sensor_frame);
 
         FlightPhase fp_before = fp_get();
-        fp_update(&hwil_sensor_frame);
+        Status update_status = fp_update(&hwil_sensor_frame);
         if (fp_get() != fp_before) {
             printf("^ @ %.1f s\n\n", MILLIS() / 1000.);
         }
 
-        StateFrame state_frame = se_as_frame();
-        state_frame.flight_phase = fp_get();
-        state_frame.timestamp = MICROS();
-        store_state_frame(&state_frame);
+        if (update_status == STATUS_OK) {
+            StateFrame state_frame = se_as_frame();
+            state_frame.gentimestamp = MICROS();
+            store_state_frame(&state_frame);
 
-        max_acc = fmaxf(max_acc, state_frame.acc_vert);
-        max_vel = fmaxf(max_vel, state_frame.vel_vert);
-        max_alt = fmaxf(max_alt, state_frame.pos_vert);
+            max_acc = fmaxf(max_acc, state_frame.acc_vert);
+            max_vel = fmaxf(max_vel, state_frame.vel_vert);
+            max_alt = fmaxf(max_alt, state_frame.pos_vert);
+        }
 
         DELAY(config_get_ptr()->control_loop_period_ms);
     }

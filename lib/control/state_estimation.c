@@ -175,6 +175,9 @@ const StateEst* se_predict() { return s_state_ptr; }
 
 StateFrame se_as_frame() {
     StateFrame frame = {
+        .timestamp = (uint64_t)(s_state_ptr->time * 1e6f),
+        .flight_phase = fp_get(),
+
         // Linear values
         .pos_vert = s_state_ptr->posVert,
         .vel_vert = s_state_ptr->velVert,
@@ -207,21 +210,19 @@ StateFrame se_as_frame() {
         .vel_ekf = s_state_ptr->velEkf,
         .acc_ekf = s_state_ptr->accEkf,
 
-        .orient_ekf_1 = s_state_ptr->orientEkf1,
-        .orient_ekf_2 = s_state_ptr->orientEkf2,
-        .orient_ekf_3 = s_state_ptr->orientEkf3,
-        .orient_ekf_4 = s_state_ptr->orientEkf4,
+        .orient_ekf_w = s_state_ptr->orientEkfw,
+        .orient_ekf_x = s_state_ptr->orientEkfx,
+        .orient_ekf_y = s_state_ptr->orientEkfy,
+        .orient_ekf_z = s_state_ptr->orientEkfz,
 
         .pos_var_ekf = s_state_ptr->posVarEkf,
         .vel_var_ekf = s_state_ptr->velVarEkf,
         .acc_var_ekf = s_state_ptr->accVarEkf,
 
-        .orient_var_ekf_1 = s_state_ptr->orientVarEkf1,
-        .orient_var_ekf_2 = s_state_ptr->orientVarEkf2,
-        .orient_var_ekf_3 = s_state_ptr->orientVarEkf3,
-        .orient_var_ekf_4 = s_state_ptr->orientVarEkf4,
-        // We could change these to w x y z but I tried to change it and it
-        // broke
+        .orient_var_ekf_w = s_state_ptr->orientVarEkfw,
+        .orient_var_ekf_x = s_state_ptr->orientVarEkfx,
+        .orient_var_ekf_y = s_state_ptr->orientVarEkfy,
+        .orient_var_ekf_z = s_state_ptr->orientVarEkfz,
     };
 
     return frame;

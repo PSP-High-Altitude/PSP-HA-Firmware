@@ -1,12 +1,12 @@
 syntax = "proto3";
 
 message StateFrame {
-  // System timestamp (us since power on)
+  // Time for which state is estimated
   uint64 timestamp = 1;
 
   // Flight phase (enum value)
   uint32 flight_phase = 2;
-  
+
   // Vertical position (m)
   float pos_vert = 3;
 
@@ -31,8 +31,8 @@ message StateFrame {
   float acc_geo_y = 13;
   float acc_geo_z = 14;
 
-  // Field number 15 reserved (1-byte encoding)
-  reserved 15;
+  // Time at which estimate was generated
+  uint64 gentimestamp = 15;
 
   // Body angular velocity (rad/s)
   float angvel_body_x = 16;
@@ -55,10 +55,10 @@ message StateFrame {
   float acc_ekf = 25;
 
   // EKF orientation (quarternion)
-  float orient_ekf_1 = 26;
-  float orient_ekf_2 = 27;
-  float orient_ekf_3 = 28;
-  float orient_ekf_4 = 29;
+  float orient_ekf_w = 26;
+  float orient_ekf_x = 27;
+  float orient_ekf_y = 28;
+  float orient_ekf_z = 29;
 
   // EKF position variance
   float pos_var_ekf = 30;
@@ -70,8 +70,8 @@ message StateFrame {
   float acc_var_ekf = 32;
 
   // EKF orientation variance
-  float orient_var_ekf_1 = 33;
-  float orient_var_ekf_2 = 34;
-  float orient_var_ekf_3 = 35;
-  float orient_var_ekf_4 = 36;
+  float orient_var_ekf_w = 33;
+  float orient_var_ekf_x = 34;
+  float orient_var_ekf_y = 35;
+  float orient_var_ekf_z = 36;
 }

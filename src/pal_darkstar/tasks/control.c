@@ -82,6 +82,7 @@ void task_control(TaskHandle_t* handle_ptr) {
 
     while (1) {
         SensorFrame sensor_frame;
+        Status update_status;
 
         // Check if we have sensor data available without waiting
         if (xQueueReceive(s_sensor_queue, &sensor_frame, 0) != pdPASS) {
@@ -89,25 +90,30 @@ void task_control(TaskHandle_t* handle_ptr) {
             // but with an updated timestamp so that state estimation
             // can correctly compute the dt from adjacent iterations
             s_nan_frame.timestamp = MICROS();
-            fp_update(&s_nan_frame);
+            update_status = fp_update(&s_nan_frame);
         } else {
             // Otherwise just forward the frame as is
-            fp_update(&sensor_frame);
+            update_status = fp_update(&sensor_frame);
         }
 
+        // Trigger sensor read for next iteration
         sensors_start_read();
-        pspcom_update_fp(fp_get());
 
-        StateFrame state_frame = se_as_frame();
-        state_frame.flight_phase = fp_get();
-        state_frame.timestamp = MICROS();
-        storage_queue_state(&state_frame);
+        // Store the state only if update returned OK
+        if (update_status == STATUS_OK) {
+            StateFrame state_frame = se_as_frame();
+            state_frame.gentimestamp = MICROS();
+            storage_queue_state(&state_frame);
+        }
+
+        // Get new state and send state updates where required
+        FlightPhase flight_phase = fp_get();
+        pspcom_update_fp(flight_phase);
 
         // Yellow LED is solid when READY, strobing when in flight
-        if (state_frame.flight_phase == FP_READY) {
+        if (flight_phase == FP_READY) {
             gpio_write(PIN_YELLOW, GPIO_HIGH);
-        } else if (state_frame.flight_phase > FP_READY &&
-                   state_frame.flight_phase < FP_LANDED) {
+        } else if (flight_phase > FP_READY && flight_phase < FP_LANDED) {
             // 25% duty cycle, 400 ms period
             gpio_write(PIN_YELLOW, (MILLIS() % 400) < 100);
         } else {
@@ -115,24 +121,25 @@ void task_control(TaskHandle_t* handle_ptr) {
         }
 
         // Blink red LED in error state
-        if (state_frame.flight_phase == FP_ERROR) {
+        if (flight_phase == FP_ERROR) {
             // 25% duty cycle, 400 ms period
             gpio_write(PIN_RED, (MILLIS() % 400) < 100);
         }
 
         // Periodically pause storage to segment files when grounded
         static uint64_t s_last_autosave_ms = 0;
-        if (state_frame.flight_phase == FP_WAIT ||
-            state_frame.flight_phase == FP_LANDED) {
+        if (flight_phase == FP_WAIT || flight_phase == FP_LANDED) {
+            // Start pausing every time we do this check if it has
+            // been more than 5 minutes since the last time we did it
             if (MILLIS() - s_last_autosave_ms > 5 * 60 * 1000) {
-                // Pause every 5 minutes; note that this will stall state
-                // estimation while the save is in progress, so we don't want to
-                // do this either in flight or in launch detect mode
                 s_last_autosave_ms = MILLIS();
                 storage_pause(STORAGE_PAUSE_BRK);
-                while (storage_is_active()) {
-                    DELAY(1);
-                }
+            }
+        } else {
+            // If the storage is currently paused, clear our pause flag
+            // This is okay because we're the only ones using this flag,
+            // and the storage won't resume if someone else stopped it
+            if (!storage_is_active()) {
                 storage_start(STORAGE_PAUSE_BRK);
             }
         }

@@ -18,6 +18,10 @@ typedef enum {
 
 typedef enum { FP_STG_GO, FP_STG_NOGO, FP_STG_WAIT } FlightStageStatus;
 
+// How many buffered frames to consume each iter of the control loop
+// This MUST be strictly greater than 1 to deplete the buffer
+#define LD_REPLAY_FRAMES_PER_ITER (2)
+
 Status fp_init();
 
 FlightPhase fp_get();
