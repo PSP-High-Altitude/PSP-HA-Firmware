@@ -27,10 +27,10 @@ static mfloat R_diag[NUM_KIN_MEAS];    // get set in preprocess
 // TODO: Better place for all this config stuff
 // These copied from the values I used during python testing
 static const mfloat Q_VARS_1[NUM_TOT_STATES] = {
-    1.2, 1.0e-03, 4.0e+00, 1.0e-01, 1.0e-01, 1.0e-01, 1.0e-01};
-static const mfloat Q_VARS_2[NUM_TOT_STATES] = {10., 1.,  1., 0.1,
+    1.5, 1.0e-03, 4.0e+00, 1.0e-01, 1.0e-01, 1.0e-01, 1.0e-01};
+static const mfloat Q_VARS_2[NUM_TOT_STATES] = {10., .2,  .1, 0.1,
                                                 0.1, 0.1, 0.1};
-static const mfloat R_DIAG_1[NUM_KIN_MEAS] = {20.0e-01, 3.e-04, 3.e-04};
+static const mfloat R_DIAG_1[NUM_KIN_MEAS] = {30.0e-01, 5.e-04, 5.e-04};
 static const mfloat R_DIAG_2[NUM_KIN_MEAS] = {1, 1., 1.};
 
 // TODO: Initial height?
