@@ -29,7 +29,7 @@ const static BoardConfig s_default_config = {
     .max_grounded_vel_mps = 2,      // m/s
     .min_grounded_time_ms = 10000,  // ms
     .max_ready_acc_bias_mps2 = 2,   // m/s^2
-    .orient_antenna_up = true,      // antenna down
+    .orient_antenna_up = true,      // antenna up
 
     // Stage separation settings
     .stage_is_separator_bool = 0,

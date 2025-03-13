@@ -132,16 +132,17 @@ void task_control(TaskHandle_t* handle_ptr) {
             // Start pausing every time we do this check if it has
             // been more than 5 minutes since the last time we did it
             if (MILLIS() - s_last_autosave_ms > 5 * 60 * 1000) {
+                PAL_LOGI("Starting periodic grounded storage pause\n");
                 s_last_autosave_ms = MILLIS();
                 storage_pause(STORAGE_PAUSE_BRK);
             }
-        } else {
-            // If the storage is currently paused, clear our pause flag
-            // This is okay because we're the only ones using this flag,
-            // and the storage won't resume if someone else stopped it
-            if (!storage_is_active()) {
-                storage_start(STORAGE_PAUSE_BRK);
-            }
+        }
+
+        // If the storage is currently paused, clear our pause flag
+        // This is okay because we're the only ones using this flag,
+        // and the storage won't resume if someone else stopped it
+        if (!storage_is_active()) {
+            storage_start(STORAGE_PAUSE_BRK);
         }
 
         vTaskDelayUntil(&last_iteration_start_tick,
