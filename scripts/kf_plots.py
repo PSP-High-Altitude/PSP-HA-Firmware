@@ -9,8 +9,8 @@ from darkstar_plots import *
 # c_out_file = r'C:\Users\hkadl\OneDrive - purdue.edu\Documents\PSP\PSP-HA-Firmware\lib\control\kf_out.csv'
 # data_in_file2 = r'C:\Users\hkadl\OneDrive - purdue.edu\Documents\PSP\Python\Data Files\pal_test\pal_fsl_test_dat.csv'
 # data_in_file = r'C:\Users\hkadl\OneDrive - purdue.edu\Documents\PSP\Python\Data Files\pal_test\dat_trimmed.csv'
-data_in_file = r'C:\Users\hkadl\OneDrive - purdue.edu\Documents\PSP\PSP-HA-Firmware\sim_out\sensor.csv'
-kf_out_file = r'C:\Users\hkadl\OneDrive - purdue.edu\Documents\PSP\PSP-HA-Firmware\sim_out\state.csv'
+# data_in_file = r'C:\Users\hkadl\OneDrive - purdue.edu\Documents\PSP\PSP-HA-Firmware\sim_out\sensor.csv'
+ # kf_out_file = r'C:\Users\hkadl\OneDrive - purdue.edu\Documents\PSP\PSP-HA-Firmware\sim_out\state.csv'
 # NEW_NAMES = ["timestamp",	"flight_phase",	"pos_geo_x",	"pos_geo_y",	"pos_geo_z",	"vel_geo_x",	"vel_geo_y",	"vel_geo_z",	"acc_geo_x",	"acc_geo_y",    "acc_geo_z", 	"pos_geo_x",	"pos_geo_y",	"pos_geo_z",	"vel_geo_x",	"vel_geo_y",	"vel_geo_z",	"acc_geo_x",	"acc_geo_y",	"acc_geo_z",    "angvel_body_x",	"angvel_body_y",	"angvel_body_z",	"orient_geo_w",	"orient_geo_x",	"orient_geo_y",	"orient_geo_z"]
 
 data_in_file = r'.\sim_out\sensor.csv'
@@ -27,7 +27,7 @@ kf_names = ['pos_ekf', 'vel_ekf', 'acc_ekf']
 # plot_kf_se(kf_state, name="kf state")
 name = "SWIL"
 plot_compare_vertical_se(kf_state, kf_state, kf_names, vert_state_names, name=name, legnames=["kf state", "state"])
-plot_altitude_pressure(kf_state, data, kf_names, vert_state_names, name)
+# plot_altitude_pressure(kf_state, data, kf_names, vert_state_names, name)
 plot_kf_se(kf_state, name=name)
 
 
