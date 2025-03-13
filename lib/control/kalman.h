@@ -39,6 +39,7 @@
 #define IMU_ACCEL_MAX (16. * 1)       // accel limit, g
 #define BARO_SPEED_MAX (200)          // m/s
 #define BARO_SPEED_FULL (50)          // m/s
+#define DROGUE_ACCEL_CUTOFF (-20)
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define SIGN(a) ((a) < (0.) ? (-1.) : (1.))

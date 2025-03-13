@@ -28,7 +28,7 @@ static mfloat R_diag[NUM_KIN_MEAS];    // get set in preprocess
 // These copied from the values I used during python testing
 static const mfloat Q_VARS_1[NUM_TOT_STATES] = {
     1.5, 1.0e-03, 4.0e+00, 1.0e-01, 1.0e-01, 1.0e-01, 1.0e-01};
-static const mfloat Q_VARS_2[NUM_TOT_STATES] = {10., .2,  .1, 0.1,
+static const mfloat Q_VARS_2[NUM_TOT_STATES] = {10., .5,  .5, 0.1,
                                                 0.1, 0.1, 0.1};
 static const mfloat R_DIAG_1[NUM_KIN_MEAS] = {30.0e-01, 5.e-04, 5.e-04};
 static const mfloat R_DIAG_2[NUM_KIN_MEAS] = {1, 1., 1.};
@@ -344,6 +344,13 @@ kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
             z[KF_ACC_H] =
                 NAN;  // remove accel measuremnts bc they aren't helpful anymore
             z[KF_ACC_I] = NAN;
+            if (x.pData[KF_ACC] <
+                DROGUE_ACCEL_CUTOFF) {  // for the dege case where the
+                                        // deployment spike happens at phase
+                                        // transition
+                x.pData[KF_ACC] = -10;
+                mat_edit(&P, KF_ACC, KF_ACC, mat_val(&P, KF_ACC, KF_ACC) * 10);
+            }
             filter_status = KF_SUCCESS;
             break;
         case FP_LANDED:
