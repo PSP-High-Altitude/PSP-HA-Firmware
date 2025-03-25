@@ -59,21 +59,22 @@ void cmd_print_config(char *str) { config_print(); }
 // Config invalidate command
 char regex_invalidate_config[] = "^invalidate_config[\n]*$";
 void cmd_invalidate_config(char *str) {
-    config_invalidate();
-    PAL_LOGW("Board config invalidated!\n");
+    PAL_LOGW("Invalidating board config\n");
+    EXPECT_OK(config_invalidate(), "failed to invalidate config\n");
 }
 
 // Backup invalidate command
 char regex_invalidate_backup[] = "^invalidate_backup[\n]*$";
 void cmd_invalidate_backup(char *str) {
-    memset(backup_get_ptr(), 0, sizeof(Backup));
-    PAL_LOGW("Board backup pointer invalidated!\n");
+    PAL_LOGW("Invalidating backup\n");
+    EXPECT_OK(backup_invalidate(), "failed to invalidate backup\n");
 
     // Pause storage
     storage_pause(STORAGE_PAUSE_RESET);
     while (storage_is_active()) {
         DELAY_MICROS(1000);
     }
+
     NVIC_SystemReset();
 }
 

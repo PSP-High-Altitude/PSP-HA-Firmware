@@ -10,3 +10,9 @@ Status backup_init() {
 }
 
 Backup* backup_get_ptr() { return &s_backup; }
+
+Status backup_invalidate() {
+    printf("Invalidated backup SRAM by clearing\n");
+    memset(backup_get_ptr(), 0x00, sizeof(Backup));
+    return STATUS_OK;
+}

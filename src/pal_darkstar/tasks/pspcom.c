@@ -203,6 +203,9 @@ void task_pspcom_rx() {
                     case RESETDEVICE:
                         // Reset board if magic byte received
                         if (msg.payload_len == 1 && msg.payload[0] == 0x42) {
+                            // Invalidate backup SRAM
+                            backup_invalidate();
+
                             // Pause storage
                             storage_pause(STORAGE_PAUSE_RESET);
                             while (storage_is_active()) {

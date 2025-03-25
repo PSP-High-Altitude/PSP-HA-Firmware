@@ -20,4 +20,6 @@ Status backup_init();
 
 Backup* backup_get_ptr();
 
+Status backup_invalidate();
+
 #endif  // BACKUP_H

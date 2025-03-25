@@ -79,8 +79,8 @@ bool tud_msc_test_unit_ready_cb(uint8_t lun) {
 
     // Wait for storage task to clean up
     if (storage_is_active()) {
-        // Additional Sense 3A-00 is NOT_FOUND
-        tud_msc_set_sense(lun, SCSI_SENSE_NOT_READY, 0x3a, 0x00);
+        // SCIS SCI 04-01 is Not Ready - becoming ready
+        tud_msc_set_sense(lun, SCSI_SENSE_NOT_READY, 0x04, 0x01);
         return false;
     }
 
