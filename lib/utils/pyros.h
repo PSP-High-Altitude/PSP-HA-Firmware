@@ -6,14 +6,18 @@
 #include "status.h"
 
 // Max number of queued fire commands (including retries)
-#define PYRO_QUEUE_LEN 8
+// Should be greater than the number of pyro channels
+#define PYRO_QUEUE_LEN (8)
 
-// Pyro fire length (ms)
-#define PYRO_FIRE_LENGTH_MS 1000
+// Pyro fire pulse width (ms)
+#define PYRO_FIRE_LENGTH_MS (100)
 
-// Pyro retries (if we make it to the ground and the pyro didn't fire someone
-// approaching could get injured)
-#define PYRO_MAX_RETRIES 100
+// Pyro continuity check delay (ms)
+#define PYRO_CHECK_DELAY_MS (1000)
+
+// Pyro retries (if we make it to the ground and the pyro
+// didn't fire someone approaching could get injured)
+#define PYRO_MAX_RETRIES (10)
 
 typedef enum {
     PYRO_MAIN,

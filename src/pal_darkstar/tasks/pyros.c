@@ -113,16 +113,17 @@ void task_pyros() {
         gpio_write(fire_pin, GPIO_HIGH);
         DELAY(PYRO_FIRE_LENGTH_MS);
         gpio_write(fire_pin, GPIO_LOW);
+        DELAY(PYRO_CHECK_DELAY_MS);
 
         // If we still detect continuity on the pin, retry if we still have
-        // retries left by readding the command to the queue
+        // retries left by readding the command to the queue (for round robin)
         if (gpio_read(cont_pin) == GPIO_HIGH && s_retries_left[pyro] > 0) {
             PAL_LOGW("Pyro retrying (%lu retries left)\n",
-                     s_retries_left[pyro]);
+                     s_retries_left[pyro] - 1);
 
             while (xQueueSend(s_pyro_queue_handle, &pyro, 1) != pdPASS) {
-                // This should be impossible with a long enough queue, but retry
-                // a few times anyway just in case
+                // This should be impossible with a long enough queue,
+                // but retry a few times anyway just in case
                 s_retries_left[pyro] -= 1;
             }
 
