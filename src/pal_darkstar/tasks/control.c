@@ -6,11 +6,11 @@
 #include "board_config.h"
 #include "flight_control.h"
 #include "gpio/gpio.h"
-#include "pspcom.h"
 #include "sensors.h"
 #include "state.pb.h"
 #include "state_estimation.h"
 #include "storage.h"
+#include "telem.h"
 #include "timer.h"
 
 // FreeRTOS
@@ -108,7 +108,7 @@ void task_control(TaskHandle_t* handle_ptr) {
 
         // Get new state and send state updates where required
         FlightPhase flight_phase = fp_get();
-        pspcom_update_fp(flight_phase);
+        telem_update_fp(flight_phase);
 
         // Yellow LED is solid when READY, strobing when in flight
         if (flight_phase == FP_READY) {

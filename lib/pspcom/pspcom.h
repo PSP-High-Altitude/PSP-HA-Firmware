@@ -1,5 +1,5 @@
 #ifndef PSPCOM_H
-#define PSPCOM
+#define PSPCOM_H
 
 #include <stdint.h>
 
@@ -8,8 +8,12 @@
 #include "sensor.pb.h"
 #include "status.h"
 
-#define CRC16_POLY 0x1021
-#define CRC16_INIT 0xFFFF
+#define CRC16_POLY (0x1021)
+#define CRC16_INIT (0xFFFF)
+
+#define ARM_TIMEOUT_MS (10000)
+
+#define PSPCOM_MAX_PAYLOAD_LEN (256)
 
 enum {
     NACK = 0x00,
@@ -45,7 +49,7 @@ typedef struct {
     uint8_t payload_len;
     uint8_t device_id;
     uint8_t msg_id;
-    uint8_t payload[256];
+    uint8_t payload[PSPCOM_MAX_PAYLOAD_LEN];
 } pspcommsg;
 
 typedef struct __attribute__((packed)) {
@@ -62,34 +66,15 @@ typedef struct __attribute__((packed)) {
 } gps_vel_packed;
 
 typedef struct {
-    SensorFrame *sensor_frame;
-    GPS_Fix_TypeDef *gps_fix;
+    SensorFrame* sensor_frame;
+    GPS_Fix_TypeDef* gps_fix;
 } PAL_Data_Typedef;
 
-uint16_t crc16(uint16_t checksum, pspcommsg msg);
+uint16_t crc16(uint16_t checksum, pspcommsg* msg);
 
-Status pspcom_init();
+Status pspcom_handle_message(pspcommsg* msg);
+pspcommsg pspcom_make_standard(SensorFrame* sensor_frame,
+                               GPS_Fix_TypeDef* gps_fix,
+                               FlightPhase flight_phase);
 
-void task_pspcom_rx();
-
-void pspcom_send_msg(pspcommsg msg);
-
-void pspcom_send_sensor(SensorFrame* sensor_frame);
-
-void pspcom_send_gps(GPS_Fix_TypeDef* gps_fix);
-
-void pspcom_update_sensors(SensorFrame* sensor_frame);
-
-void pspcom_update_gps(GPS_Fix_TypeDef* gps_fix);
-
-void pspcom_update_fp(FlightPhase flight_phase);
-
-void task_pspcom_tx();
-
-void pspcom_send_status();
-
-void pspcom_send_standard();
-
-Status pspcom_change_frequency(uint32_t frequency_hz);
-
-#endif
+#endif  // PSPCOM_H

@@ -5,9 +5,9 @@
 #include "board.h"
 #include "board_config.h"
 #include "control.h"
-#include "pspcom.h"
 #include "spi/spi.h"
 #include "storage.h"
+#include "telem.h"
 #include "timer.h"
 
 // Sensor drivers
@@ -185,6 +185,6 @@ void task_sensors(TaskHandle_t* handle_ptr) {
 
         control_update_sensors(&sensor_frame);
         storage_queue_sensors(&sensor_frame);
-        pspcom_update_sensors(&sensor_frame);
+        telem_update_sensors(&sensor_frame);
     }
 }
