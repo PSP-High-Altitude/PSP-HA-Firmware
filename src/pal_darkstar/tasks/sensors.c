@@ -91,21 +91,23 @@ Status sensors_init() {
     Status status = STATUS_OK;
 
     // Allow each intialization to occur
-    UPDATE_STATUS(status,
-                  EXPECT_OK_RETRIES(ms5637_init(&s_baro_conf),
-                                    "Barometer initialization failed\n", 5));
-
-    UPDATE_STATUS(
-        status, EXPECT_OK_RETRIES(kx134_init(&s_acc_conf, KX134_OUT_RATE_200_HZ,
-                                             KX134_RANGE_64_G),
-                                  "Accelerometer initialization failed\n", 5));
-
-    UPDATE_STATUS(
-        status, EXPECT_OK_RETRIES(iis2mdc_init(&s_mag_conf, IIS2MDC_ODR_100_HZ),
-                                  "Magnetometer initialization failed\n", 5));
-    UPDATE_STATUS(
+    UPDATE_STATUS(  ///
         status,
-        EXPECT_OK_RETRIES(
+        EXPECT_OK_RETRIES(  ///
+            ms5637_init(&s_baro_conf), "Barometer initialization failed\n", 5));
+    UPDATE_STATUS(  ///
+        status,
+        EXPECT_OK_RETRIES(  ///
+            kx134_init(&s_acc_conf, KX134_OUT_RATE_200_HZ, KX134_RANGE_64_G),
+            "Accelerometer initialization failed\n", 5));
+    UPDATE_STATUS(  ///
+        status,
+        EXPECT_OK_RETRIES(  ///
+            iis2mdc_init(&s_mag_conf, IIS2MDC_ODR_100_HZ),
+            "Magnetometer initialization failed\n", 5));
+    UPDATE_STATUS(  ///
+        status,
+        EXPECT_OK_RETRIES(  ///
             bmi088_init(&s_imu_acc_conf, &s_imu_rot_conf,
                         BMI088_GYRO_RATE_200_HZ, BMI088_ACC_RATE_200_HZ,
                         BMI088_GYRO_RANGE_2000_DPS, BMI088_ACC_RANGE_24_G),
@@ -116,10 +118,7 @@ Status sensors_init() {
         ASSERT_OK(STATUS_STATE_ERROR, "unable to get ptr to config\n");
     }
 
-    // Fail if any sensor initialization failed
-    ASSERT_OK(status, "sensor initialization failed\n");
-
-    return STATUS_OK;
+    return status;
 }
 
 Status sensors_start_read() {

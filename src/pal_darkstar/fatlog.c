@@ -6,8 +6,13 @@
 #include "stdlib.h"
 #include "timer.h"
 
+#ifdef COMPAT_9K5
+#define MOUNT_POINT "/NAND"
+#define VOLUME_LABEL "PAL9k5"
+#else  // not COMPAT_9K5
 #define MOUNT_POINT "/MMC"
 #define VOLUME_LABEL "Darkstar"
+#endif  // not COMPAT_9K5
 
 #define FNAME_LEN 64
 #define HEADER_LEN 64
