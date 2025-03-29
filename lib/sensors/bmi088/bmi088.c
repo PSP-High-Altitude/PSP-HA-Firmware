@@ -118,7 +118,7 @@ Status bmi088_init(I2cDevice* acc_device, I2cDevice* gyro_device,
     }
 
     // Delay at least 1 ms
-    DELAY(2);
+    DELAY(5);
 
     buf = 0xB6;
     if (bmi088_write(gyro_device, BMI088_GYRO_SOFTRESET, &buf, 1) !=
@@ -127,7 +127,7 @@ Status bmi088_init(I2cDevice* acc_device, I2cDevice* gyro_device,
     }
 
     // Delay at least 30 ms
-    DELAY(31);
+    DELAY(50);
 
     // Exit accelerometer from PS mode
     buf = 0x04;
@@ -137,7 +137,7 @@ Status bmi088_init(I2cDevice* acc_device, I2cDevice* gyro_device,
     }
 
     // Delay 450 us at least
-    DELAY_MICROS(500);
+    DELAY(1);
 
     // Configure accerometer rate
     buf = 0xA0 | acc_rate;

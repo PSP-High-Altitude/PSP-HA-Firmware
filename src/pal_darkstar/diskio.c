@@ -28,7 +28,7 @@
 #include "timer.h"
 
 #ifndef FF_VOLUME_STRS
-const char *VolumeStr[FF_VOLUMES] = {"MMC, NAND"};
+const char *VolumeStr[FF_VOLUMES] = {"MMC", "NAND"};
 #endif
 
 RAM_D2 static uint8_t rw_buf[512];  // DMA happy buffer

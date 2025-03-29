@@ -24,7 +24,6 @@ Status backup_init() {
 Backup* backup_get_ptr() { return (Backup*)D3_BKPSRAM_BASE; }
 
 Status backup_invalidate() {
-    PAL_LOGI("Invalidating backup SRAM by clearing\n");
     memset(backup_get_ptr(), 0x00, sizeof(Backup));
     return STATUS_OK;
 }

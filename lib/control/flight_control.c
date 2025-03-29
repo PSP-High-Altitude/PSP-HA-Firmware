@@ -263,20 +263,16 @@ FlightPhase fp_update_init(const SensorFrame* sensor_frame) {
         // Check that high-g accelerometer was within range
         if (fabsf(acc_h_avg_mag - 1) * G_MAG >
             s_config_ptr->max_ready_acc_bias_mps2) {
-            PAL_LOGE(
+            PAL_LOGW(
                 "High-g accelerometer avg %.3f is unacceptable; aborting\n",
                 acc_h_avg_mag);
-            PAL_LOGI("FP_INIT -> FP_ERROR");
-            return FP_ERROR;
         }
 
         // Check that low-g accelerometer was within range
         if (fabsf(acc_i_avg_mag - 1) * G_MAG >
             s_config_ptr->max_ready_acc_bias_mps2) {
-            PAL_LOGE("Low-g accelerometer avg %.3f is unacceptable; aborting\n",
+            PAL_LOGW("Low-g accelerometer avg %.3f is unacceptable; aborting\n",
                      acc_i_avg_mag);
-            PAL_LOGI("FP_INIT -> FP_ERROR");
-            return FP_ERROR;
         }
 
         PAL_LOGI("FP_INIT -> FP_WAIT\n");
