@@ -148,8 +148,8 @@ int main(void) {
     // Perform critical bare-metal initialization
     HAL_Init();
     SystemClock_Config();
-    init_timers();
     backup_init();
+    init_timers();
     rtc_init();
     button_event_init();
     camera_init();

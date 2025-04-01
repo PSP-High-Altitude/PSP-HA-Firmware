@@ -32,7 +32,7 @@ static OrientFunc orientation_function = NULL;
 
 static Vector s_grav_vec = {.x = -G_MAG, .y = 0.f, .z = 0.f};
 
-static float s_ground_alt = 0.f;
+static float* s_ground_alt_ptr;
 
 enum LogState {
     SE_LOG_OK = 0,
@@ -124,6 +124,7 @@ Status se_init() {
               "failed to init baro diff time window\n");
 
     s_state_ptr = &(backup_get_ptr()->state_estimate);
+    s_ground_alt_ptr = &(backup_get_ptr()->ground_alt_m);
 
     SensorDirection sensor_dir =
         config_get_ptr()->orient_antenna_up ? IMU_Z_DOWN : IMU_Z_UP;
@@ -165,9 +166,9 @@ Status se_set_time(float t_s) {
 }
 
 Status se_set_ground_pressure(float p_mbar) {
-    s_ground_alt = se_baro_alt_m(p_mbar);
-    kf_set_initial_alt(s_ground_alt);
-    PAL_LOGI("Ground baro alt set to %.1f m\n", s_ground_alt);
+    *s_ground_alt_ptr = se_baro_alt_m(p_mbar);
+    kf_set_initial_alt(*s_ground_alt_ptr);
+    PAL_LOGI("Ground baro alt set to %.1f m\n", *s_ground_alt_ptr);
     return STATUS_OK;
 }
 
@@ -313,7 +314,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     /* BARO ALT UPDATE */
     /*******************/
     float pressure = sensor_frame->pressure;
-    float baro_alt = se_baro_alt_m(pressure) - s_ground_alt;
+    float baro_alt = se_baro_alt_m(pressure) - *s_ground_alt_ptr;
 
     /***********************/
     /* LINEAR MODEL UPDATE */

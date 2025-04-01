@@ -14,6 +14,7 @@ typedef struct {
     BoardConfig board_config;
     StateEst state_estimate;
     FlightPhase flight_phase;
+    float ground_alt_m;
 } Backup;
 
 Status backup_init();

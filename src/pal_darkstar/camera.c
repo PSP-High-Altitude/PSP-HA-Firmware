@@ -37,10 +37,10 @@ Status camera_set_mode(CameraMode mode) {
 
     if (mode == CAMERA_MODE_OFF && s_camera_mode == CAMERA_MODE_RUN) {
         uart_tx(&s_camera_device, cmd, sizeof(cmd));
-        s_camera_mode = CAMERA_MODE_RUN;
+        s_camera_mode = CAMERA_MODE_OFF;
     } else if (mode == CAMERA_MODE_RUN && s_camera_mode == CAMERA_MODE_OFF) {
         uart_tx(&s_camera_device, cmd, sizeof(cmd));
-        s_camera_mode = CAMERA_MODE_OFF;
+        s_camera_mode = CAMERA_MODE_RUN;
     }
 
     return STATUS_OK;
