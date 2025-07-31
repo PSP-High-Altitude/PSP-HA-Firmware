@@ -314,6 +314,8 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     /*******************/
     float pressure = sensor_frame->pressure;
     float baro_alt = se_baro_alt_m(pressure) - s_ground_alt;
+    // PSPSP: You can replace this function with your own to incorportate it
+    // into one of our existing models
 
     /***********************/
     /* LINEAR MODEL UPDATE */
@@ -422,10 +424,21 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
         .rot_x = rot.x,
         .rot_y = rot.y,
         .rot_z = rot.z,
+
     };
 
     kf_do_kf(phase, kf_input, dt);      // TODO: status output here
     kf_write_state(s_state_ptr);        // write new state to StateEst
+
+    /********************/
+    /* PSPSP ATMOSPHERE */
+    /********************/
+    // Put stuff here
+    // sensor_frame is a struct that has all the sensor data
+    // sensor_frame->pressure
+    // s_stat_ptr points to a struct which has the estimated state. This is what
+    // gets saved and output in sim out
+    s_state_ptr->posVert = 0;  // save your output here
 
     return STATUS_OK;
 }

@@ -1,6 +1,8 @@
 #ifndef ATMOS_TEMPLATE_H
 #define ATMOS_TEMPLATE_H
 
+// FOR PSPSP
+
 typedef float float32_t;  // this is the size of float we will use
 
 // FUNCTION DECLARATIONS HERE:
