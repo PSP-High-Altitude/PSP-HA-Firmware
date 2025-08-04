@@ -32,7 +32,15 @@ static OrientFunc orientation_function = NULL;
 
 static Vector s_grav_vec = {.x = -G_MAG, .y = 0.f, .z = 0.f};
 
+static LayerData atmos_struct = {
+	.altitude_table = {0.f, 11000.f, 25200.f, 47000.f, 53000.f, 79000.f, 90000.f, 105000.f},
+	.lapse_rate_table = {-6.5e-3f, 0.0f, 3.0e-3f, 0.0f, -4.5e-3f, 0.0f, 4.0e-3f, 0.0f}
+};
+
+// TODO: Assign these variables according to launch conditions, possibly with a rolling average
 static float s_ground_alt = 0.f;
+static float s_ground_temp = 0.f;
+static float s_ground_pressure = 0.f;
 
 enum LogState {
     SE_LOG_OK = 0,
@@ -143,6 +151,13 @@ Status se_init() {
     }
 
     kf_init_state(x0, P0_diag);
+
+	// LayerData struct
+	atmos_struct.altitude_table[0] = s_ground_alt;
+	atmos_struct.temp_table[0] = s_ground_temp;
+	atmos_struct.pressure_table[0] = s_ground_pressure;
+
+	gen_atmosphere_struct(&atmos_struct, s_ground_temp, s_ground_pressure);
 
     return STATUS_OK;
 }
@@ -438,7 +453,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     // sensor_frame->pressure
     // s_stat_ptr points to a struct which has the estimated state. This is what
     // gets saved and output in sim out
-    s_state_ptr->posVert = 0;  // save your output here
+    s_state_ptr->posVert = pressure_to_altitude(sensor_frame->pressure, &atmos_struct);  // save your output here
 
     return STATUS_OK;
 }
