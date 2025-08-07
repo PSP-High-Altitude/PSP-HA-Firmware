@@ -9,15 +9,23 @@
 #include "storage.h"
 #include "timer.h"
 
+#ifdef _WIN32
+const static char NULL_DEVICE[] = "NUL";
+#endif
+
+#ifdef __linux__
+const char NULL_DEVICE[] = "/dev/null";
+#endif
+
+
 const static char s_sensor_fname[] = "sim_out/sensor.csv";
 const static char s_state_fname[] = "sim_out/state.csv";
 
 int main() {
     // Need to do this because PAL_LOG* writes to FDs 3 and 4
-    // NOTE: this is Windows-specific; change to /dev/null on Unix
     printf("Redirecting FD 3 and FD 4 to NUL\n");
-    __attribute__((unused)) FILE* n1 = fopen("NUL", "w");
-    __attribute__((unused)) FILE* n2 = fopen("NUL", "w");
+    __attribute__((unused)) FILE* n1 = fopen(NULL_DEVICE, "w");
+    __attribute__((unused)) FILE* n2 = fopen(NULL_DEVICE, "w");
 
     printf("Creating sensor output file at %s\n", s_sensor_fname);
     create_sensor_csv(s_sensor_fname);
@@ -41,7 +49,8 @@ int main() {
         store_sensor_frame(&hwil_sensor_frame);
 
         FlightPhase fp_before = fp_get();
-        Status update_status = fp_update(&hwil_sensor_frame);
+        Status update_status = fp_update(&hwil_sensor_frame)/* & se_update(fp_before, &hwil_sensor_frame)*/;
+
         if (fp_get() != fp_before) {
             printf("^ @ %.1f s\n\n", MILLIS() / 1000.);
         }
