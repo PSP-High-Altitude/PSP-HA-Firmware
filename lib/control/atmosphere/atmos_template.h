@@ -2,7 +2,7 @@
 #define ATMOS_TEMPLATE_H
 
 #define G_MAG (9.81f) // since including all of state_estimation.h would be a circular dependency
-#define R_MAG (0.287f)
+#define R_MAG (287.05f)
 #define TABLE_LEN (8)
 
 // FOR PSPSP

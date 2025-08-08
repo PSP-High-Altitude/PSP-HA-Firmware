@@ -39,8 +39,8 @@ static LayerData atmos_struct = {
 
 // TODO: Assign these variables according to launch conditions, possibly with a rolling average
 static float s_ground_alt = 0.f;
-static float s_ground_temp = 0.f;
-static float s_ground_pressure = 0.f;
+static float s_ground_temp = 288.16f;
+static float s_ground_pressure = 1013.25f;
 
 enum LogState {
     SE_LOG_OK = 0,
@@ -154,8 +154,6 @@ Status se_init() {
 
 	// LayerData struct
 	atmos_struct.altitude_table[0] = s_ground_alt;
-	atmos_struct.temp_table[0] = s_ground_temp;
-	atmos_struct.pressure_table[0] = s_ground_pressure;
 
 	gen_atmosphere_struct(&atmos_struct, s_ground_temp, s_ground_pressure);
 
