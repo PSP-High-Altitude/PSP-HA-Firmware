@@ -225,3 +225,7 @@ analysis.py
 
 # Ignore asm files
 *.asm
+
+# ignore shell scripts for building
+*.bat
+*.sh
