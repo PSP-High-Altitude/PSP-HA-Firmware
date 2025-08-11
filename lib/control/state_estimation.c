@@ -16,6 +16,8 @@
 #define CHUTE_DEPLOYED(x) \
     ((x) == FP_DROGUE || (x) == FP_MAIN || (x) == FP_LANDED)
 
+#define N_SAMPLES 5 // for rolling average
+
 typedef Vector* (*OrientFunc)(float, float, float, Vector*);
 static OrientFunc get_orientation_function(SensorDirection up_dir);
 
@@ -38,9 +40,12 @@ static LayerData atmos_struct = {
 };
 
 // TODO: Assign these variables according to launch conditions, possibly with a rolling average
-static float s_ground_alt = 0.f;
+static float s_ground_alt = 0.f; // for eh2-booster
 static float s_ground_temp = 288.16f;
 static float s_ground_pressure = 1013.25f;
+
+static int current_sample = 0;
+static float rolling_avg_samples[N_SAMPLES] = {-1.f, -1.f, -1.f, -1.f, -1.f};
 
 enum LogState {
     SE_LOG_OK = 0,
@@ -326,7 +331,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     /* BARO ALT UPDATE */
     /*******************/
     float pressure = sensor_frame->pressure;
-    float baro_alt = se_baro_alt_m(pressure) - s_ground_alt;
+    float baro_alt = pressure_to_altitude(pressure, &atmos_struct) - s_ground_alt;
     // PSPSP: You can replace this function with your own to incorportate it
     // into one of our existing models
 
@@ -451,7 +456,32 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     // sensor_frame->pressure
     // s_stat_ptr points to a struct which has the estimated state. This is what
     // gets saved and output in sim out
-    s_state_ptr->posVert = pressure_to_altitude(sensor_frame->pressure, &atmos_struct);  // save your output here
+    //s_state_ptr->posVert = pressure_to_altitude(sensor_frame->pressure, &atmos_struct);  // save your output here
+	
+	float total = 0.f;
+	rolling_avg_samples[current_sample] = pressure_to_altitude(sensor_frame->pressure, &atmos_struct);
+
+	for (int i = 0; i < N_SAMPLES; i++) {
+		float s = rolling_avg_samples[i];
+
+		if (s < 0) {
+			total = 0.f;
+			break;
+		}
+
+		total += s;
+	}
+
+	if (total > 0) {
+		total /= N_SAMPLES;
+		s_state_ptr->posVert = total;
+	}
+	
+	if (current_sample == N_SAMPLES - 1) {
+		current_sample = 0;
+	} else {
+		current_sample++;
+	}
 
     return STATUS_OK;
 }
