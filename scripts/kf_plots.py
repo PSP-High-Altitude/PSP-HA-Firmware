@@ -1,10 +1,10 @@
 # Import('env')
 import sys
-# sys.path.append(r'C:\Users\hkadl\OneDrive - purdue.edu\Documents\PSP\Flight-Analysis\PAL Post Flight')
+sys.path.append(r'C:\Users\hkadl\OneDrive - purdue.edu\Documents\PSP\Flight-Analysis\PAL Post Flight')
 from darkstar_plots import *
 
 # from pal_plots import load_sensor_data, plot_pressure, plot_pressure_alt
-from darkstar_plots import *
+# from darkstar_plots import *
 
 # c_out_file = r'C:\Users\hkadl\OneDrive - purdue.edu\Documents\PSP\PSP-HA-Firmware\lib\control\kf_out.csv'
 # data_in_file2 = r'C:\Users\hkadl\OneDrive - purdue.edu\Documents\PSP\Python\Data Files\pal_test\pal_fsl_test_dat.csv'

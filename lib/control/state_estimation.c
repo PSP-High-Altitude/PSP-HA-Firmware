@@ -415,6 +415,10 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     /********************/
     /* EKF MODEL UPDATE */
     /********************/
+    // use these to always invalidate a sensor for DEBUG ONLY
+    bool kf_no_pressure = false;  // NOTE: DEBUG ONLY
+    bool kf_no_accel = false;     // NOTE: DEBUG ONLY
+
     KfInputVector kf_input = {
         .pressure = se_valid_pressure(pressure) ? pressure : NAN,
         .acc_h = se_valid_acc(acc_h.x) ? acc_h.x : NAN,
