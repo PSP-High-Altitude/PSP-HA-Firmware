@@ -83,14 +83,14 @@ typedef enum {
 } kf_status;
 
 // Use these enums for indexing x and z for readability and changeability
-typedef enum {
+typedef enum {   // for x (state)
     KF_POS = 0,  // position index in state vector
     KF_VEL = 1,  // velocity index in state vector
     KF_ACC = 2,  // acceleration index in state vector
     KF_Q0 = 3,   // first index of quaternion in state vector
 } kf_x_idx;
 
-typedef enum {
+typedef enum {  // for z (meas)
     KF_BARO = 0,
     KF_ACC_H = 1,
     KF_ACC_I = 2,

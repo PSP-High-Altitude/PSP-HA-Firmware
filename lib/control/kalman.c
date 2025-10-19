@@ -360,8 +360,8 @@ kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
     }
 
     // data preproccssing
-    if (fabs(x.pData[KF_ACC_I]) >
-        IMU_ACCEL_MAX) {    // remove saturated imu accel meas
+    if (fabs(x.pData[KF_ACC]) >
+        9.81 * IMU_ACCEL_MAX) {  // remove saturated imu accel meas
         z[KF_ACC_I] = NAN;  // use x or z?
     }
     // if (x.pData[KF_VEL] >= BARO_SPEED_MAX || phase == FP_BOOST) {
