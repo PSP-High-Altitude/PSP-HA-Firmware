@@ -56,7 +56,7 @@ def plot_compare_accel(se_df1, se_df2, names1, names2, sensor_df, xlim=None, nam
 
     data1 = [se_df1[names1[0]], se_df1[names1[1]], se_df1[names1[2]]]
     data2 = [se_df2[names2[0]], se_df2[names2[1]], se_df2[names2[2]]]
-    acc_data = [-9.81*(sensor_df[" acc_i_z"]+1), -9.81*(sensor_df[" acc_h_z"]+1)]
+    acc_data = [-9.81*(sensor_df["acc_i_z"]+1), -9.81*(sensor_df["acc_h_z"]+1)]
     labels = ["Height (geo) [m]", "Vel (geo) [m/s]", "Acc (body) [m/s^2]"]
     event_idx = se_df1.index[se_df1['flight_phase'].diff() != 0].tolist()
     for p in [2]:
