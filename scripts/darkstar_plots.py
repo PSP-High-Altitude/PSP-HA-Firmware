@@ -45,6 +45,37 @@ def plot_compare_vertical_se(se_df1, se_df2, names1, names2, xlim=None, name="",
             # plt.plot([t1[event_idx[i]],t1[event_idx[i]]], plt.ylim(), '--', color="#700000", lw=0.5)
     plt.suptitle(name)
 
+def plot_compare_accel(se_df1, se_df2, names1, names2, sensor_df, xlim=None, name="", legnames=[]):
+    if 'adjusted_time' in se_df1: t1 = se_df1['adjusted_time']
+    else: t1 = se_df1['time']
+    if 'adjusted_time' in se_df2: t2 = se_df2['adjusted_time']
+    else: t2 = se_df2['time']
+    if 'adjusted_time' in sensor_df: t3 = sensor_df['adjusted_time']
+    else: t3 = sensor_df['time']
+    fig = plt.figure()
+
+    data1 = [se_df1[names1[0]], se_df1[names1[1]], se_df1[names1[2]]]
+    data2 = [se_df2[names2[0]], se_df2[names2[1]], se_df2[names2[2]]]
+    acc_data = [-9.81*(sensor_df[" acc_i_z"]+1), -9.81*(sensor_df[" acc_h_z"]+1)]
+    labels = ["Height (geo) [m]", "Vel (geo) [m/s]", "Acc (body) [m/s^2]"]
+    event_idx = se_df1.index[se_df1['flight_phase'].diff() != 0].tolist()
+    for p in [2]:
+        # plt.subplot(3,1,p+1)
+        plt.plot(t1, data1[p], lw=1)
+        plt.plot(t2, data2[p], lw=1)
+        plt.plot(t3, acc_data[0], ".", ms=0.6)
+        plt.plot(t3, acc_data[1], ".", ms=0.6)
+        plt.grid(True)
+        plt.xlabel("Time (s)")
+        plt.ylabel(labels[p])
+        if len(legnames) > 0:
+            plt.legend(legnames)
+        for i in range(len(event_idx)):
+            plt.ylim(plt.ylim())
+            plt.plot([t1[event_idx[i]],t1[event_idx[i]]], plt.ylim(), '--g', lw=0.6)
+            # plt.plot([t1[event_idx[i]],t1[event_idx[i]]], plt.ylim(), '--', color="#700000", lw=0.5)
+    plt.suptitle(name)
+
 def plot_diff_vertical_se(se_df1, se_df2, names1, names2, xlim=None, name="", legnames=[]):
     if 'adjusted_time' in se_df1: t1 = se_df1['adjusted_time']
     else: t1 = se_df1['time']
