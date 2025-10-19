@@ -45,6 +45,35 @@ def plot_compare_vertical_se(se_df1, se_df2, names1, names2, xlim=None, name="",
             # plt.plot([t1[event_idx[i]],t1[event_idx[i]]], plt.ylim(), '--', color="#700000", lw=0.5)
     plt.suptitle(name)
 
+def plot_diff_vertical_se(se_df1, se_df2, names1, names2, xlim=None, name="", legnames=[]):
+    if 'adjusted_time' in se_df1: t1 = se_df1['adjusted_time']
+    else: t1 = se_df1['time']
+    if 'adjusted_time' in se_df2: t2 = se_df2['adjusted_time']
+    else: t2 = se_df2['time']
+    fig = plt.figure()
+
+    data1 = [se_df1[names1[0]], se_df1[names1[1]], se_df1[names1[2]]]
+    data2 = [se_df2[names2[0]], se_df2[names2[1]], se_df2[names2[2]]]
+    vars1 = [se_df1['pos_var_ekf'], se_df1['vel_var_ekf'], se_df1['acc_var_ekf']]
+    labels = ["Height (geo) [m]", "Vel (geo) [m/s]", "Acc (body) [m/s^2]"]
+    event_idx = se_df1.index[se_df1['flight_phase'].diff() != 0].tolist()
+    for p in range(3):
+        plt.subplot(3,1,p+1)
+        plt.plot(t1, data1[p]-data2[p], lw=1)
+        plt.plot(t1, np.sqrt(vars1[p])*3, '--r', lw=.9)
+        plt.plot(t1, -np.sqrt(vars1[p])*3, '--r', lw=.9)
+        # plt.plot(t2, data2[p], lw=1)
+        plt.grid(True)
+        plt.xlabel("Time (s)")
+        plt.ylabel(labels[p])
+        if len(legnames) > 0 and p == 1:
+            plt.legend(legnames)
+        for i in range(len(event_idx)):
+            plt.ylim(plt.ylim())
+            plt.plot([t1[event_idx[i]],t1[event_idx[i]]], plt.ylim(), '--g', lw=0.7)
+            # plt.plot([t1[event_idx[i]],t1[event_idx[i]]], plt.ylim(), '--', color="#700000", lw=0.5)
+    plt.suptitle(name)
+
 def plot_altitude_pressure(se_df, data_df, names, refnames, name):
     if 'adjusted_time' in se_df: t = se_df['adjusted_time']
     else: t = se_df['time']

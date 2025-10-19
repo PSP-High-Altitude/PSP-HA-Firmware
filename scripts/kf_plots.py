@@ -1,6 +1,6 @@
 # Import('env')
 import sys
-sys.path.append(r'C:\Users\hkadl\OneDrive - purdue.edu\Documents\PSP\Flight-Analysis\PAL Post Flight')
+# sys.path.append(r'C:\Users\hkadl\OneDrive - purdue.edu\Documents\PSP\Flight-Analysis\PAL Post Flight')
 from darkstar_plots import *
 
 # from pal_plots import load_sensor_data, plot_pressure, plot_pressure_alt
@@ -21,17 +21,19 @@ data = load_data(data_in_file)
 
 
 kf_state = load_data(kf_out_file)
-kf_state = trim_data(kf_state, 25, 41) # trim to ascent
+kf_state = trim_data(kf_state, 25, 39.5) # trim to ascent
 vert_state_names = ['pos_vert', 'vel_vert', 'acc_vert']
 kf_names = ['pos_ekf', 'vel_ekf', 'acc_ekf']
 # plot_pressure(data)
 # plot_kf_se(kf_state, name="kf state")
-name = "SWIL EH2 boost no acc" # TODO: name as command line input
+name = "SWIL EH2 boost no pressure" # TODO: name as command line input
 # xl1 = [25,45]
 plot_compare_vertical_se(kf_state, kf_state, kf_names, vert_state_names, name=name, legnames=["kf state", "state"])
 # plot_altitude_pressure(kf_state, data, kf_names, vert_state_names, name)
 plot_kf_se(kf_state, name=name)
+plot_diff_vertical_se(kf_state, kf_state, kf_names, vert_state_names, name=name, legnames=["kf state", "state"])
 
+# plot error
 
 plt.show()
 plt.pause(.1) # make plot not disappear in debug mode
