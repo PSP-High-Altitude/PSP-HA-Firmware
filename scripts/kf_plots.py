@@ -27,18 +27,18 @@ vert_state_names = ['pos_vert', 'vel_vert', 'acc_vert']
 kf_names = ['pos_ekf', 'vel_ekf', 'acc_ekf']
 # plot_pressure(data)
 # plot_kf_se(kf_state, name="kf state")
-name = "SWIL EH2 boost no pressure" # TODO: name as command line input
+name = "SWIL EH2 boost all" # TODO: name as command line input
 # xl1 = [25,45]
 plot_compare_vertical_se(kf_state, kf_state, kf_names, vert_state_names, name=name, legnames=["kf state", "state"])
-# plot_altitude_pressure(kf_state, data, kf_names, vert_state_names, name)
 # plot_kf_se(kf_state, name=name)
 plot_diff_vertical_se(kf_state, kf_state, kf_names, vert_state_names, name=name, legnames=["kf state", "state"])
 
+# plot_altitude_pressure(kf_state, data, kf_names, vert_state_names, name)
 # plot error
 
 # accel compare
 plot_compare_accel(kf_state, kf_state, kf_names, vert_state_names, data, name=name, legnames=["kf state", "state", "acc_i", "acc_h"])
-
+plot_altitude_pressure(kf_state, data, kf_names, vert_state_names, name)
 plt.show()
 plt.pause(.1) # make plot not disappear in debug mode
 

@@ -108,6 +108,8 @@ def plot_diff_vertical_se(se_df1, se_df2, names1, names2, xlim=None, name="", le
 def plot_altitude_pressure(se_df, data_df, names, refnames, name):
     if 'adjusted_time' in se_df: t = se_df['adjusted_time']
     else: t = se_df['time']
+    if 'adjusted_time' in data_df: t_data = data_df['adjusted_time']
+    else: t_data = data_df['time']
     fig = plt.figure()
 
     data = [se_df[names[0]], se_df[names[0]], se_df[names[1]]]
@@ -123,11 +125,11 @@ def plot_altitude_pressure(se_df, data_df, names, refnames, name):
         ax1.set_ylabel(labels[p])
         if (p == 0):
             ax2 = ax1.twinx()  
-            ax2.plot(t, data_df['pressure'], 'g', lw=.9)
+            ax2.plot(t_data, data_df['pressure'], 'g', lw=.9)
             ax2.set_ylabel("pressure (mbar)")
 
             h0 = pressureToAlt(data_df['pressure'][0])
-            ax1.plot(t, pressureToAlt(data_df['pressure'])-h0, 'r.', alpha=1, ms=.09)
+            ax1.plot(t_data, pressureToAlt(data_df['pressure'])-h0, 'r.', alpha=1, ms=.09)
 
             ax1.legend(["kf height", "pressure", "pressure height"])
         else:
