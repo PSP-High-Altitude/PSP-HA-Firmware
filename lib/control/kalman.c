@@ -30,6 +30,7 @@ static const mfloat Q_VARS_1[NUM_TOT_STATES] = {
     1.5, 1.0e-03, 4.0e+00, 1.0e-01, 1.0e-01, 1.0e-01, 1.0e-01};
 static const mfloat Q_VARS_2[NUM_TOT_STATES] = {10., .5,  .5, 0.1,
                                                 0.1, 0.1, 0.1};
+//                                          pressure, acc_h, acc_i
 static const mfloat R_DIAG_1[NUM_KIN_MEAS] = {30.0e-01, 5.e-04, 5.e-04};
 static const mfloat R_DIAG_2[NUM_KIN_MEAS] = {1, 1., 1.};
 
@@ -279,10 +280,11 @@ kf_status kf_update(const mfloat* z, const mfloat* R_diag) {
     mfloat
         temp_space[mat_size(&P)];  // space for all temporary matrices used in
                                    // this function (only 1 is needed at a time)
+    mfloat temp_space2[mat_size(&P)];  // More space for better P equation
     // mat hx = {NUM_KIN_MEAS, 1, &temp_space};
 
     status = kf_H_matrix(&x, z);  // Make H Matrix (linearized h(x)), resized to
-                                  // exclude NaN measurments
+                                  // exclude NaN measurements
     if (status == KF_NO_VALID_MEAS) {
         return status;
     }
@@ -292,6 +294,7 @@ kf_status kf_update(const mfloat* z, const mfloat* R_diag) {
     kf_R_matrix(R_diag, z);                 // Make R matrix, resized for NaNs
     mat_setSize(&S, R.numRows, R.numCols);  // Resize S to match R
     math_status = mat_transposeMultiply(&H, &P, &S);  // HPH'
+    // TODO: scale HPH for underweighting pressure
     math_status = mat_addTo(&S, &R);                  // S = HPH' + R
 
     // K = self.P @ H.T @ inv(S) # Kalman Gain
@@ -308,15 +311,36 @@ kf_status kf_update(const mfloat* z, const mfloat* R_diag) {
     math_status = arm_mat_mult_f32(&K, &y, &Ky);  // Ky = K*y'
     math_status = mat_addTo(&x, &Ky);             // x += Ky
 
+    // Less stable: P = P - KHP
+    // mat KHP = {K.numRows, P.numCols,
+    //            temp_space};  // NOTE: temp_space might be too small if there
+    //                          // are more measurements than states
+    // math_status = mat_doubleMultiply(&K, &H, &P, &KHP);  // K*H*P
+    // mat_scale(&KHP, -1);                   // -KHP
+    // math_status = mat_addTo(&P, &KHP);     // P = P + -KHP
+
     // P = (np.eye(n) - K @ H) @ self.P @ (np.eye(n) - K @ H).T + K @ R @ K.T
-    // ^more numerically stable version of P = P - KHP
-    mat KHP = {K.numRows, P.numCols,
-               temp_space};  // NOTE: temp_space might be too small if there
-                             // are more measurements than states
-    math_status = mat_doubleMultiply(&K, &H, &P, &KHP);  // K*H*P
-    mat_scale(&KHP, -1);                   // -KHP
-    math_status = mat_addTo(&P, &KHP);     // P = P + -KHP
-    // TODO: Replace this with the more numerically stable version
+    // P = (I - KH) P (I - KH)' + KRK'
+    // ^more numerically stable version of P = P - KHP. This also works for
+    // non-optimal K, (like underwieghting)
+    // can use both temp space
+    mat I = {P.numCols, P.numRows, temp_space};    // I
+    mfloat ones[P.numRows];                        // ones for I
+    arm_fill_f32(1, ones, P.numRows);              // ones for I
+    mat_diag(&I, ones, true);                      // make I
+    mat KH = {P.numCols, P.numRows, temp_space2};  // KH
+    math_status = arm_mat_mult_f32(&K, &H, &KH);   // KH
+    mat_scale(&KH, -1);                            // -KH
+    mat_addTo(&KH, &I);                            // I-KH (stored in KH)
+    // done with I, can reuse temp_space
+    mat L = {P.numCols, P.numRows, temp_space};  // L will be (I-KH)P(I-KH)'
+    math_status = mat_transposeMultiply(&KH, &P, &L);  // L = (I-KH)P(I-KH)'
+    // done with KH, can reuse (I-KH)P(I-KH)'temp_space2
+    mat KRK = {P.numCols, P.numRows, temp_space2};      // KRK'
+    math_status = mat_transposeMultiply(&K, &R, &KRK);  // KRK'
+    math_status = arm_mat_add_f32(
+        &L, &KRK, &P);  // P = (I - KH) P (I - KH)' + KRK' (done!)
+
     return KF_SUCCESS;
 }
 
