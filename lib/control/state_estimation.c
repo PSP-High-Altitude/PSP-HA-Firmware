@@ -134,7 +134,8 @@ Status se_init() {
     ASSERT_OK(kf_init_mats(), "failed to allocate memory for kf matrices");
     mfloat x0[NUM_TOT_STATES] = {0, 0, 0, 1,
                                  0, 0, 0};  // TODO: get these from config file
-    mfloat P0_diag[NUM_TOT_STATES] = {10, 5, 1, 1, 1, 1, 1};
+    mfloat P0_diag[NUM_TOT_STATES] = {15, 20, 500, 1,
+                                      1,  1,  1};  // these are variances
 
     // kf direction enum defined differently than this one
     int kf_up = sensor_dir + 1;
@@ -416,8 +417,8 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     /* EKF MODEL UPDATE */
     /********************/
     // use these to always invalidate a sensor for DEBUG ONLY
-    bool kf_no_pressure = true;  // NOTE: DEBUG ONLY
-    bool kf_no_accel = false;    // NOTE: DEBUG ONLY
+    bool kf_no_pressure = false;  // NOTE: DEBUG ONLY
+    bool kf_no_accel = false;     // NOTE: DEBUG ONLY
 
     KfInputVector kf_input = {
         .pressure = se_valid_pressure(pressure) ? pressure : NAN,

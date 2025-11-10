@@ -39,11 +39,16 @@ static const mfloat R_DIAG_2[NUM_KIN_MEAS] = {4, 1., 1.};
 // TODO: Initial height?
 static mfloat s_initial_height;
 
+static mfloat K_UNDERWEIGHT = 2. / 4.;  // factor to scale K by
+// static mfloat UNDERWEIGHT_CUTOFF = 45;  // underweight when alt sig^2 greater
+// than this. 45 sig^2 = 20 3sig km
+
 // Just for debugging
 static arm_status math_status;   // Watch this for math debugging
 static kf_status filter_status;  // Watch this for kf debugging
 int iteration = 0;
 int pressure_gate_count = 0;
+int underweight_count = 0;  // consecutive underweights
 
 // MATRIX DEFINITIONS
 
@@ -111,6 +116,21 @@ void mat_scale(mat* A, mfloat scale) {
     for (int i = 0; i < n; i++) {
         (A->pData)[i] *= scale;
     }
+}
+
+mfloat mat_trace(mat* A) {
+    // Should only be used on square mat
+    int n;  // use smaller one to be safe
+    if (A->numCols < A->numRows) {
+        n = A->numCols;
+    } else {
+        n = A->numRows;
+    }
+    mfloat sum = 0;
+    for (size_t i = 0; i < n; i++) {
+        sum += mat_val(A, i, i);
+    }
+    return sum;
 }
 
 arm_status mat_addTo(mat* A, const mat* B) {
@@ -292,11 +312,28 @@ kf_status kf_update(const mfloat* z, const mfloat* R_diag) {
     }
     kf_resid(&x, z, &y);  // Calc residual, resized to exclude NaN measurements
 
+    // stuff for underweighting -
+    /* underweighting should happen when the state
+    cov tries to converge really fast, usually when pressure measurements come
+    back after being gone for a while. Underweighting the k matrix makes the
+    effect less strong. However the weight is applied to the whole K, not
+    just the pressure part */
+
     // S = H @ self.P @ H.T + R # system uncertainty (in measurement space)
     kf_R_matrix(R_diag, z);                 // Make R matrix, resized for NaNs
     mat_setSize(&S, R.numRows, R.numCols);  // Resize S to match R
-    math_status = mat_transposeMultiply(&H, &P, &S);  // HPH'
-    // TODO: scale HPH for underweighting pressure
+    math_status = mat_transposeMultiply(&H, &P, &S);  // HPH' (-> S)
+    // if ((mat_trace(&S) > K_UNDERWEIGHT / (1 - K_UNDERWEIGHT) * mat_trace(&R))
+    // &&
+    //     y.numRows == NUM_KIN_MEAS) {  // don't do it if there are nan meas
+    // if ((mat_val(&P, KF_POS, KF_POS) > UNDERWEIGHT_CUTOFF) &&
+    //     y.numRows == NUM_KIN_MEAS) {
+    if (false) {
+        underweight_count++;
+        mat_scale(&S, K_UNDERWEIGHT);  // scale HPH' by weight p
+    } else {
+        underweight_count = 0;
+    }
     math_status = mat_addTo(&S, &R);                  // S = HPH' + R
 
     // K = self.P @ H.T @ inv(S) # Kalman Gain
@@ -390,17 +427,22 @@ kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
         9.81 * IMU_ACCEL_MAX) {  // remove saturated imu accel meas
         z[KF_ACC_I] = NAN;  // use x or z?
     }
-    if (x.pData[KF_VEL] >= BARO_SPEED_MAX || phase == FP_BOOST) {
+    // if (x.pData[KF_VEL] >= BARO_SPEED_MAX) {
+    //     z[KF_BARO] = NAN;
+    // } else if (x.pData[KF_VEL] >=
+    //            BARO_SPEED_FULL) {  // increase baro meas var -- prevent
+    //            sudden
+    //                                // change when pressure comes back
+    //     R_diag[KF_BARO] = R_DIAG_1[KF_BARO] * 100;
+    // }
+
+    if (x.pData[KF_VEL] >= BARO_SPEED_MAX) {
         z[KF_BARO] = NAN;
-    } else if (x.pData[KF_VEL] > 0) {
+    } else if (x.pData[KF_VEL] > BARO_SPEED_FULL) {
         // increase varaince when going fast but not supersonic yet
         mfloat vel = x.pData[KF_VEL];
-        mfloat varScaleClamp = vel - BARO_SPEED_FULL;
-        mfloat fastVarScale = 50.f / (1. + BARO_SPEED_MAX - vel);
-        if (isnormal(fastVarScale) && fastVarScale > 1) {
-            R_diag[KF_BARO] *= 1.f + varScaleClamp * fastVarScale;
-        }
-        // TODO: Fix this baro speed stuff
+        mfloat scale = 0.1 * pow(vel - BARO_SPEED_FULL, 2) + 1;
+        R_diag[KF_BARO] = R_DIAG_1[KF_BARO] * scale;
     }
 
     return filter_status;
