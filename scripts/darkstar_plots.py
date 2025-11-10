@@ -56,12 +56,15 @@ def plot_compare_accel(se_df1, se_df2, names1, names2, sensor_df, xlim=None, nam
 
     data1 = [se_df1[names1[0]], se_df1[names1[1]], se_df1[names1[2]]]
     data2 = [se_df2[names2[0]], se_df2[names2[1]], se_df2[names2[2]]]
+    vars1 = [se_df1['pos_var_ekf'], se_df1['vel_var_ekf'], se_df1['acc_var_ekf']]
     acc_data = [-9.81*(sensor_df["acc_i_z"]+1), -9.81*(sensor_df["acc_h_z"]+1)]
     labels = ["Height (geo) [m]", "Vel (geo) [m/s]", "Acc (body) [m/s^2]"]
     event_idx = se_df1.index[se_df1['flight_phase'].diff() != 0].tolist()
     for p in [2]:
         # plt.subplot(3,1,p+1)
         plt.plot(t1, data1[p], lw=1)
+        plt.plot(t1, data1[p] + np.sqrt(vars1[p])*3, "--", alpha = 0.6, lw=.7, color="cadetblue", label=r"3 $\sigma$ bound")
+        plt.plot(t1, data1[p] - np.sqrt(vars1[p])*3, "--", alpha = 0.6, lw=.7, color="cadetblue",)
         plt.plot(t2, data2[p], lw=1)
         plt.plot(t3, acc_data[0], ".", ms=0.6)
         plt.plot(t3, acc_data[1], ".", ms=0.6)
@@ -129,9 +132,11 @@ def plot_altitude_pressure(se_df, data_df, names, refnames, name):
             ax2.set_ylabel("pressure (mbar)")
 
             h0 = pressureToAlt(data_df['pressure'][0])
-            ax1.plot(t_data, pressureToAlt(data_df['pressure'])-h0, 'r.', alpha=1, ms=.09)
+            ax1.plot(t_data, pressureToAlt(data_df['pressure'])-h0, 'r.', alpha=1, ms=.1)
+            ax1.plot(t, data[p] + np.sqrt(vars[p])*3, "--", alpha = 0.6, lw=.7, color="cadetblue", label=r"3 $\sigma$ bound")
+            ax1.plot(t, data[p] - np.sqrt(vars[p])*3, "--", alpha = 0.6, lw=.7, color="cadetblue",)
 
-            ax1.legend(["kf height", "pressure", "pressure height"])
+            ax1.legend(["kf height", "pressure", "pressure height", r"3$\sigma$ bound"])
         else:
             ax1.plot(t, data2[p], lw=1)
             ax2 = ax1.twinx()  
