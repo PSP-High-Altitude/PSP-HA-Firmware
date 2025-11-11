@@ -21,6 +21,7 @@
 #include "dhara/map.h"
 #include "gpio/gpio.h"
 #include "nand/mt29f4g.h"
+#include "fake_fat/fake_fat.h"
 #include "rtc/rtc.h"
 #include "sdmmc/sdmmc.h"
 #include "string.h"
@@ -31,7 +32,7 @@
 const char *VolumeStr[FF_VOLUMES] = {"MMC", "NAND"};
 #endif
 
-RAM_D2 static uint8_t rw_buf[512];  // DMA happy buffer
+// RAM_D2 static uint8_t rw_buf[512];  // DMA happy buffer
 
 /* MMC/SD command */
 #define CMD0 (0)           /* GO_IDLE_STATE */
@@ -116,15 +117,13 @@ struct dhara_nand s_nand;
 static dhara_error_t s_map_error = DHARA_E_NONE;
 static uint8_t s_map_buffer[1U << MT29F4G_PAGE_SIZE_LOG2];
 
-static SdmmcDevice s_sd_sdmmc_device;
+// static SdmmcDevice s_sd_sdmmc_device;
 
 /* Initialize MMC interface */
 Status diskio_init(SdmmcDevice *device) {
     generate_crc_table();
 
-    // Create a local copy of MMC device (actual setup will be done later)
-    s_sd_sdmmc_device.periph = device->periph;
-    s_sd_sdmmc_device.clk = device->clk;
+    fake_fat_init();
 
     // Initialize FTL for NAND
     memset(&s_map, 0, sizeof(s_map));
@@ -151,17 +150,17 @@ DWORD get_fattime() {
 /*-----------------------------------------------------------------------*/
 /* Check status with timeout                                             */
 /*-----------------------------------------------------------------------*/
-static Status sdmmc_check_status(uint64_t timeout) {
-    SdmmcState res;
-    uint64_t start_time = xTaskGetTickCount();
-    do {
-        res = sdmmc_status(&s_sd_sdmmc_device);
-        // Yield until timeout
-        DELAY(0);
-    } while ((res != SD_CARD_TRANSFER) &&
-             (xTaskGetTickCount() - start_time < timeout));
-    return res == SD_CARD_TRANSFER ? STATUS_OK : STATUS_ERROR;
-}
+// static Status sdmmc_check_status(uint64_t timeout) {
+//     SdmmcState res;
+//     uint64_t start_time = xTaskGetTickCount();
+//     do {
+//         res = sdmmc_status(&s_sd_sdmmc_device);
+//         // Yield until timeout
+//         DELAY(0);
+//     } while ((res != SD_CARD_TRANSFER) &&
+//              (xTaskGetTickCount() - start_time < timeout));
+//     return res == SD_CARD_TRANSFER ? STATUS_OK : STATUS_ERROR;
+// }
 
 /*--------------------------------------------------------------------------
 
@@ -181,11 +180,6 @@ DSTATUS disk_initialize(BYTE drv /* Physical drive number (0) */
             if (Stat[0] & STA_NODISK)
                 return Stat[0]; /* Is card existing in the soket? */
 
-            if (sdmmc_setup(&s_sd_sdmmc_device) != STATUS_OK) {
-                PAL_LOGE("Failed to initialize MMC hardware\n");
-                Stat[0] = STA_NOINIT;
-                return Stat[0];
-            }
             Stat[0] &= ~STA_NOINIT; /* Clear STA_NOINIT flag */
             return Stat[0];
         }
@@ -237,11 +231,7 @@ DRESULT disk_read(
 
     if (drv == 0) {
         while (count--) {
-            if (sdmmc_read_blocks(&s_sd_sdmmc_device, (uint8_t *)rw_buf, sect++,
-                                  1) != STATUS_OK) {
-                return RES_ERROR;
-            }
-            memcpy(buff, rw_buf, 512);
+            fake_fat_read(sect, buff);
             buff += 512;
         }
         return RES_OK;
@@ -275,15 +265,7 @@ DRESULT disk_write(BYTE drv,         /* Physical drive number (0) */
     DWORD sect = (DWORD)sector;
 
     if (drv == 0) {
-        while (count--) {
-            memcpy(rw_buf, buff, 512);
-            buff += 512;
-            if (sdmmc_write_blocks(&s_sd_sdmmc_device, (uint8_t *)rw_buf,
-                                   sect++, 1) != STATUS_OK) {
-                return RES_ERROR;
-            }
-        }
-        return RES_OK;
+        return RES_WRPRT;
     } else if (drv == 1) {
         unsigned int i = 0;
         while (i < count) {
@@ -310,7 +292,6 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
                    BYTE cmd,  /* Control command code */
                    void *buff /* Pointer to the conrtol data */
 ) {
-    SdmmcInfo info;
     DWORD st, ed;
     DRESULT res;
     LBA_t *dp;
@@ -325,41 +306,25 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
             case CTRL_SYNC: /* Wait for end of internal write process of the
                              * drive
                              */
-                if (sdmmc_check_status(200) != STATUS_OK) {
-                    res = RES_ERROR;
-                    break;
-                }
                 res = RES_OK;
                 break;
 
             case GET_SECTOR_COUNT: /* Get drive capacity in unit of sector
                                     * (DWORD)
                                     */
-                if (sdmmc_info(&s_sd_sdmmc_device, &info) != STATUS_OK) {
-                    res = RES_ERROR;
-                    break;
-                }
-                *(DWORD *)buff = info.LogBlockNbr;
+                *(DWORD *)buff = fake_fat_get_total_sectors();
                 res = RES_OK;
                 break;
 
             case GET_SECTOR_SIZE: /* Get sector size (WORD) */
-                if (sdmmc_info(&s_sd_sdmmc_device, &info) != STATUS_OK) {
-                    res = RES_ERROR;
-                    break;
-                }
-                *(WORD *)buff = info.LogBlockSize;
+                *(WORD *)buff = 512;
                 res = RES_OK;
                 break;
 
             case GET_BLOCK_SIZE: /* Get erase block size in unit of sector
                                   * (DWORD)
                                   */
-                if (sdmmc_info(&s_sd_sdmmc_device, &info) != STATUS_OK) {
-                    res = RES_ERROR;
-                    break;
-                }
-                *(WORD *)buff = info.LogBlockSize / 512;
+                *(WORD *)buff = 1;
                 res = RES_OK;
                 break;
 
@@ -367,17 +332,7 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
                              * 1)
                              */
                 dp = buff;
-                st = (DWORD)dp[0];
-                ed = (DWORD)dp[1];
-                if (sdmmc_erase(&s_sd_sdmmc_device, st, ed) != STATUS_OK) {
-                    res = RES_ERROR;
-                    break;
-                }
-                if (sdmmc_check_status(30000) != STATUS_OK) {
-                    res = RES_ERROR;
-                    break;
-                }
-                res = RES_OK;
+                res = RES_WRPRT;
                 break;
 
             default:

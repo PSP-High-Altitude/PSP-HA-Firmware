@@ -179,11 +179,7 @@ int32_t tud_msc_read10_cb(uint8_t lun, uint32_t lba, uint32_t offset,
 bool tud_msc_is_writable_cb(uint8_t lun) {
     (void)lun;
 
-#ifdef CFG_EXAMPLE_MSC_READONLY
     return false;
-#else
-    return true;
-#endif
 }
 
 // Callback invoked when received WRITE10 command.

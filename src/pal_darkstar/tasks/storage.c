@@ -227,8 +227,8 @@ Status storage_init() {
     // Initialize FATFS
     UPDATE_STATUS(status,  ///
                   EXPECT_OK(diskio_init(&s_sdmmc_device), "diskio init"));
-    UPDATE_STATUS(status,  ///
-                  EXPECT_OK(fatlog_init(), "fatlog init"));
+    // UPDATE_STATUS(status,  ///
+    //               EXPECT_OK(fatlog_init(), "fatlog init"));
 
     // Initialize config
     UPDATE_STATUS(status,  ///
