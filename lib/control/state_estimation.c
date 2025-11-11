@@ -330,8 +330,10 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     /* BARO ALT UPDATE */
     /*******************/
     float pressure = sensor_frame->pressure;
-    float baro_alt = se_baro_alt_m(pressure) - s_ground_alt;
-    // float baro_alt =
+    // float baro_alt = se_baro_alt_m(pressure) - s_ground_alt; // old method
+    float baro_alt = atmos_pressure_to_altitude(sensor_frame->pressure,
+                                                &atmos_struct) -
+                     s_ground_alt;  // new method
 
     /***********************/
     /* LINEAR MODEL UPDATE */
