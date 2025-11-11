@@ -623,6 +623,7 @@ mfloat kf_pressureToAlt(mfloat p_mbar) {  // only used for gating
     mfloat alt_m =
         44330.f * (1.f - powf(((p_mbar) / SEA_LEVEL_PRESSURE), 1.f / 5.25588f));
     // TODO: check for invalid pressure
+    // TODO: Check validity or replace this with new atmos model
     return alt_m;
 }
 

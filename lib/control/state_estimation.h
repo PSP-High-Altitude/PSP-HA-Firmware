@@ -16,7 +16,9 @@
 #define M_PI (3.1415926535f)
 #endif
 
+#ifndef G_MAG
 #define G_MAG (9.81f)
+#endif
 
 #define BARO_ALT_MEDIAN_WINDOW 25
 #define BARO_ALT_SMA_WINDOW 50

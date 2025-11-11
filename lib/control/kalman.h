@@ -40,6 +40,8 @@
 #define BARO_SPEED_MAX (225)          // m/s
 #define BARO_SPEED_FULL (175)         // m/s
 #define DROGUE_ACCEL_CUTOFF (-20)
+#define USE_LAYERED_ATMOSPHERE \
+    (true)  // whether kf uses basic or fancy atmosphere model
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define SIGN(a) ((a) < (0.) ? (-1.) : (1.))
@@ -69,7 +71,7 @@
 
 // STRUCT DEFINITIONS
 
-// change these if we want diferent sized floats. You also must change the
+// change these if we want different sized floats. You also must change the
 // math functions
 typedef arm_matrix_instance_f32 mat;
 typedef float32_t mfloat;
@@ -111,6 +113,7 @@ arm_status mat_edit(mat* mat_ptr, uint16_t i, uint16_t j, mfloat value);
 void mat_diag(mat* mat_ptr, const mfloat* diag_vals, bool zeros);
 int mat_size(const mat* m);
 kf_status mat_alloc(mat* mat_ptr, uint16_t rows, uint16_t cols);
+
 /**
  * @brief out = (A * B) * C. Make sure the dimensions work
  *

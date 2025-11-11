@@ -3,6 +3,7 @@
 #include <math.h>
 #include <string.h>
 
+#include "atmosphere.h"
 #include "backup/backup.h"
 #include "filter/median_filter.h"
 #include "filter/sma_filter.h"
@@ -32,7 +33,17 @@ static OrientFunc orientation_function = NULL;
 
 static Vector s_grav_vec = {.x = -G_MAG, .y = 0.f, .z = 0.f};
 
+static LayerData atmos_struct = {
+    .altitude_table = {0.f, 11000.f, 25200.f, 47000.f, 53000.f, 79000.f,
+                       90000.f, 105000.f},  // km?
+    .lapse_rate_table = {-6.5e-3f, 0.0f, 3.0e-3f, 0.0f, -4.5e-3f, 0.0f, 4.0e-3f,
+                         0.0f}};
+
+// TODO: Assign these variables according to launch conditions, possibly with a
+// rolling average
 static float s_ground_alt = 0.f;
+static float s_ground_temp = 288.16f;
+static float s_ground_pressure = 1013.25f;
 
 enum LogState {
     SE_LOG_OK = 0,
@@ -144,6 +155,10 @@ Status se_init() {
     }
 
     kf_init_state(x0, P0_diag);
+
+    // Atmosphere initialization
+    atmos_struct.altitude_table[0] = s_ground_alt;
+    gen_atmosphere_struct(&atmos_struct, s_ground_temp, s_ground_pressure);
 
     return STATUS_OK;
 }
