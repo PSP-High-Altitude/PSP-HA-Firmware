@@ -158,7 +158,8 @@ Status se_init() {
 
     // Atmosphere initialization
     atmos_struct.altitude_table[0] = s_ground_alt;
-    gen_atmosphere_struct(&atmos_struct, s_ground_temp, s_ground_pressure);
+    atmos_gen_atmosphere_struct(&atmos_struct, s_ground_temp,
+                                s_ground_pressure);
 
     return STATUS_OK;
 }
@@ -330,6 +331,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     /*******************/
     float pressure = sensor_frame->pressure;
     float baro_alt = se_baro_alt_m(pressure) - s_ground_alt;
+    // float baro_alt =
 
     /***********************/
     /* LINEAR MODEL UPDATE */

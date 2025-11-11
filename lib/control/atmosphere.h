@@ -19,12 +19,13 @@ typedef struct {
 } LayerData;
 
 // FUNCTION DECLARATIONS HERE:
-float calc_temp(float altitude, float initial_altitude, float initial_temp,
-                float lapse_rate);
-float calc_pressure(float altitude, float initial_altitude, float initial_temp,
-                    float initial_pressure, float lapse_rate);
-void gen_atmosphere_struct(LayerData* atmos, float initial_temp,
-                           float initial_pressure);
-float pressure_to_altitude(float pressure, LayerData* atmos);
+float atmos_calc_temp(float altitude, float initial_altitude,
+                      float initial_temp, float lapse_rate);
+float atmos_calc_pressure(float altitude, float initial_altitude,
+                          float initial_temp, float initial_pressure,
+                          float lapse_rate);
+void atmos_gen_atmosphere_struct(LayerData* atmos, float initial_temp,
+                                 float initial_pressure);
+float atmos_pressure_to_altitude(float pressure, LayerData* atmos);
 
 #endif  // ATMOSPHERE_H

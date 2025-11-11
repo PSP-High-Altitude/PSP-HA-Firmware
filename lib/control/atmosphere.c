@@ -7,15 +7,16 @@
 
 // FUNCTION DEFINITIONS HERE
 
-float calc_temp(float altitude, float initial_altitude, float initial_temp,
-                float lapse_rate) {
+float atmos_calc_temp(float altitude, float initial_altitude,
+                      float initial_temp, float lapse_rate) {
     return initial_temp + lapse_rate * (altitude - initial_altitude);
 }
 
-float calc_pressure(float altitude, float initial_altitude, float initial_temp,
-                    float initial_pressure, float lapse_rate) {
+float atmos_calc_pressure(float altitude, float initial_altitude,
+                          float initial_temp, float initial_pressure,
+                          float lapse_rate) {
     float temp =
-        calc_temp(altitude, initial_altitude, initial_temp, lapse_rate);
+        atmos_calc_temp(altitude, initial_altitude, initial_temp, lapse_rate);
 
     if (lapse_rate == 0)
         return initial_pressure *
@@ -26,8 +27,8 @@ float calc_pressure(float altitude, float initial_altitude, float initial_temp,
            powf((temp / initial_temp), -1 * G_MAG / (R_MAG * lapse_rate));
 }
 
-void gen_atmosphere_struct(LayerData* atmos, float initial_temp,
-                           float initial_pressure) {
+void atmos_gen_atmosphere_struct(LayerData* atmos, float initial_temp,
+                                 float initial_pressure) {
     atmos->temp_table[0] = initial_temp;
     atmos->pressure_table[0] = initial_pressure;
 
@@ -40,10 +41,10 @@ void gen_atmosphere_struct(LayerData* atmos, float initial_temp,
     */
 
     for (int i = 1; i < TABLE_LEN; i++) {
-        atmos->temp_table[i] =
-            calc_temp(atmos->altitude_table[i], atmos->altitude_table[i - 1],
-                      atmos->temp_table[i - 1], atmos->lapse_rate_table[i - 1]);
-        atmos->pressure_table[i] = calc_pressure(
+        atmos->temp_table[i] = atmos_calc_temp(
+            atmos->altitude_table[i], atmos->altitude_table[i - 1],
+            atmos->temp_table[i - 1], atmos->lapse_rate_table[i - 1]);
+        atmos->pressure_table[i] = atmos_calc_pressure(
             atmos->altitude_table[i], atmos->altitude_table[i - 1],
             atmos->temp_table[i - 1], atmos->pressure_table[i - 1],
             atmos->lapse_rate_table[i - 1]);
@@ -53,7 +54,7 @@ void gen_atmosphere_struct(LayerData* atmos, float initial_temp,
 // TODO: optimize using rocket state instead of looping every time
 // The worst case time complexity right now is O(n), but this could potentially
 // be brought down to O(1)
-float pressure_to_altitude(float pressure, LayerData* atmos) {
+float atmos_pressure_to_altitude(float pressure, LayerData* atmos) {
     int closest = -1;
 
     for (int i = 0; i < TABLE_LEN - 1;
