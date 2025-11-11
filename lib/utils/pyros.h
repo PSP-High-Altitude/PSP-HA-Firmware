@@ -1,6 +1,7 @@
 #ifndef PYROS_H
 #define PYROS_H
 
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "status.h"
@@ -30,6 +31,7 @@ typedef enum {
 Status pyros_init();
 
 Status pyros_fire(Pyro pyro);
+bool pyros_cont(Pyro pyro);
 
 void task_pyros();
 

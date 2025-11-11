@@ -4,13 +4,13 @@
 #include "backup/backup.h"
 #include "board_config.h"
 #include "fatlog.h"
-#include "pspcom.h"
 #include "regex.h"
 #include "rtc/rtc.h"
 #include "status.h"
 #include "stm32h7xx_hal.h"
 #include "tasks/storage.h"
 #include "timer.h"
+#include "wlcomm.h"
 
 // Help command
 char regex_help[] = "^help[\n]*$";
@@ -101,7 +101,7 @@ char regex_set_frequency[] = "^set_frequency [0-9]{1,10}[\n]*$";
 void cmd_set_frequency(char *str) {
     uint32_t frequency;
     sscanf(str, "set_frequency %ld", &frequency);
-    if (pspcom_change_frequency(frequency) != STATUS_OK) {
+    if (wlcomm_set_freq(frequency) != STATUS_OK) {
         PAL_LOGE("Failed to change telemetry frequency!\n");
         return;
     }

@@ -205,18 +205,7 @@ static void storage_dump_log() {
 }
 
 Status storage_init() {
-    // Initialize FATFS
-    ASSERT_OK(diskio_init(&s_sdmmc_device), "diskio init");
-    ASSERT_OK(fatlog_init(), "fatlog init");
-
-    // Initialize config
-    ASSERT_OK(config_load(), "load config");
-
-    // Initialize config ptr
-    s_config_ptr = config_get_ptr();
-    if (s_config_ptr == NULL) {
-        ASSERT_OK(STATUS_STATE_ERROR, "unable to get ptr to config\n");
-    }
+    Status status = STATUS_OK;
 
     // Create the queues
     s_sensor_queue = xQueueCreate(SENSOR_QUEUE_LENGTH, SENSOR_QUEUE_ITEM_SIZE);
@@ -235,16 +224,41 @@ Status storage_init() {
     xQueueAddToSet(s_state_queue, s_queue_set);
     xQueueAddToSet(s_gps_queue, s_queue_set);
 
+    // Initialize FATFS
+    UPDATE_STATUS(status,  ///
+                  EXPECT_OK(diskio_init(&s_sdmmc_device), "diskio init"));
+    UPDATE_STATUS(status,  ///
+                  EXPECT_OK(fatlog_init(), "fatlog init"));
+
+    // Initialize config
+    UPDATE_STATUS(status,  ///
+                  EXPECT_OK(config_load(), "load config"));
+
+    // Initialize config ptr
+    s_config_ptr = config_get_ptr();
+    if (s_config_ptr == NULL) {
+        UPDATE_STATUS(status, EXPECT_OK(STATUS_STATE_ERROR,
+                                        "unable to get ptr to config\n"));
+    }
+
     // Create the data directory
-    ASSERT_OK(fatlog_mkdir(LOG_DIR), "failed to create log dir\n");
-    ASSERT_OK(fatlog_mkdir(SENSOR_DIR), "failed to create sensor dir\n");
-    ASSERT_OK(fatlog_mkdir(STATE_DIR), "failed to create state dir\n");
-    ASSERT_OK(fatlog_mkdir(GPS_DIR), "failed to create gps dir\n");
+    UPDATE_STATUS(
+        status,  ///
+        EXPECT_OK(fatlog_mkdir(LOG_DIR), "failed to create log dir\n"));
+    UPDATE_STATUS(
+        status,  ///
+        EXPECT_OK(fatlog_mkdir(SENSOR_DIR), "failed to create sensor dir\n"));
+    UPDATE_STATUS(
+        status,  ///
+        EXPECT_OK(fatlog_mkdir(STATE_DIR), "failed to create state dir\n"));
+    UPDATE_STATUS(
+        status,  ///
+        EXPECT_OK(fatlog_mkdir(GPS_DIR), "failed to create gps dir\n"));
 
     // Set the pause button handler
     pause_event_callback = storage_save_event_handler;
 
-    return STATUS_OK;
+    return status;
 }
 
 bool storage_is_active() { return s_storage_active; }

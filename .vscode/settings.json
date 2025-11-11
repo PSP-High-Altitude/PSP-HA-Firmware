@@ -122,6 +122,7 @@
                 "fs_core.h": "c",
                 "fs_config_ram_0.h": "c",
                 "rl_fs.h": "c",
-                "tusb.h": "c"
+                "tusb.h": "c",
+                "board_darkstar.h": "c"
         }
 }

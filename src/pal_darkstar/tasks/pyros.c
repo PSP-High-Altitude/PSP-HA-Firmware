@@ -5,7 +5,6 @@
 #include "main.h"
 #include "queue.h"
 #include "status.h"
-#include "stdio.h"
 #include "timer.h"
 
 /********************/
@@ -82,6 +81,16 @@ Status pyros_fire(Pyro pyro) {
     taskYIELD();
 
     return STATUS_OK;
+}
+
+bool pyros_cont(Pyro pyro) {
+    // Get the pins (dummy init values to appease compiler)
+    uint8_t fire_pin = 0;
+    uint8_t cont_pin = 0;
+
+    EXPECT_OK(get_pyro_pins(pyro, &fire_pin, &cont_pin), "pyro pin mapping");
+
+    return gpio_read(cont_pin);
 }
 
 void task_pyros() {

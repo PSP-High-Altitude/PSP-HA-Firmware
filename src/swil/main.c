@@ -53,7 +53,10 @@ int main() {
 
             max_acc = fmaxf(max_acc, state_frame.acc_vert);
             max_vel = fmaxf(max_vel, state_frame.vel_vert);
-            max_alt = fmaxf(max_alt, state_frame.pos_vert);
+
+            if (fp_get() == FP_DROGUE && fp_before == FP_COAST) {
+                max_alt = state_frame.pos_ekf;
+            }
         }
 
         DELAY(config_get_ptr()->control_loop_period_ms);

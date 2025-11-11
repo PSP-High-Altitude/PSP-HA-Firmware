@@ -18,7 +18,9 @@
 #include "fatfs/diskio.h"
 
 #include "FreeRTOS.h"
+#include "dhara/map.h"
 #include "gpio/gpio.h"
+#include "nand/mt29f4g.h"
 #include "rtc/rtc.h"
 #include "sdmmc/sdmmc.h"
 #include "string.h"
@@ -26,7 +28,7 @@
 #include "timer.h"
 
 #ifndef FF_VOLUME_STRS
-const char *VolumeStr[FF_VOLUMES] = {"MMC"};
+const char *VolumeStr[FF_VOLUMES] = {"MMC", "NAND"};
 #endif
 
 RAM_D2 static uint8_t rw_buf[512];  // DMA happy buffer
@@ -109,14 +111,29 @@ uint8_t get_cmd_crc(BYTE cmd, DWORD arg) {
 /*-----------------------------------------------------------------------*/
 /* Peripheral controls (Platform dependent)                              */
 /*-----------------------------------------------------------------------*/
+struct dhara_map s_map;
+struct dhara_nand s_nand;
+static dhara_error_t s_map_error = DHARA_E_NONE;
+static uint8_t s_map_buffer[1U << MT29F4G_PAGE_SIZE_LOG2];
+
 static SdmmcDevice s_sd_sdmmc_device;
 
 /* Initialize MMC interface */
 Status diskio_init(SdmmcDevice *device) {
-    // Create a local copy (actual setup will be done later)
+    generate_crc_table();
+
+    // Create a local copy of MMC device (actual setup will be done later)
     s_sd_sdmmc_device.periph = device->periph;
     s_sd_sdmmc_device.clk = device->clk;
-    generate_crc_table();
+
+    // Initialize FTL for NAND
+    memset(&s_map, 0, sizeof(s_map));
+    memset(&s_nand, 0, sizeof(s_nand));
+    memset(&s_map_buffer, 0, sizeof(s_map_buffer));
+    s_nand.log2_page_size = MT29F4G_PAGE_SIZE_LOG2;
+    s_nand.log2_ppb = MT29F4G_PAGE_PER_BLOCK_LOG2;
+    s_nand.num_blocks = MT29F4G_BLOCK_COUNT;
+
     return STATUS_OK;
 }
 
@@ -134,7 +151,7 @@ DWORD get_fattime() {
 /*-----------------------------------------------------------------------*/
 /* Check status with timeout                                             */
 /*-----------------------------------------------------------------------*/
-static Status check_status(uint64_t timeout) {
+static Status sdmmc_check_status(uint64_t timeout) {
     SdmmcState res;
     uint64_t start_time = xTaskGetTickCount();
     do {
@@ -165,12 +182,29 @@ DSTATUS disk_initialize(BYTE drv /* Physical drive number (0) */
                 return Stat[0]; /* Is card existing in the soket? */
 
             if (sdmmc_setup(&s_sd_sdmmc_device) != STATUS_OK) {
+                PAL_LOGE("Failed to initialize MMC hardware\n");
                 Stat[0] = STA_NOINIT;
                 return Stat[0];
             }
             Stat[0] &= ~STA_NOINIT; /* Clear STA_NOINIT flag */
             return Stat[0];
         }
+    } else if (drv == 1) {
+        if ((Stat[1] & STA_NOINIT) == 0)
+            return Stat[1]; /* Check if drive is ready */
+
+        if (mt29f4g_init() != STATUS_OK) {
+            PAL_LOGE("Failed to initialize NAND hardware\n");
+            Stat[1] = STA_NOINIT;
+            return Stat[1];
+        }
+
+        dhara_map_init(&s_map, &s_nand, s_map_buffer, 4);
+        dhara_map_resume(&s_map, &s_map_error);
+        dhara_map_sync(&s_map, &s_map_error);
+
+        Stat[1] &= ~STA_NOINIT; /* Clear STA_NOINIT flag */
+        return Stat[1];
     } else {
         return STA_NODISK;
     }
@@ -184,7 +218,7 @@ DSTATUS disk_initialize(BYTE drv /* Physical drive number (0) */
 
 DSTATUS disk_status(BYTE drv /* Physical drive number (0) */
 ) {
-    if (drv > 0) return STA_NOINIT;
+    if (drv > 1) return STA_NOINIT;
 
     return Stat[drv]; /* Return disk status */
 }
@@ -209,6 +243,18 @@ DRESULT disk_read(
             }
             memcpy(buff, rw_buf, 512);
             buff += 512;
+        }
+        return RES_OK;
+    } else if (drv == 1) {
+        unsigned int i = 0;
+        while (i < count) {
+            if (dhara_map_read(&s_map, sect, (uint8_t *)buff, &s_map_error) !=
+                0) {
+                return RES_ERROR;
+            }
+            i++;
+            sect++;
+            buff += (1U << s_nand.log2_page_size);
         }
         return RES_OK;
     }
@@ -236,6 +282,18 @@ DRESULT disk_write(BYTE drv,         /* Physical drive number (0) */
                                    sect++, 1) != STATUS_OK) {
                 return RES_ERROR;
             }
+        }
+        return RES_OK;
+    } else if (drv == 1) {
+        unsigned int i = 0;
+        while (i < count) {
+            if (dhara_map_write(&s_map, sect, (uint8_t *)buff, &s_map_error) !=
+                0) {
+                return RES_ERROR;
+            }
+            i++;
+            sect++;
+            buff += (1U << s_nand.log2_page_size);
         }
         return RES_OK;
     }
@@ -267,7 +325,7 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
             case CTRL_SYNC: /* Wait for end of internal write process of the
                              * drive
                              */
-                if (check_status(200) != STATUS_OK) {
+                if (sdmmc_check_status(200) != STATUS_OK) {
                     res = RES_ERROR;
                     break;
                 }
@@ -315,7 +373,7 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
                     res = RES_ERROR;
                     break;
                 }
-                if (check_status(30000) != STATUS_OK) {
+                if (sdmmc_check_status(30000) != STATUS_OK) {
                     res = RES_ERROR;
                     break;
                 }
@@ -326,6 +384,35 @@ DRESULT disk_ioctl(BYTE drv,  /* Physical drive number (0) */
                 res = RES_PARERR;
         }
         return res;
+    } else if (drv == 1) {
+        switch (cmd) {
+            case CTRL_SYNC:
+                if (dhara_map_sync(&s_map, &s_map_error) != 0) {
+                    return RES_ERROR;
+                }
+                return RES_OK;
+            case GET_SECTOR_COUNT:
+                *(DWORD *)buff = (DWORD)dhara_map_capacity(&s_map);
+                return RES_OK;
+            case GET_SECTOR_SIZE:
+                *(DWORD *)buff = 1U << s_nand.log2_page_size;
+                return RES_OK;
+            case GET_BLOCK_SIZE:
+                *(DWORD *)buff = 1U << s_nand.log2_ppb;
+                return RES_OK;
+            case CTRL_TRIM:
+                dp = buff;
+                st = (DWORD)dp[0];
+                ed = (DWORD)dp[1];
+                for (int i = st; i < ed; i++) {
+                    if (dhara_map_trim(&s_map, i, &s_map_error) != 0) {
+                        return RES_ERROR;
+                    }
+                }
+                return RES_OK;
+            default:
+                return RES_PARERR;
+        }
     }
 
     return RES_PARERR;

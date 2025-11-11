@@ -6,9 +6,9 @@
 #include "gps.pb.h"
 #include "i2c/i2c.h"
 #include "max_m10s.h"
-#include "pspcom.h"
 #include "rtc/rtc.h"
 #include "storage.h"
+#include "telem.h"
 #include "timer.h"
 
 // FreeRTOS
@@ -124,7 +124,7 @@ void task_gps(TaskHandle_t* handle_ptr) {
 
             // update_gps_for_control(&gps_frame);
             storage_queue_gps(&gps_frame);
-            pspcom_update_gps(&fix);
+            telem_update_gps(&fix);
 
             // Update RTC
             RTCDateTime rtc_datetime = rtc_get_datetime();

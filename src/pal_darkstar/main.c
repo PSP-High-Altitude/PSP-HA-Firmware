@@ -5,11 +5,11 @@
 #include "board_config.h"
 #include "button_event.h"
 #include "buttons.h"
+#include "camera.h"
 #include "clocks.h"
 #include "data.h"
 #include "gpio/gpio.h"
 #include "malloc.h"
-#include "pspcom.h"
 #include "pyros.h"
 #include "rtc/rtc.h"
 #include "status.h"
@@ -20,6 +20,7 @@
 #include "tasks/gps.h"
 #include "tasks/sensors.h"
 #include "tasks/storage.h"
+#include "tasks/telem.h"
 #include "tasks/voltage.h"
 #include "timer.h"
 #include "uart/uart.h"
@@ -86,7 +87,7 @@ void task_init() {
     init_error |= (EXPECT_OK(gps_init(), "init GPS") != STATUS_OK) << 4;
     init_error |= (EXPECT_OK(control_init(), "init control") != STATUS_OK) << 5;
     init_error |= (EXPECT_OK(pyros_init(), "init pyros") != STATUS_OK) << 6;
-    init_error |= (EXPECT_OK(pspcom_init(), "init pspcom") != STATUS_OK) << 7;
+    init_error |= (EXPECT_OK(telem_init(), "init telem") != STATUS_OK) << 7;
     // init_error |= (EXPECT_OK(voltage_init(), "init voltage") != STATUS_OK) <<
     // 8;
 
@@ -113,11 +114,11 @@ void task_init() {
     TASK_CREATE(task_pyros, +10, 2048);
     TASK_CREATE(task_control, +9, 2048);
     TASK_CREATE(task_sensors, +8, 2048);
-    TASK_CREATE(task_pspcom_tx, +7, 2048);
+    TASK_CREATE(task_telem_tx, +7, 2048);
     TASK_CREATE(task_gps, +6, 2048);
     TASK_CREATE(task_storage, +5, 5120);
     // TASK_CREATE(task_voltage, +4, 512);
-    TASK_CREATE(task_pspcom_rx, +3, 2048);
+    TASK_CREATE(task_telem_rx, +3, 2048);
     TASK_CREATE(task_buzzer, +2, 512);
     TASK_CREATE(task_usb, +1, 4096);
 
@@ -126,15 +127,6 @@ void task_init() {
 #endif
 
     xTaskResumeAll();
-
-    // After starting tasks, set the transmit frequency
-    // if (pspcom_change_frequency(config_get_ptr()->telemetry_frequency_hz) !=
-    //     STATUS_OK) {
-    //     PAL_LOGE("Failed to set telemetry frequency!\n");
-    // } else {
-    //     PAL_LOGI("Telemetry frequency set to %.3f MHz!\n",
-    //              config_get_ptr()->telemetry_frequency_hz / 1e6);
-    // }
 
     while (1) {
 #ifdef HWIL_TEST
@@ -156,19 +148,20 @@ int main(void) {
     // Perform critical bare-metal initialization
     HAL_Init();
     SystemClock_Config();
-    init_timers();
     backup_init();
+    init_timers();
     rtc_init();
     button_event_init();
+    camera_init();
 
-    // Define GPIOs
-
+#ifndef COMPAT_9K5
     // Resets
     gpio_write(PIN_GPS_RST, GPIO_HIGH);
     gpio_write(PIN_RADIO_RST, GPIO_HIGH);
 
     // Radio SPI
     gpio_write(PIN_RADIO_CS, GPIO_HIGH);
+#endif  // not COMPAT_9K5
 
     // Analog switches
     adc_set_pc2_sw(true);
@@ -184,7 +177,6 @@ int main(void) {
     gpio_mode(PIN_PAUSE, GPIO_INPUT_PULLDOWN);
 
     // Launch FreeRTOS kernel and init task
-
     TASK_CREATE(task_init, -1, 10240);
 
     PAL_LOGI("Starting scheduler\n");
