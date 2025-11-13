@@ -27,20 +27,28 @@ static mfloat R_diag[NUM_KIN_MEAS];    // get set in preprocess
 // TODO: Better place for all this config stuff
 // These copied from the values I used during python testing
 static const mfloat Q_VARS_1[NUM_TOT_STATES] = {
-    1.2, 1.0e-03, 4.0e+00, 1.0e-01, 1.0e-01, 1.0e-01, 1.0e-01};
-static const mfloat Q_VARS_2[NUM_TOT_STATES] = {10., 1.,  1., 0.1,
+    5, 5.0e-01, 5.0e+01, 1.0e-01, 1.0e-01, 1.0e-01, 1.0e-01};
+// 1.5, 1.0e-03, 4.0e+00, 1.0e-01, 1.0e-01, 1.0e-01, 1.0e-01};
+static const mfloat Q_VARS_2[NUM_TOT_STATES] = {10., .5,  .5, 0.1,
                                                 0.1, 0.1, 0.1};
-static const mfloat R_DIAG_1[NUM_KIN_MEAS] = {20.0e-01, 3.e-04, 3.e-04};
-static const mfloat R_DIAG_2[NUM_KIN_MEAS] = {1, 1., 1.};
+//                                          pressure, acc_h, acc_i
+static const mfloat R_DIAG_1[NUM_KIN_MEAS] = {40.0e-01, 6.e-04, 6.e-04};
+// static const mfloat R_DIAG_1[NUM_KIN_MEAS] = {30.0e-01, 5.e-04, 5.e-04};
+static const mfloat R_DIAG_2[NUM_KIN_MEAS] = {4, 1., 1.};
 
 // TODO: Initial height?
 static mfloat s_initial_height;
+
+static mfloat K_UNDERWEIGHT = 2. / 4.;  // factor to scale K by
+// static mfloat UNDERWEIGHT_CUTOFF = 45;  // underweight when alt sig^2 greater
+// than this. 45 sig^2 = 20 3sig km
 
 // Just for debugging
 static arm_status math_status;   // Watch this for math debugging
 static kf_status filter_status;  // Watch this for kf debugging
 int iteration = 0;
 int pressure_gate_count = 0;
+int underweight_count = 0;  // consecutive underweights
 
 // MATRIX DEFINITIONS
 
@@ -108,6 +116,21 @@ void mat_scale(mat* A, mfloat scale) {
     for (int i = 0; i < n; i++) {
         (A->pData)[i] *= scale;
     }
+}
+
+mfloat mat_trace(mat* A) {
+    // Should only be used on square mat
+    int n;  // use smaller one to be safe
+    if (A->numCols < A->numRows) {
+        n = A->numCols;
+    } else {
+        n = A->numRows;
+    }
+    mfloat sum = 0;
+    for (size_t i = 0; i < n; i++) {
+        sum += mat_val(A, i, i);
+    }
+    return sum;
 }
 
 arm_status mat_addTo(mat* A, const mat* B) {
@@ -279,19 +302,38 @@ kf_status kf_update(const mfloat* z, const mfloat* R_diag) {
     mfloat
         temp_space[mat_size(&P)];  // space for all temporary matrices used in
                                    // this function (only 1 is needed at a time)
+    mfloat temp_space2[mat_size(&P)];  // More space for better P equation
     // mat hx = {NUM_KIN_MEAS, 1, &temp_space};
 
     status = kf_H_matrix(&x, z);  // Make H Matrix (linearized h(x)), resized to
-                                  // exclude NaN measurments
+                                  // exclude NaN measurements
     if (status == KF_NO_VALID_MEAS) {
         return status;
     }
     kf_resid(&x, z, &y);  // Calc residual, resized to exclude NaN measurements
 
+    // stuff for underweighting -
+    /* underweighting should happen when the state
+    cov tries to converge really fast, usually when pressure measurements come
+    back after being gone for a while. Underweighting the k matrix makes the
+    effect less strong. However the weight is applied to the whole K, not
+    just the pressure part */
+
     // S = H @ self.P @ H.T + R # system uncertainty (in measurement space)
     kf_R_matrix(R_diag, z);                 // Make R matrix, resized for NaNs
     mat_setSize(&S, R.numRows, R.numCols);  // Resize S to match R
-    math_status = mat_transposeMultiply(&H, &P, &S);  // HPH'
+    math_status = mat_transposeMultiply(&H, &P, &S);  // HPH' (-> S)
+    // if ((mat_trace(&S) > K_UNDERWEIGHT / (1 - K_UNDERWEIGHT) * mat_trace(&R))
+    // &&
+    //     y.numRows == NUM_KIN_MEAS) {  // don't do it if there are nan meas
+    // if ((mat_val(&P, KF_POS, KF_POS) > UNDERWEIGHT_CUTOFF) &&
+    //     y.numRows == NUM_KIN_MEAS) {
+    if (false) {
+        underweight_count++;
+        mat_scale(&S, K_UNDERWEIGHT);  // scale HPH' by weight p
+    } else {
+        underweight_count = 0;
+    }
     math_status = mat_addTo(&S, &R);                  // S = HPH' + R
 
     // K = self.P @ H.T @ inv(S) # Kalman Gain
@@ -308,15 +350,36 @@ kf_status kf_update(const mfloat* z, const mfloat* R_diag) {
     math_status = arm_mat_mult_f32(&K, &y, &Ky);  // Ky = K*y'
     math_status = mat_addTo(&x, &Ky);             // x += Ky
 
+    // Less stable: P = P - KHP
+    // mat KHP = {K.numRows, P.numCols,
+    //            temp_space};  // NOTE: temp_space might be too small if there
+    //                          // are more measurements than states
+    // math_status = mat_doubleMultiply(&K, &H, &P, &KHP);  // K*H*P
+    // mat_scale(&KHP, -1);                   // -KHP
+    // math_status = mat_addTo(&P, &KHP);     // P = P + -KHP
+
     // P = (np.eye(n) - K @ H) @ self.P @ (np.eye(n) - K @ H).T + K @ R @ K.T
-    // ^more numerically stable version of P = P - KHP
-    mat KHP = {K.numRows, P.numCols,
-               temp_space};  // NOTE: temp_space might be too small if there
-                             // are more measurements than states
-    math_status = mat_doubleMultiply(&K, &H, &P, &KHP);  // K*H*P
-    mat_scale(&KHP, -1);                   // -KHP
-    math_status = mat_addTo(&P, &KHP);     // P = P + -KHP
-    // TODO: Replace this with the more numerically stable version
+    // P = (I - KH) P (I - KH)' + KRK'
+    // ^more numerically stable version of P = P - KHP. This also works for
+    // non-optimal K, (like underwieghting)
+    // can use both temp space
+    mat I = {P.numCols, P.numRows, temp_space};    // I
+    mfloat ones[P.numRows];                        // ones for I
+    arm_fill_f32(1, ones, P.numRows);              // ones for I
+    mat_diag(&I, ones, true);                      // make I
+    mat KH = {P.numCols, P.numRows, temp_space2};  // KH
+    math_status = arm_mat_mult_f32(&K, &H, &KH);   // KH
+    mat_scale(&KH, -1);                            // -KH
+    mat_addTo(&KH, &I);                            // I-KH (stored in KH)
+    // done with I, can reuse temp_space
+    mat L = {P.numCols, P.numRows, temp_space};  // L will be (I-KH)P(I-KH)'
+    math_status = mat_transposeMultiply(&KH, &P, &L);  // L = (I-KH)P(I-KH)'
+    // done with KH, can reuse (I-KH)P(I-KH)'temp_space2
+    mat KRK = {P.numCols, P.numRows, temp_space2};      // KRK'
+    math_status = mat_transposeMultiply(&K, &R, &KRK);  // KRK'
+    math_status = arm_mat_add_f32(
+        &L, &KRK, &P);  // P = (I - KH) P (I - KH)' + KRK' (done!)
+
     return KF_SUCCESS;
 }
 
@@ -344,6 +407,13 @@ kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
             z[KF_ACC_H] =
                 NAN;  // remove accel measuremnts bc they aren't helpful anymore
             z[KF_ACC_I] = NAN;
+            if (x.pData[KF_ACC] <
+                DROGUE_ACCEL_CUTOFF) {  // for the dege case where the
+                                        // deployment spike happens at phase
+                                        // transition
+                x.pData[KF_ACC] = -10;
+                mat_edit(&P, KF_ACC, KF_ACC, mat_val(&P, KF_ACC, KF_ACC) * 10);
+            }
             filter_status = KF_SUCCESS;
             break;
         case FP_LANDED:
@@ -353,20 +423,26 @@ kf_status kf_preprocess(mfloat* z, mfloat* R_diag, FlightPhase phase) {
     }
 
     // data preproccssing
-    if (fabs(x.pData[KF_ACC_I]) >
-        IMU_ACCEL_MAX) {    // remove saturated imu accel meas
+    if (fabs(x.pData[KF_ACC]) >
+        9.81 * IMU_ACCEL_MAX) {  // remove saturated imu accel meas
         z[KF_ACC_I] = NAN;  // use x or z?
     }
-    if (x.pData[KF_VEL] >= BARO_SPEED_MAX || phase == FP_BOOST) {
+    // if (x.pData[KF_VEL] >= BARO_SPEED_MAX) {
+    //     z[KF_BARO] = NAN;
+    // } else if (x.pData[KF_VEL] >=
+    //            BARO_SPEED_FULL) {  // increase baro meas var -- prevent
+    //            sudden
+    //                                // change when pressure comes back
+    //     R_diag[KF_BARO] = R_DIAG_1[KF_BARO] * 100;
+    // }
+
+    if (x.pData[KF_VEL] >= BARO_SPEED_MAX) {
         z[KF_BARO] = NAN;
-    } else if (x.pData[KF_VEL] > 0) {
+    } else if (x.pData[KF_VEL] > BARO_SPEED_FULL) {
         // increase varaince when going fast but not supersonic yet
         mfloat vel = x.pData[KF_VEL];
-        mfloat varScaleClamp = vel - BARO_SPEED_FULL;
-        mfloat fastVarScale = 50.f / (1. + BARO_SPEED_MAX - vel);
-        if (isnormal(fastVarScale) && fastVarScale > 1) {
-            R_diag[KF_BARO] *= 1.f + varScaleClamp * fastVarScale;
-        }
+        mfloat scale = 0.1 * pow(vel - BARO_SPEED_FULL, 2) + 1;
+        R_diag[KF_BARO] = R_DIAG_1[KF_BARO] * scale;
     }
 
     return filter_status;
@@ -547,6 +623,7 @@ mfloat kf_pressureToAlt(mfloat p_mbar) {  // only used for gating
     mfloat alt_m =
         44330.f * (1.f - powf(((p_mbar) / SEA_LEVEL_PRESSURE), 1.f / 5.25588f));
     // TODO: check for invalid pressure
+    // TODO: Check validity or replace this with new atmos model
     return alt_m;
 }
 
