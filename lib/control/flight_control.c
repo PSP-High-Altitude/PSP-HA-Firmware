@@ -122,7 +122,13 @@ Status fp_init() {
     return STATUS_OK;
 }
 
-FlightPhase fp_get() { return *s_flight_phase_ptr; }
+FlightPhase fp_get() { 
+    if(s_flight_phase_ptr) {
+        return *s_flight_phase_ptr;
+    } else {
+        return FP_ERROR;
+    }
+}
 
 Status fp_update(const SensorFrame* sensor_frame) {
     FlightPhase flight_phase = *s_flight_phase_ptr;

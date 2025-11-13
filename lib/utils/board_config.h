@@ -16,6 +16,8 @@ typedef struct {
     uint32_t sensor_loop_period_ms;
     // period in ms between file system flushes and pause request checks
     uint32_t storage_loop_period_ms;
+    // divider between rate of sensor/control frames and frames actually stored when on the ground
+    uint32_t storage_rate_divider_ground;
     // period in ms between polling the GPS
     uint32_t gps_loop_period_ms;
     // period in ms between checking for incoming telemetry messages

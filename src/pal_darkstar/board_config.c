@@ -14,6 +14,7 @@ const static BoardConfig s_default_config = {
     .control_loop_period_ms = 10,             // ms
     .sensor_loop_period_ms = 100,             // ms
     .storage_loop_period_ms = 1000,           // ms
+    .storage_rate_divider_ground = 10,               // store 10x slower on ground
     .gps_loop_period_ms = 200,                // ms
     .pspcom_rx_loop_period_ms = 100,          // ms
     .pspcom_tx_ground_loop_period_ms = 5000,  // ms
@@ -176,6 +177,7 @@ void config_print() {
     printf("Control loop period: %ld ms\n", config->control_loop_period_ms);
     printf("Sensor loop period: %ld ms\n", config->sensor_loop_period_ms);
     printf("Storage loop period: %ld ms\n", config->storage_loop_period_ms);
+    printf("Storage rate divider (ground): %ld\n", config->storage_rate_divider_ground);
     printf("GPS loop period: %ld ms\n", config->gps_loop_period_ms);
     printf("PSPCOM RX loop period: %ld ms\n", config->pspcom_rx_loop_period_ms);
     printf("PSPCOM TX ground loop period: %ld ms\n",

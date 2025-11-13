@@ -14,6 +14,7 @@
 #include "stdio.h"
 #include "stdlib.h"
 #include "timer.h"
+#include "flight_control.h"
 
 // FreeRTOS
 #include "FreeRTOS.h"
@@ -36,6 +37,9 @@ static QueueSetHandle_t s_queue_set;
 
 static bool s_storage_active = false;
 static uint32_t s_pause_mode = 0;
+static uint32_t s_sensor_storage_rate_counter = 0;
+static uint32_t s_state_storage_rate_counter = 0;
+static uint32_t s_gps_storage_rate_counter = 0;
 
 static char s_logfile_path[64];
 static char s_datfile_path[64];
@@ -270,29 +274,80 @@ void storage_pause(StoragePauseMode mode) { s_pause_mode |= mode; }
 void storage_start(StoragePauseMode mode) { s_pause_mode &= ~mode; }
 
 Status storage_queue_sensors(const SensorFrame* sensor_frame) {
-    if (xQueueSend(s_sensor_queue, sensor_frame, 0) != pdPASS) {
-        s_sensor_overflows += 1;
-        return STATUS_BUSY;
-    }
+    s_sensor_storage_rate_counter++;
 
+    bool grounded = (fp_get() < FP_BOOST) || (fp_get() >= FP_LANDED); 
+
+    if (grounded && s_sensor_storage_rate_counter >= s_config_ptr->storage_rate_divider_ground) {
+        s_sensor_storage_rate_counter = 0;
+
+        // Store at a reduced rate when on the ground
+        if (xQueueSend(s_sensor_queue, sensor_frame, 0) != pdPASS) {
+            s_sensor_overflows += 1;
+            return STATUS_BUSY;
+        }
+    } else {
+        s_sensor_storage_rate_counter = 0;
+
+        // Store every frame when in flight
+        if (xQueueSend(s_sensor_queue, sensor_frame, 0) != pdPASS) {
+            s_sensor_overflows += 1;
+            return STATUS_BUSY;
+        }
+    }
+    
     return STATUS_OK;
 }
 
 Status storage_queue_state(const StateFrame* state_frame) {
-    if (xQueueSend(s_state_queue, state_frame, 0) != pdPASS) {
-        s_state_overflows += 1;
-        return STATUS_BUSY;
-    }
+    s_state_storage_rate_counter++;
 
+    bool grounded = (fp_get() < FP_BOOST) || (fp_get() >= FP_LANDED); 
+
+    if (grounded && s_state_storage_rate_counter >= s_config_ptr->storage_rate_divider_ground) {
+        s_state_storage_rate_counter = 0;
+
+        // Store at a reduced rate when on the ground
+        if (xQueueSend(s_state_queue, state_frame, 0) != pdPASS) {
+            s_state_overflows += 1;
+            return STATUS_BUSY;
+        }
+    } else {
+        s_state_storage_rate_counter = 0;
+
+        // Store every frame when in flight
+        if (xQueueSend(s_state_queue, state_frame, 0) != pdPASS) {
+            s_state_overflows += 1;
+            return STATUS_BUSY;
+        }
+    }
+    
     return STATUS_OK;
 }
 
 Status storage_queue_gps(const GpsFrame* gps_frame) {
-    if (xQueueSend(s_gps_queue, gps_frame, 0) != pdPASS) {
-        s_gps_overflows += 1;
-        return STATUS_BUSY;
-    }
+    s_gps_storage_rate_counter++;
 
+    bool grounded = (fp_get() < FP_BOOST) || (fp_get() >= FP_LANDED); 
+
+    if (grounded && s_gps_storage_rate_counter >= s_config_ptr->storage_rate_divider_ground) {
+        s_gps_storage_rate_counter = 0;
+
+        // Store at a reduced rate when on the ground
+        if (xQueueSend(s_gps_queue, gps_frame, 0) != pdPASS) {
+            s_gps_overflows += 1;
+            return STATUS_BUSY;
+        }
+    } else {
+        s_gps_storage_rate_counter = 0;
+
+        // Store every frame when in flight
+        if (xQueueSend(s_gps_queue, gps_frame, 0) != pdPASS) {
+            s_gps_overflows += 1;
+            return STATUS_BUSY;
+        }
+    }
+    
     return STATUS_OK;
 }
 
