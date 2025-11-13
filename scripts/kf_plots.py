@@ -43,7 +43,7 @@ plot_diff_vertical_se(kf_state, kf_state, kf_names, vert_state_names, name=name,
 # plot error
 
 # COMPARE TO MEAS
-plot_compare_accel(kf_state, kf_state, kf_names, vert_state_names, data, name=name, legnames=["kf state", "state", "acc_i", "acc_h"])
+# plot_compare_accel(kf_state, kf_state, kf_names, vert_state_names, data, name=name, legnames=["kf state", "state", "acc_i", "acc_h"])
 plot_altitude_pressure(kf_state, data, kf_names, vert_state_names, name)
 
 plt.show()
