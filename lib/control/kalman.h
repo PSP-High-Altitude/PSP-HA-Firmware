@@ -38,7 +38,7 @@
 #define SEA_LEVEL_PRESSURE (1013.25f) /** milibars */
 #define IMU_ACCEL_MAX (16. * 1)       // accel limit, g
 #define BARO_SPEED_MAX (225)          // m/s
-#define BARO_SPEED_FULL (175)         // m/s
+#define BARO_SPEED_FULL (150)         // m/s
 #define DROGUE_ACCEL_CUTOFF (-20)
 #define USE_LAYERED_ATMOSPHERE \
     (true)  // whether kf uses basic or fancy atmosphere model
