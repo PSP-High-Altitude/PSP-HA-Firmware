@@ -25,7 +25,8 @@ static BoardConfig s_config = {
     .max_grounded_vel_mps = 2,      // m/s
     .min_grounded_time_ms = 10000,  // ms
     .max_ready_acc_bias_mps2 = 2,   // m/s^2
-    .orient_antenna_up = true,      // antenna up
+    .orient_antenna_up =
+        true,  // antenna up (true for darkstar, false for old stuff)
 
     // Stage separation settings
     .stage_is_separator_bool = 0,
