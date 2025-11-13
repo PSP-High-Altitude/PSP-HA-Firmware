@@ -35,7 +35,7 @@ static Vector s_grav_vec = {.x = -G_MAG, .y = 0.f, .z = 0.f};
 
 static LayerData atmos_struct = {
     .altitude_table = {0.f, 11000.f, 25200.f, 47000.f, 53000.f, 79000.f,
-                       90000.f, 105000.f},  // km?
+                       90000.f, 105000.f},  // m
     .lapse_rate_table = {-6.5e-3f, 0.0f, 3.0e-3f, 0.0f, -4.5e-3f, 0.0f, 4.0e-3f,
                          0.0f}};
 
@@ -157,8 +157,7 @@ Status se_init() {
     kf_init_state(x0, P0_diag);
 
     // Atmosphere initialization
-    atmos_struct.altitude_table[0] = s_ground_alt;
-    atmos_gen_atmosphere_struct(&atmos_struct, s_ground_temp,
+    atmos_gen_atmosphere_struct(&atmos_struct, s_ground_alt, s_ground_temp,
                                 s_ground_pressure);
 
     return STATUS_OK;
@@ -457,8 +456,8 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
         kf_input.acc_i = NAN;
     }
 
-    kf_do_kf(phase, kf_input, dt);      // TODO: status output here
-    kf_write_state(s_state_ptr);        // write new state to StateEst
+    kf_do_kf(phase, kf_input, dt);  // TODO: status output here
+    kf_write_state(s_state_ptr);    // write new state to StateEst
 
     return STATUS_OK;
 }
