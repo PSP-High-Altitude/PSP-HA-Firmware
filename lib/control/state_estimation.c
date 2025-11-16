@@ -3,6 +3,7 @@
 #include <math.h>
 #include <string.h>
 
+#include "atmosphere.h"
 #include "backup/backup.h"
 #include "filter/median_filter.h"
 #include "filter/sma_filter.h"
@@ -159,7 +160,7 @@ Status se_init() {
 
     // Atmosphere initialization
     atmos_struct.altitude_table[0] = *s_ground_alt_ptr;
-    atmos_gen_atmosphere_struct(&atmos_struct, s_ground_temp,
+    atmos_gen_atmosphere_struct(&atmos_struct, *s_ground_alt_ptr, s_ground_temp,
                                 s_ground_pressure);
     return STATUS_OK;
 }
@@ -192,6 +193,9 @@ const StateEst* se_predict() { return s_state_ptr; }
 
 StateFrame se_as_frame() {
     StateFrame frame = {
+        .timestamp = (uint64_t)(s_state_ptr->time * 1e6f),
+        .flight_phase = fp_get(),
+
         // Linear values
         .pos_vert = s_state_ptr->posVert,
         .vel_vert = s_state_ptr->velVert,
@@ -329,10 +333,10 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     /* BARO ALT UPDATE */
     /*******************/
     float pressure = sensor_frame->pressure;
-    // float baro_alt = se_baro_alt_m(pressure) - *s_ground_alt_ptr;
-    float baro_alt = atmos_pressure_to_altitude(sensor_frame->pressure,
-                                                &atmos_struct) -
-                     *s_ground_alt_ptr;  // new method
+    float baro_alt = se_baro_alt_m(pressure) - *s_ground_alt_ptr;
+    // float baro_alt = atmos_pressure_to_altitude(sensor_frame->pressure,
+    //                                             &atmos_struct) -
+    //                  *s_ground_alt_ptr;  // new method
 
     /***********************/
     /* LINEAR MODEL UPDATE */
