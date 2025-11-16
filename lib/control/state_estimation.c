@@ -224,10 +224,10 @@ StateFrame se_as_frame() {
         .vel_ekf = s_state_ptr->velEkf,
         .acc_ekf = s_state_ptr->accEkf,
 
-        .orient_ekf_1 = s_state_ptr->orientEkf1,
-        .orient_ekf_2 = s_state_ptr->orientEkf2,
-        .orient_ekf_3 = s_state_ptr->orientEkf3,
-        .orient_ekf_4 = s_state_ptr->orientEkf4,
+        .orient_ekf_w = s_state_ptr->orientEkfw,
+        .orient_ekf_x = s_state_ptr->orientEkfx,
+        .orient_ekf_y = s_state_ptr->orientEkfy,
+        .orient_ekf_z = s_state_ptr->orientEkfz,
 
         .pos_var_ekf = s_state_ptr->posVarEkf,
         .vel_var_ekf = s_state_ptr->velVarEkf,
