@@ -3,7 +3,6 @@
 #include <math.h>
 #include <string.h>
 
-#include "atmosphere.h"
 #include "backup/backup.h"
 #include "filter/median_filter.h"
 #include "filter/sma_filter.h"
@@ -193,9 +192,6 @@ const StateEst* se_predict() { return s_state_ptr; }
 
 StateFrame se_as_frame() {
     StateFrame frame = {
-        .timestamp = (uint64_t)(s_state_ptr->time * 1e6f),
-        .flight_phase = fp_get(),
-
         // Linear values
         .pos_vert = s_state_ptr->posVert,
         .vel_vert = s_state_ptr->velVert,
@@ -228,10 +224,10 @@ StateFrame se_as_frame() {
         .vel_ekf = s_state_ptr->velEkf,
         .acc_ekf = s_state_ptr->accEkf,
 
-        .orient_ekf_w = s_state_ptr->orientEkfw,
-        .orient_ekf_x = s_state_ptr->orientEkfx,
-        .orient_ekf_y = s_state_ptr->orientEkfy,
-        .orient_ekf_z = s_state_ptr->orientEkfz,
+        .orient_ekf_1 = s_state_ptr->orientEkf1,
+        .orient_ekf_2 = s_state_ptr->orientEkf2,
+        .orient_ekf_3 = s_state_ptr->orientEkf3,
+        .orient_ekf_4 = s_state_ptr->orientEkf4,
 
         .pos_var_ekf = s_state_ptr->posVarEkf,
         .vel_var_ekf = s_state_ptr->velVarEkf,
