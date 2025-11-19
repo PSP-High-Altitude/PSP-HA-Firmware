@@ -41,7 +41,7 @@
 #define BARO_SPEED_FULL (150)         // m/s
 #define DROGUE_ACCEL_CUTOFF (-20)
 #define USE_LAYERED_ATMOSPHERE \
-    (false)  // whether kf uses basic or fancy atmosphere model
+    (true)  // whether kf uses basic or fancy atmosphere model
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 #define SIGN(a) ((a) < (0.) ? (-1.) : (1.))

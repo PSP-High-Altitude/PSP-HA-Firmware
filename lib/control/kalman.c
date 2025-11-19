@@ -318,7 +318,7 @@ kf_status kf_update(const mfloat* z, const mfloat* R_diag) {
     cov tries to converge really fast, usually when pressure measurements come
     back after being gone for a while. Underweighting the k matrix makes the
     effect less strong. However the weight is applied to the whole K, not
-    just the pressure part */
+    just the pressure part */ // Instead of underweighting R is scales up
 
     // S = H @ self.P @ H.T + R # system uncertainty (in measurement space)
     kf_R_matrix(R_diag, z);                 // Make R matrix, resized for NaNs
@@ -453,7 +453,13 @@ void kf_pressure_gate(mfloat* z, mfloat stdevs) {
     // discard pressure meas if it is far from current state
     // mfloat stdevs = 5;
     if (!isnan(z[KF_BARO])) {
-        mfloat meas_alt = kf_pressureToAlt(z[KF_BARO]);
+        mfloat meas_alt;
+        if (USE_LAYERED_ATMOSPHERE) {
+            meas_alt = atmos_pressure_to_altitude(z[KF_BARO]);
+        }
+        if (!USE_LAYERED_ATMOSPHERE || (meas_alt == -1) || (isnan(meas_alt))) {
+            meas_alt = kf_pressureToAlt(z[KF_BARO]);
+        }
         mfloat diff = fabs(meas_alt - x.pData[KF_POS]);
         mfloat cutoff = (sqrtf(mat_val(&P, KF_POS, KF_POS)) * stdevs);
         if ((diff > 15) && (diff > cutoff) && (pressure_gate_count < 10)) {
@@ -506,8 +512,9 @@ kf_status kf_H_matrix(const mat* x, const mfloat* z) {
     mfloat dpdh;
     if USE_LAYERED_ATMOSPHERE {
         dpdh = atmos_calc_pressure_deriv(
-            x->pData[KF_POS]);  // TODO: Check ASl or AGL!!!!!
-    } else {
+            x->pData[KF_POS]);  // x alt stored ASL, converted to AGL for saving
+    }
+    if (!USE_LAYERED_ATMOSPHERE || (dpdh == -1) || (isnan(dpdh))) {
         // This is the linearized state -> meas conversion
         mfloat a = 44330;
         mfloat b = 5.25588;
@@ -584,7 +591,14 @@ void kf_fx(mat* x, mfloat dt, const mfloat* w) {  // state update function
 }
 
 void kf_hx(const mat* x, const mfloat* z, mat* out) {
-    mat_edit(out, 0, 0, kf_altToPressure(mat_val(x, 0, 0)));
+    mfloat pressure;
+    if (USE_LAYERED_ATMOSPHERE) {
+        pressure = atmos_altitude_to_pressure(mat_val(x, KF_POS, 0));
+    }
+    if (!USE_LAYERED_ATMOSPHERE || (pressure == -1) || (isnan(pressure))) {
+        pressure = kf_altToPressure(mat_val(x, KF_POS, 0));
+    }
+    mat_edit(out, 0, 0, pressure);
     mat_edit(out, 1, 0, mat_val(x, 2, 0) / G + 1);  // acc 1
     mat_edit(out, 2, 0, mat_val(x, 2, 0) / G + 1);  // acc 2
     // No direction checks should be needed because accel meas sign gets
@@ -635,12 +649,12 @@ mfloat kf_pressureToAlt(mfloat p_mbar) {  // only used for gating
     return alt_m;
 }
 
-void kf_set_initial_alt(mfloat alt) {
+void kf_set_initial_alt(mfloat alt) {  // x contains height ASL.
     s_initial_height = alt;
     x.pData[KF_POS] = alt;
 }
 
-void kf_write_state(StateEst* state_ptr) {
+void kf_write_state(StateEst* state_ptr) {  // Height saved is AGL.
     state_ptr->posEkf = x.pData[KF_POS] - s_initial_height;
     state_ptr->velEkf = x.pData[KF_VEL];
     state_ptr->accEkf = x.pData[KF_ACC];

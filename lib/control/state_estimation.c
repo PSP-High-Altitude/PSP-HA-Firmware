@@ -153,7 +153,7 @@ Status se_init() {
     kf_init_state(x0, P0_diag);
 
     // Atmosphere initialization
-    atmos_set_ground_alt(*s_ground_alt_ptr);
+    atmos_set_ground_alt(*s_ground_alt_ptr);  // not sure if this is needed
     // atmos_struct.altitude_table[0] = *s_ground_alt_ptr;
     atmos_gen_atmosphere_struct(*s_ground_alt_ptr, s_ground_temp,
                                 s_ground_pressure);
