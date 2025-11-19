@@ -41,8 +41,8 @@ float atmos_calc_pressure_deriv(float altitude) {
     int closest = -1;
 
     for (int i = 0; i < TABLE_LEN - 1; i++) {
-        if (altitude <= layer_data.altitude_table[i] &&
-            altitude > layer_data.altitude_table[i + 1]) {
+        if (altitude >= layer_data.altitude_table[i] &&
+            altitude < layer_data.altitude_table[i + 1]) {
             closest = i;
             break;
         }
@@ -53,7 +53,7 @@ float atmos_calc_pressure_deriv(float altitude) {
     float initial_pressure = layer_data.pressure_table[closest];
     float lapse_rate = layer_data.lapse_rate_table[closest];
 
-    float temp = atmos_calc_temp(altitude, initial_altitude, initial_altitude,
+    float temp = atmos_calc_temp(altitude, initial_altitude, initial_temp,
                                  lapse_rate);
 
     if (lapse_rate == 0)  // pause
@@ -122,8 +122,8 @@ float atmos_altitude_to_pressure(float altitude) {
     int closest = -1;
 
     for (int i = 0; i < TABLE_LEN - 1; i++) {
-        if (altitude <= layer_data.altitude_table[i] &&
-            altitude > layer_data.altitude_table[i + 1]) {
+        if (altitude >= layer_data.altitude_table[i] &&
+            altitude < layer_data.altitude_table[i + 1]) {
             closest = i;
             break;
         }
