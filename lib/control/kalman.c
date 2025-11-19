@@ -4,6 +4,7 @@
 // #include "flight_control.h"
 #include "math.h"
 // #include "state_estimation.h"
+#include "atmosphere.h"
 #include "stdlib.h"
 
 // MATRICES (STATIC)
@@ -502,11 +503,18 @@ void kf_R_matrix(const mfloat* meas_vars, const mfloat* z) {
 }
 
 kf_status kf_H_matrix(const mat* x, const mfloat* z) {
-    // This is the linearized state -> meas conversion
-    mfloat a = 44330;
-    mfloat b = 5.25588;
-    mfloat h = MAX(mat_val(x, 0, 0), 0);  // mat to ensure alt isn't negative
-    mfloat dpdh = (-b * SEA_LEVEL_PRESSURE * pow((a - h), (b - 1))) / pow(a, b);
+    mfloat dpdh;
+    if USE_LAYERED_ATMOSPHERE {
+        dpdh = atmos_calc_pressure_deriv(
+            x->pData[KF_POS]);  // TODO: Check ASl or AGL!!!!!
+    } else {
+        // This is the linearized state -> meas conversion
+        mfloat a = 44330;
+        mfloat b = 5.25588;
+        mfloat h =
+            MAX(mat_val(x, 0, 0), 0);  // mat to ensure alt isn't negative
+        dpdh = (-b * SEA_LEVEL_PRESSURE * pow((a - h), (b - 1))) / pow(a, b);
+    }
 
     // Resize H for NaNs
     bool nans[NUM_KIN_MEAS];

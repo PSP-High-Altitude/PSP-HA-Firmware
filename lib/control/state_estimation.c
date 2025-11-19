@@ -35,12 +35,6 @@ static Vector s_grav_vec = {.x = -G_MAG, .y = 0.f, .z = 0.f};
 
 static float* s_ground_alt_ptr;
 
-static LayerData atmos_struct = {
-    .altitude_table = {0.f, 11000.f, 25200.f, 47000.f, 53000.f, 79000.f,
-                       90000.f, 105000.f},  // km?
-    .lapse_rate_table = {-6.5e-3f, 0.0f, 3.0e-3f, 0.0f, -4.5e-3f, 0.0f, 4.0e-3f,
-                         0.0f}};
-
 // TODO: Assign these variables according to launch conditions, possibly with a
 // rolling average
 // static float s_ground_alt = 0.f;
@@ -159,8 +153,9 @@ Status se_init() {
     kf_init_state(x0, P0_diag);
 
     // Atmosphere initialization
-    atmos_struct.altitude_table[0] = *s_ground_alt_ptr;
-    atmos_gen_atmosphere_struct(&atmos_struct, *s_ground_alt_ptr, s_ground_temp,
+    atmos_set_ground_alt(*s_ground_alt_ptr);
+    // atmos_struct.altitude_table[0] = *s_ground_alt_ptr;
+    atmos_gen_atmosphere_struct(*s_ground_alt_ptr, s_ground_temp,
                                 s_ground_pressure);
     return STATUS_OK;
 }
@@ -335,7 +330,7 @@ Status se_update(FlightPhase phase, const SensorFrame* sensor_frame) {
     float pressure = sensor_frame->pressure;
     float baro_alt = se_baro_alt_m(pressure) - *s_ground_alt_ptr;
     // float baro_alt = atmos_pressure_to_altitude(sensor_frame->pressure,
-    //                                             &atmos_struct) -
+    //                                             ) -
     //                  *s_ground_alt_ptr;  // new method
 
     /***********************/
