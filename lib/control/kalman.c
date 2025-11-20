@@ -462,7 +462,8 @@ void kf_pressure_gate(mfloat* z, mfloat stdevs) {
         }
         mfloat diff = fabs(meas_alt - x.pData[KF_POS]);
         mfloat cutoff = (sqrtf(mat_val(&P, KF_POS, KF_POS)) * stdevs);
-        if ((diff > 15) && (diff > cutoff) && (pressure_gate_count < 10)) {
+        if ((diff > 15) && (diff > cutoff) && (pressure_gate_count < 10) &&
+            (iteration != 0)) {
             // if ((diff > 100) && (diff > cutoff)) {
             pressure_gate_count++;
             z[KF_BARO] = NAN;  // reject meas

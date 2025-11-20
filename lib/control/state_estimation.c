@@ -142,8 +142,8 @@ Status se_init() {
     ASSERT_OK(kf_init_mats(), "failed to allocate memory for kf matrices");
     mfloat x0[NUM_TOT_STATES] = {0, 0, 0, 1,
                                  0, 0, 0};  // TODO: get these from config file
-    mfloat P0_diag[NUM_TOT_STATES] = {10, 5, 1, 1, 1, 1, 1};
-
+    mfloat P0_diag[NUM_TOT_STATES] = {30, 30, 500, 1,
+                                      1,  1,  1};  // these are variances
     // kf direction enum defined differently than this one
     int kf_up = sensor_dir + 1;
     if (kf_up > 3) {
