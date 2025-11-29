@@ -1,39 +1,77 @@
 syntax = "proto3";
 
 message StateFrame {
-  // System timestamp (us since power on)
+  // Time for which state is estimated
   uint64 timestamp = 1;
 
   // Flight phase (enum value)
   uint32 flight_phase = 2;
 
-  // Position (m)
-  float pos_n = 3;
-  float pos_e = 4;
-  float pos_d = 5;
+  // Vertical position (m)
+  float pos_vert = 3;
 
-  // NED velocity (m/s)
-  float vel_n = 6;
-  float vel_e = 7;
-  float vel_d = 8;
+  // Vertical velocity (m/s)
+  float vel_vert = 4;
 
-  // NED acceleration (m/s^2)
-  float acc_n = 9;
-  float acc_e = 10;
-  float acc_d = 11;
+  // Vertical acceleration (m/s^2)
+  float acc_vert = 5;
 
-  // Body velocity (m/s)
-  float vel_x = 12;
-  float vel_y = 13;
-  float vel_z = 14;
+  // Inertial position (m)
+  float pos_geo_x = 6;
+  float pos_geo_y = 7;
+  float pos_geo_z = 8;
 
-  // Body acceleration (m/s^2)
-  float acc_x = 15;
-  float acc_y = 16;
-  float acc_z = 17;
+  // Inertial velocity (m/s)
+  float vel_geo_x = 9;
+  float vel_geo_y = 10;
+  float vel_geo_z = 11;
 
-  // Orientation (deg)
-  float orient_x = 18;
-  float orient_y = 19;
-  float orient_z = 20;
+  // Inertial acceleration (m/s^2)
+  float acc_geo_x = 12;
+  float acc_geo_y = 13;
+  float acc_geo_z = 14;
+
+  // Time at which estimate was generated
+  uint64 gentimestamp = 15;
+
+  // Body angular velocity (rad/s)
+  float angvel_body_x = 16;
+  float angvel_body_y = 17;
+  float angvel_body_z = 18;
+
+  // Inertial orientation (quarternion)
+  float orient_geo_w = 19;
+  float orient_geo_x = 20;
+  float orient_geo_y = 21;
+  float orient_geo_z = 22;
+
+  // EKF position (m)
+  float pos_ekf = 23;
+
+  // EKF velocity (m/s)
+  float vel_ekf = 24;
+
+  // EKF acceleration (m/s^2)
+  float acc_ekf = 25;
+
+  // EKF orientation (quarternion)
+  float orient_ekf_w = 26;
+  float orient_ekf_x = 27;
+  float orient_ekf_y = 28;
+  float orient_ekf_z = 29;
+
+  // EKF position variance
+  float pos_var_ekf = 30;
+
+  // EKF velocity variance
+  float vel_var_ekf = 31;
+
+  // EKF acceleration variance
+  float acc_var_ekf = 32;
+
+  // EKF orientation variance
+  float orient_var_ekf_w = 33;
+  float orient_var_ekf_x = 34;
+  float orient_var_ekf_y = 35;
+  float orient_var_ekf_z = 36;
 }

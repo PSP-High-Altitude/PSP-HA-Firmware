@@ -5,7 +5,7 @@ import subprocess
 def run_git_command(git_command):
     try:
         # Run the provided git command and capture the output
-        result = subprocess.run(["git"] + git_command.split(), capture_output=True, text=True, check=True)
+        result = subprocess.run(["git"] + git_command.split(), capture_output=True, text=True, check=True, encoding='utf-8')
         return result.stdout.strip()
     except subprocess.CalledProcessError as e:
         # Handle any errors that may occur

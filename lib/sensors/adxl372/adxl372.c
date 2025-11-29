@@ -45,7 +45,7 @@ static Status adxl372_read(SpiDevice* device, uint8_t address, uint8_t* rx_buf,
     Status status = spi_exchange(device, tx_buf, rx_buf_new, len + 1);
     memcpy(rx_buf, rx_buf_new + 1, len);
 
-    DELAY_MICROS(100);
+    // DELAY_MICROS(100);
 
     return status;
 }
@@ -68,7 +68,7 @@ static Status adxl372_write(SpiDevice* device, uint8_t address, uint8_t* tx_buf,
     // Exchange address and write len bytes
     Status status = spi_exchange(device, tx_buf_new, rx_buf, len + 1);
 
-    DELAY_MICROS(100);
+    // DELAY_MICROS(100);
 
     return status;
 }

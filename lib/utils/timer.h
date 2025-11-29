@@ -3,9 +3,7 @@
 
 #include <stdint.h>
 
-void initTimers();
-
-void DELAY_NOP(uint16_t mS);
+void init_timers();
 
 uint64_t MICROS();
 

@@ -5,6 +5,8 @@
 
 #include "timer.h"
 
+static bool s_initialized = false;
+
 Status iis2mdc_init(I2cDevice* device, Iis2mdcODR odr) {
     uint8_t buf[2];
 
@@ -25,9 +27,11 @@ Status iis2mdc_init(I2cDevice* device, Iis2mdcODR odr) {
     buf[1] = ((1 << 7) |     // Enable temperature compensation
               (odr << 2) |   // Set output data rate from args
               (0b00 << 0));  // Set operation mode to continuous
-    if (i2c_write(device, buf, 2) != STATUS_OK) {
+    if (i2c_write_verify(device, buf, 2) != STATUS_OK) {
         return STATUS_ERROR;
     }
+
+    s_initialized = true;
 
     return STATUS_OK;
 }
@@ -35,6 +39,10 @@ Status iis2mdc_init(I2cDevice* device, Iis2mdcODR odr) {
 Mag iis2mdc_read(I2cDevice* device) {
     uint8_t buf[6];
     Mag mag = {NAN, NAN, NAN};
+
+    if (!s_initialized) {
+        return mag;
+    }
 
     buf[0] = IIS2MDC_OUT | 0x80;  // Set MSb for auto increment
     if (i2c_write(device, buf, 1) != STATUS_OK) {

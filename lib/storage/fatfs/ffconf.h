@@ -170,54 +170,50 @@
 /* Number of volumes (logical drives) to be used. (1-10) */
 
 #define FF_STR_VOLUME_ID 2
-#define FF_VOLUME_STRS "SD", "NAND"
+// #define FF_VOLUME_STRS "SD", "NAND"
 /* FF_STR_VOLUME_ID switches support for volume ID in arbitrary strings.
-/  When FF_STR_VOLUME_ID is set to 1 or 2, arbitrary strings can be used as drive
-/  number in the path name. FF_VOLUME_STRS defines the volume ID strings for each
-/  logical drives. Number of items must not be less than FF_VOLUMES. Valid
-/  characters for the volume ID strings are A-Z, a-z and 0-9, however, they are
-/  compared in case-insensitive. If FF_STR_VOLUME_ID >= 1 and FF_VOLUME_STRS is
-/  not defined, a user defined volume string table is needed as:
+/  When FF_STR_VOLUME_ID is set to 1 or 2, arbitrary strings can be used as
+drive /  number in the path name. FF_VOLUME_STRS defines the volume ID strings
+for each /  logical drives. Number of items must not be less than FF_VOLUMES.
+Valid /  characters for the volume ID strings are A-Z, a-z and 0-9, however,
+they are /  compared in case-insensitive. If FF_STR_VOLUME_ID >= 1 and
+FF_VOLUME_STRS is /  not defined, a user defined volume string table is needed
+as:
 /
 /  const char* VolumeStr[FF_VOLUMES] = {"ram","flash","sd","usb",...
 */
-
 
 #define FF_MULTI_PARTITION	0
 /* This option switches support for multiple volumes on the physical drive.
 /  By default (0), each logical drive number is bound to the same physical drive
 /  number and only an FAT volume found on the physical drive will be mounted.
 /  When this function is enabled (1), each logical drive number can be bound to
-/  arbitrary physical drive and partition listed in the VolToPart[]. Also f_fdisk()
-/  function will be available. */
-
+/  arbitrary physical drive and partition listed in the VolToPart[]. Also
+f_fdisk() /  function will be available. */
 
 #define FF_MIN_SS		512
-#define FF_MAX_SS		512
-/* This set of options configures the range of sector size to be supported. (512,
-/  1024, 2048 or 4096) Always set both 512 for most systems, generic memory card and
-/  harddisk, but a larger value may be required for on-board flash memory and some
-/  type of optical media. When FF_MAX_SS is larger than FF_MIN_SS, FatFs is configured
-/  for variable sector size mode and disk_ioctl() function needs to implement
-/  GET_SECTOR_SIZE command. */
-
+#define FF_MAX_SS 512
+/* This set of options configures the range of sector size to be supported.
+(512, /  1024, 2048 or 4096) Always set both 512 for most systems, generic
+memory card and /  harddisk, but a larger value may be required for on-board
+flash memory and some /  type of optical media. When FF_MAX_SS is larger than
+FF_MIN_SS, FatFs is configured /  for variable sector size mode and disk_ioctl()
+function needs to implement /  GET_SECTOR_SIZE command. */
 
 #define FF_LBA64		0
 /* This option switches support for 64-bit LBA. (0:Disable or 1:Enable)
-/  To enable the 64-bit LBA, also exFAT needs to be enabled. (FF_FS_EXFAT == 1) */
-
+/  To enable the 64-bit LBA, also exFAT needs to be enabled. (FF_FS_EXFAT == 1)
+*/
 
 #define FF_MIN_GPT		0x10000000
 /* Minimum number of sectors to switch GPT as partitioning format in f_mkfs and
-/  f_fdisk function. 0x100000000 max. This option has no effect when FF_LBA64 == 0. */
-
+/  f_fdisk function. 0x100000000 max. This option has no effect when FF_LBA64 ==
+0. */
 
 #define FF_USE_TRIM		0
 /* This option switches support for ATA-TRIM. (0:Disable or 1:Enable)
 /  To enable Trim function, also CTRL_TRIM command should be implemented to the
 /  disk_ioctl() function. */
-
-
 
 /*---------------------------------------------------------------------------/
 / System Configurations
@@ -249,8 +245,7 @@
 /  FF_NORTC_MDAY and FF_NORTC_YEAR have no effect.
 /  These options have no effect in read-only configuration (FF_FS_READONLY = 1). */
 
-
-#define FF_FS_NOFSINFO	0
+#define FF_FS_NOFSINFO 1
 /* If you need to know correct free space on the FAT32 volume, set bit 0 of this
 /  option, and f_getfree() function at the first time after volume mount will force
 /  a full FAT scan. Bit 1 controls the use of last allocated cluster number.

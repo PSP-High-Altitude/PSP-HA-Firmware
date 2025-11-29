@@ -5,10 +5,11 @@
 static uint32_t read_D1(I2cDevice* device, AdcSpeed speed);
 static uint32_t read_D2(I2cDevice* device, AdcSpeed speed);
 
-I2cDevice *device;
-CalibrationData data;
+static CalibrationData s_cal_data;
 
-uint8_t conversion_delay_ms[] = {1, 2, 3, 5, 9, 17};
+static uint8_t s_conversion_delay_ms[] = {1, 2, 3, 5, 9, 17};
+
+static bool s_initialized = false;
 
 Status ms5637_init(I2cDevice* device) {
     uint8_t rx_buf[2];
@@ -28,7 +29,7 @@ Status ms5637_init(I2cDevice* device) {
     if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
         return STATUS_ERROR;
     };
-    data.C1 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
+    s_cal_data.C1 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
 
     // Read C2
     tx_buf[0] = 0xA0 | (2 << 1);
@@ -38,7 +39,7 @@ Status ms5637_init(I2cDevice* device) {
     if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
         return STATUS_ERROR;
     };
-    data.C2 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
+    s_cal_data.C2 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
 
     // Read C3
     tx_buf[0] = 0xA0 | (3 << 1);
@@ -48,7 +49,7 @@ Status ms5637_init(I2cDevice* device) {
     if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
         return STATUS_ERROR;
     };
-    data.C3 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
+    s_cal_data.C3 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
 
     // Read C4
     tx_buf[0] = 0xA0 | (4 << 1);
@@ -58,7 +59,7 @@ Status ms5637_init(I2cDevice* device) {
     if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
         return STATUS_ERROR;
     };
-    data.C4 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
+    s_cal_data.C4 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
 
     // Read C5
     tx_buf[0] = 0xA0 | (5 << 1);
@@ -68,7 +69,7 @@ Status ms5637_init(I2cDevice* device) {
     if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
         return STATUS_ERROR;
     };
-    data.C5 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
+    s_cal_data.C5 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
 
     // Read C6
     tx_buf[0] = 0xA0 | (6 << 1);
@@ -78,7 +79,9 @@ Status ms5637_init(I2cDevice* device) {
     if (i2c_read(device, rx_buf, 2) != STATUS_OK) {
         return STATUS_ERROR;
     };
-    data.C6 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
+    s_cal_data.C6 = ((uint16_t)rx_buf[0] << 8) | rx_buf[1];
+
+    s_initialized = true;
 
     return STATUS_OK;
 }
@@ -91,19 +94,23 @@ static uint32_t read_D1(I2cDevice* device, AdcSpeed speed) {
     if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
         return D_READ_ERROR;
     }
-    DELAY(conversion_delay_ms[speed / 2] + 1);
+    DELAY(s_conversion_delay_ms[speed / 2] + 1);
     tx_buf[0] = 0x00;
-    while (!D1) {
-        // Send ADC read command
-        if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
-            return D_READ_ERROR;
-        }
-        if (i2c_read(device, rx_buf, 3) != STATUS_OK) {
-            return D_READ_ERROR;
-        }
-        D1 = ((uint32_t)rx_buf[0] << 16) | ((uint32_t)rx_buf[1] << 8) |
-             rx_buf[2];
+
+    // Send ADC read command
+    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
+        return D_READ_ERROR;
     }
+    if (i2c_read(device, rx_buf, 3) != STATUS_OK) {
+        return D_READ_ERROR;
+    }
+    D1 = ((uint32_t)rx_buf[0] << 16) | ((uint32_t)rx_buf[1] << 8) | rx_buf[2];
+
+    // If we read nothing return an error
+    if (D1 == 0) {
+        return D_READ_ERROR;
+    }
+
     return D1;
 }
 
@@ -115,26 +122,32 @@ static uint32_t read_D2(I2cDevice* device, AdcSpeed speed) {
     if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
         return D_READ_ERROR;
     }
-    DELAY(conversion_delay_ms[speed / 2] + 1);
+    DELAY(s_conversion_delay_ms[speed / 2] + 1);
     tx_buf[0] = 0x00;
-    while (!D2) {
-        // Send ADC read command
-        if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
-            return D_READ_ERROR;
-        }
-        if (i2c_read(device, rx_buf, 3) != STATUS_OK) {
-            return D_READ_ERROR;
-        }
-        D2 = ((uint32_t)rx_buf[0] << 16) | ((uint32_t)rx_buf[1] << 8) |
-             rx_buf[2];
+
+    // Send ADC read command
+    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
+        return D_READ_ERROR;
     }
+    if (i2c_read(device, rx_buf, 3) != STATUS_OK) {
+        return D_READ_ERROR;
+    }
+    D2 = ((uint32_t)rx_buf[0] << 16) | ((uint32_t)rx_buf[1] << 8) | rx_buf[2];
+
+    // If we read nothing return an error
+    if (D2 == 0) {
+        return D_READ_ERROR;
+    }
+
     return D2;
 }
 
 BaroData ms5637_read(I2cDevice* device, AdcSpeed speed) {
-    BaroData result;
-    result.pressure = NAN;
-    result.temperature = NAN;
+    BaroData result = {NAN, NAN};
+
+    if (!s_initialized) {
+        return result;
+    }
 
     uint32_t D1;
     uint32_t D2;
@@ -145,10 +158,12 @@ BaroData ms5637_read(I2cDevice* device, AdcSpeed speed) {
     if ((D2 = read_D2(device, speed)) == D_READ_ERROR) {
         return result;
     }
-    int32_t dT = D2 - (data.C5 * 256);
-    int32_t TEMP = (int32_t)(2000 + (dT * ((float)data.C6 / 8388608)));
-    int64_t OFF = ((int64_t)data.C2 << 17) + (((int64_t)data.C4 * dT) >> 6);
-    int64_t SENS = ((int64_t)data.C1 << 16) + (((int64_t)data.C3 * dT) >> 7);
+    int32_t dT = D2 - (s_cal_data.C5 * 256);
+    int32_t TEMP = (int32_t)(2000 + (dT * ((float)s_cal_data.C6 / 8388608)));
+    int64_t OFF =
+        ((int64_t)s_cal_data.C2 << 17) + (((int64_t)s_cal_data.C4 * dT) >> 6);
+    int64_t SENS =
+        ((int64_t)s_cal_data.C1 << 16) + (((int64_t)s_cal_data.C3 * dT) >> 7);
     int32_t T2;
     int64_t OFF2;
     int64_t SENS2;

@@ -6,7 +6,8 @@
 #include "math.h"
 #include "timer.h"
 
-Kx134Range curr_range = 0;
+static Kx134Range s_curr_range = 0;
+static bool s_initialized = false;
 
 /**
  * @brief Function for SPI read of a KX134 register
@@ -17,27 +18,27 @@ Kx134Range curr_range = 0;
  * @param len number of bytes to read
  * @return Status
  */
-static Status kx134_read(SpiDevice* device, uint8_t address, uint8_t* rx_buf,
+static Status kx134_read(I2cDevice* device, uint8_t address, uint8_t* rx_buf,
                          uint8_t len) {
     if (address > 0x7F) {
         return STATUS_PARAMETER_ERROR;
     }
 
-    // Create tx buffer with extra dummy bytes
-    uint8_t tx_buf[len + 1];
-    // Create rx buffer with space for the initial blank byte
-    uint8_t rx_buf_new[len + 1];
+    // Create tx buffer for address
+    uint8_t tx_buf[1];
+    tx_buf[0] = address;  // Add address to tx buffer
 
-    tx_buf[0] = address | 0x80;  // Add address and read bit to tx buffer
+    // Write address and read len bytes
+    if (i2c_write(device, tx_buf, 1) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
+    if (i2c_read(device, rx_buf, len) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
 
-    // Exchange the address and read len bits then copy all but the first byte
-    // received to the original rx_buf.
-    Status status = spi_exchange(device, tx_buf, rx_buf_new, len + 1);
-    memcpy(rx_buf, rx_buf_new + 1, len);
+    // DELAY_MICROS(100);
 
-    DELAY_MICROS(100);
-
-    return status;
+    return STATUS_OK;
 }
 
 /**
@@ -49,27 +50,23 @@ static Status kx134_read(SpiDevice* device, uint8_t address, uint8_t* rx_buf,
  * @param len number of bytes to write
  * @return Status
  */
-static Status kx134_write(SpiDevice* device, uint8_t address, uint8_t* tx_buf,
+static Status kx134_write(I2cDevice* device, uint8_t address, uint8_t* tx_buf,
                           uint8_t len) {
     if (address > 0x7F) {
         return STATUS_PARAMETER_ERROR;
     }
 
-    // Create dummy read buffer
-    uint8_t rx_buf[len + 1];
-
-    // Create new tx buffer
+    // Create tx buffer for address
     uint8_t tx_buf_new[len + 1];
-    tx_buf_new[0] = address;  // Add address and write bit to tx buffer
-    memcpy(tx_buf_new + 1, tx_buf,
-           len);  // Copy bytes to end of the new tx buffer
+    tx_buf_new[0] = address;              // Add address to tx buffer
+    memcpy(tx_buf_new + 1, tx_buf, len);  // Add data to tx buffer
 
-    // Exchange address and write len bytes
-    Status status = spi_exchange(device, tx_buf_new, rx_buf, len + 1);
+    // Write address and len bytes
+    if (i2c_write(device, tx_buf_new, len + 1) != STATUS_OK) {
+        return STATUS_ERROR;
+    }
 
-    DELAY_MICROS(100);
-
-    return status;
+    return STATUS_OK;
 }
 
 /**
@@ -80,7 +77,7 @@ static Status kx134_write(SpiDevice* device, uint8_t address, uint8_t* tx_buf,
  * @param range Acceleration range
  * @return Status
  */
-Status kx134_init(SpiDevice* device, Kx134OutputDataRate rate,
+Status kx134_init(I2cDevice* device, Kx134OutputDataRate rate,
                   Kx134Range range) {
     uint8_t tx_buf;
     uint8_t rx_buf;
@@ -92,7 +89,7 @@ Status kx134_init(SpiDevice* device, Kx134OutputDataRate rate,
     }
 
     // power up procedure
-    tx_buf = 0x1C;
+    tx_buf = 0x00;
     if (kx134_write(device, KX134_CNTL2, &tx_buf, 1) != STATUS_OK) {
         return STATUS_ERROR;
     }
@@ -130,11 +127,13 @@ Status kx134_init(SpiDevice* device, Kx134OutputDataRate rate,
     }
 
     // enable sensor and set range
-    curr_range = range;
+    s_curr_range = range;
     tx_buf = 0xC0 | range;
     if (kx134_write(device, KX134_CNTL1, &tx_buf, 1) != STATUS_OK) {
         return STATUS_ERROR;
     }
+
+    s_initialized = true;
 
     return STATUS_OK;
 }
@@ -145,15 +144,16 @@ Status kx134_init(SpiDevice* device, Kx134OutputDataRate rate,
  * @param device SPI device
  * @return Accel struct
  */
-Accel kx134_read_accel(SpiDevice* device) {
-    Accel result;
+Accel kx134_read_accel(I2cDevice* device) {
+    Accel result = {NAN, NAN, NAN};
+
+    if (!s_initialized) {
+        return result;
+    }
 
     // Read all 6 registers at once
     uint8_t rx_buf[6];
     if (kx134_read(device, KX134_DATA, rx_buf, 6) != STATUS_OK) {
-        result.accelX = NAN;
-        result.accelY = NAN;
-        result.accelZ = NAN;
         return result;
     }
 
@@ -163,7 +163,7 @@ Accel kx134_read_accel(SpiDevice* device) {
     int16_t acc_z_raw = (int16_t)(((uint16_t)rx_buf[5] << 8) | rx_buf[4]);
 
     float conversion_factor;
-    switch (curr_range) {
+    switch (s_curr_range) {
         case KX134_RANGE_8_G:
             conversion_factor = 1.0 / 4096;
             break;
@@ -200,7 +200,7 @@ Accel kx134_read_accel(SpiDevice* device) {
  * @param range Acceleration range
  * @return Status
  */
-Status kx134_config(SpiDevice* device, Kx134OutputDataRate rate,
+Status kx134_config(I2cDevice* device, Kx134OutputDataRate rate,
                     Kx134Range range) {
     uint8_t tx_buf;
 

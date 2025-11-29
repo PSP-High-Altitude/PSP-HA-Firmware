@@ -1,30 +1,44 @@
-import struct
+import tempfile
 import time
 import sys
-
+import os
 import pandas as pd
+
+def read_varint(stream):
+    """Read a varint from the stream."""
+    shift = 0
+    result = 0
+    while True:
+        byte = stream.read(1)
+        if not byte:
+            # End of stream
+            return None
+        i = ord(byte)
+        result |= (i & 0x7F) << shift
+        if not (i & 0x80):
+            # MSB not set, end of varint
+            break
+        shift += 7
+    return result
 
 def decode_protobuf_file(file_path, protobuf_class):
     messages = []
 
-    start_time = time.time()
+    start_time = time.perf_counter()
 
     with open(file_path, 'rb') as file:
-        # Read and print the header
-        header = file.read(64)
+        header = file.readline()
+        #file.read(1)  # Consume null terminator
         print("Firmware specifier:", header.decode('utf-8'))
 
         while True:
-            # Read the length byte
-            length_byte = file.read(1)
-            if not length_byte:
-                break  # End of file
-
-            # Unpack the length
-            message_length = struct.unpack('B', length_byte)[0]
+            # Read the length
+            length = read_varint(file)
+            if length is None:
+                break  # End of stream
 
             # Read the message based on the length
-            message_data = file.read(message_length)
+            message_data = file.read(length)
 
             # Create an instance of the provided protobuf class and parse the message
             protobuf_message = protobuf_class()
@@ -32,7 +46,7 @@ def decode_protobuf_file(file_path, protobuf_class):
 
             messages.append(protobuf_message)
 
-    end_time = time.time()
+    end_time = time.perf_counter()
     elapsed_time = end_time - start_time
     print(f"Decoded {len(messages)} elements in {elapsed_time:.6f} seconds")
 
@@ -50,11 +64,11 @@ def decode_protobuf_file(file_path, protobuf_class):
     return df
 
 def write_dataframe_to_csv(dataframe, csv_output_path):
-    start_time = time.time()
+    start_time = time.perf_counter()
 
     dataframe.to_csv(csv_output_path, index=False, float_format="%.6f")
 
-    end_time = time.time()
+    end_time = time.perf_counter()
     elapsed_time = end_time - start_time
     print(f"Written {len(dataframe)} elements to CSV in {elapsed_time:.6f} seconds")
 
@@ -102,12 +116,32 @@ if __name__ == "__main__":
         print("Usage: python decode_protobuf_bin.py [sensor | gps | state] input_bin output_csv")
         sys.exit(1)
 
+    # Copy the input file to avoid modifying the original
+    with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+        print('Copying input file to temporary')
+
+        start_time = time.perf_counter()
+        with open(input_bin_path, 'rb') as original_file:
+            temp_file.write(original_file.read())
+            temp_file_path = temp_file.name
+            size = temp_file.tell()
+        end_time = time.perf_counter()
+
+    size_kib = size/1024
+    time_s = end_time - start_time
+
+    print(f'Copied {size_kib:.1f} KiB in {time_s:.1f} s')
+    print(f'Average copy speed {size_kib/time_s:.1f} KiB/s\n')
+
     # Decode the protobuf messages
-    sensor_frames = decode_protobuf_file(input_bin_path, protobuf_class)
+    df = decode_protobuf_file(temp_file_path, protobuf_class)
+
+    # Remove the copied file
+    os.remove(temp_file_path)
 
     # Do any required processing
     if frame_kind == "gps":
-        sensor_frames = unpack_gps_validity_flags(sensor_frames)
+        df = unpack_gps_validity_flags(df)
 
     # Write the decoded values to the CSV file
-    write_dataframe_to_csv(sensor_frames, output_csv_path)
+    write_dataframe_to_csv(df, output_csv_path)

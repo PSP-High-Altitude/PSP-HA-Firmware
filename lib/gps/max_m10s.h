@@ -23,6 +23,7 @@ typedef struct {
     uint8_t hour;
     uint8_t min;
     uint8_t sec;
+    int32_t nano;
 
     // Validity flags
     uint8_t date_valid;
@@ -73,6 +74,7 @@ typedef struct {
 
 Status max_m10s_init(I2cDevice* device);
 
+Status max_m10s_read_fix(I2cDevice* device, GPS_Fix_TypeDef* fix);
 Status max_m10s_poll_fix(I2cDevice* device, GPS_Fix_TypeDef* fix);
 
 #endif

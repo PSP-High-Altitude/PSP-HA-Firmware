@@ -1,0 +1,32 @@
+// This is just for compiling/debuging kf independently from everything else
+// See https://go.microsoft.com/fwlink/?LinkId=733558
+// for the documentation about the tasks.json format
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build",
+            "type": "shell",
+            "command": "gcc",
+            "args": [
+                "-g", // debug mode
+                "-I.", // Finf files in working directory
+                // "$/{kf_test.c}", // compile these
+                // "$/{kalman.c}",
+                // "$/{fake_arm_math.c}",
+                "kf_test.c", // compile these
+                "kalman.c",
+                "fake_arm_math.c",
+                "-o",
+                "kf_test" // compiled file name
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$gcc"
+            ]
+        }
+    ]
+}
