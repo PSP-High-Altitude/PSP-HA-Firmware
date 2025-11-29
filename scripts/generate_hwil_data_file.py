@@ -37,6 +37,8 @@ def generate_hwil_data_file():
 #include "sensor.pb.h"
 #include "gps.pb.h"
 
+#define nan NAN
+
 {sensor_data_defs}
 
 {gps_data_defs}
